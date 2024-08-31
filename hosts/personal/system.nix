@@ -36,6 +36,7 @@ in {
   };
   # Orbstack OCI runtime
   orbstack.enable = true;
-  # Yabai for window management
+  # Yabai and Skhd for window management
   yabai.enable = true;
+  skhd.enable = true;
 }
