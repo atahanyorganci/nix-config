@@ -6,9 +6,7 @@
   ];
   home.packages = with inputs.nix-casks.packages.${pkgs.system}; [
     raycast
-    discord
     whatsapp
-    orbstack
   ];
   firefox.enable = true;
   ghostty.enable = true;
