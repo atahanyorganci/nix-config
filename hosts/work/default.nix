@@ -11,11 +11,8 @@ in
   # Applications installed by Homebrew
   homebrew = {
     casks = [
-      "google-chrome"
-      "spotify"
       "orbstack"
       "cloudflare-warp"
-      "orbstack"
     ];
     masApps = {
       "Amphetamine" = 937984704;
