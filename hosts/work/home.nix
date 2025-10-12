@@ -10,7 +10,6 @@
     whatsapp
     orbstack
   ];
-  alacritty.enable = true;
   firefox.enable = true;
   ghostty.enable = true;
   git = {
