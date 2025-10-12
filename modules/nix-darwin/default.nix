@@ -1,7 +1,8 @@
-inputs: {
+{ ... }: {
   imports = [
     ./firefox
     ./homebrew
     ./shell
+    ./system
   ];
 }
