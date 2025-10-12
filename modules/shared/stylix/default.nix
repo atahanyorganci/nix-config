@@ -1,15 +1,17 @@
-{ pkgs, ... }:
+{ pkgs
+, ...
+}:
 let
-  main = pkgs.cascadia-code;
+  monospace = pkgs.cascadia-code;
 in
 {
-  fonts.packages = [ main ];
+  fonts.packages = [ monospace ];
   stylix = {
     enable = true;
     base16Scheme = "${pkgs.base16-schemes}/share/themes/dracula.yaml";
     fonts = {
       monospace = {
-        package = main;
+        package = monospace;
         name = "Cascadia Code NF";
       };
     };
