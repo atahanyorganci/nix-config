@@ -14,6 +14,7 @@ in
     "spotify"
     "orbstack"
     "cloudflare-warp"
+    "orbstack"
   ];
   # Enable entering sudo mode with Touch ID.
   security.pam.services.sudo_local.touchIdAuth = true;
