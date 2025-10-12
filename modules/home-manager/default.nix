@@ -1,4 +1,4 @@
-inputs: {
+{ ... }: {
   # Compatibility with NixOS
   home.stateVersion = "24.05";
   # Let Home Manager install and manage itself.
