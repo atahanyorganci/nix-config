@@ -9,6 +9,10 @@ in
     homebrew = lib.mkIf enabled {
       enable = true;
       caskArgs.no_quarantine = true;
+      onActivation = {
+        cleanup = "zap";
+        upgrade = true;
+      };
     };
   };
 }
