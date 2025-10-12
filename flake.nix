@@ -103,6 +103,7 @@
         modules = [
           ./hosts/orb
           home-manager.nixosModules.home-manager
+          stylix.nixosModules.stylix
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
@@ -111,6 +112,7 @@
             home-manager.extraSpecialArgs = { inherit user inputs; };
           }
           ./modules/nixos
+          ./modules/shared
         ];
         specialArgs = specialArgs;
       };
