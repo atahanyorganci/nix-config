@@ -1,7 +1,8 @@
 { lib, config, ... }:
 let
   casks = config.homebrew.casks;
-  enabled = builtins.length casks > 0;
+  masApps = config.homebrew.masApps or { };
+  enabled = builtins.length casks > 0 || builtins.length (lib.attrNames masApps) > 0;
 in
 {
   config = {

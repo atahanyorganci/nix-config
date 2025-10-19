@@ -9,13 +9,18 @@ in
   # Allow `nix-darwin` to manage `nix`
   nix.enable = false;
   # Applications installed by Homebrew
-  homebrew.casks = [
-    "google-chrome"
-    "spotify"
-    "orbstack"
-    "cloudflare-warp"
-    "orbstack"
-  ];
+  homebrew = {
+    casks = [
+      "google-chrome"
+      "spotify"
+      "orbstack"
+      "cloudflare-warp"
+      "orbstack"
+    ];
+    masApps = {
+      "Amphetamine" = 937984704;
+    };
+  };
   # Enable entering sudo mode with Touch ID.
   security.pam.services.sudo_local.touchIdAuth = true;
   # Set Git commit hash for darwin-version.
