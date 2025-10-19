@@ -17,26 +17,12 @@ let
     nd = "nix develop --command ${user.shell}";
   };
   enable = cfg.fish.enable || cfg.zsh.enable || cfg.bash.enable;
-  initExtra = ''
-    if [[ $(${pkgs.procps}/bin/ps --no-header --pid=$PPID --format=comm) != "fish" && -z ''${BASH_EXECUTION_STRING} ]]
-    then
-      shopt -q login_shell && LOGIN_OPTION='--login' || LOGIN_OPTION=""
-      exec ${pkgs.fish}/bin/fish $LOGIN_OPTION
-    fi
-  '';
 in
 {
   options.shell = {
-    fish = {
-      enable = lib.mkEnableOption "Fish shell";
-      addInitExtra = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = "Whether to add `initExtra` to other shells to run Fish shell by default";
-      };
-    };
-    zsh.enable = lib.mkEnableOption "zsh";
     bash.enable = lib.mkEnableOption "bash";
+    fish.enable = lib.mkEnableOption "Fish shell";
+    zsh.enable = lib.mkEnableOption "zsh";
   };
   config = lib.mkIf enable {
     home.shellAliases = shellAliases;
@@ -47,7 +33,6 @@ in
     programs.bash = lib.mkIf cfg.bash.enable {
       enable = true;
       enableCompletion = true;
-      initExtra = if cfg.fish.addInitExtra && cfg.bash.enable then initExtra else "";
     };
     programs.zsh = lib.mkIf cfg.zsh.enable {
       enable = true;
@@ -56,7 +41,6 @@ in
         path = "${config.xdg.dataHome}/zsh/history";
         share = true;
       };
-      initExtra = if cfg.fish.addInitExtra && cfg.zsh.enable then initExtra else "";
     };
     programs.fish = lib.mkIf cfg.fish.enable {
       enable = true;
