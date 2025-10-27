@@ -7,8 +7,6 @@
 let
   cfg = config.shell;
   shellAliases = {
-    # get OS name ex: "GNU/Linux", "Darwin"
-    os = "uname -o";
     # `ll` - list files with long format with `eza`
     ll = "${pkgs.eza}/bin/eza --long --header --icons";
     # `tree` - list files in a tree format with `eza`
