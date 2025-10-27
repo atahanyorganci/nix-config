@@ -54,11 +54,11 @@ in
         }
         {
           name = "${user.username}-config";
-          src = ../../../plugins/config;
+          src = ../../../fish/plugins/config;
         }
         {
           name = "${user.username}-tools";
-          src = ../../../plugins/tools;
+          src = ../../../fish/plugins/tools;
         }
       ];
     };
