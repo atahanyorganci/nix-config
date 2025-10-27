@@ -102,7 +102,6 @@ in
       enable = true;
       enableBashIntegration = cfg.bash.enable;
       enableFishIntegration = cfg.fish.enable;
-      enableNushellIntegration = cfg.nushell.enable;
       enableZshIntegration = cfg.zsh.enable;
     };
     home.packages = with pkgs; [
