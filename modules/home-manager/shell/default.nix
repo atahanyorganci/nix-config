@@ -16,15 +16,14 @@ let
     # `nd` - activate a development shell with default shell
     nd = "nix develop --command ${user.shell}";
   };
-  enable = cfg.fish.enable || cfg.zsh.enable || cfg.bash.enable;
 in
 {
   options.shell = {
-    bash.enable = lib.mkEnableOption "bash";
-    fish.enable = lib.mkEnableOption "Fish shell";
-    zsh.enable = lib.mkEnableOption "zsh";
+    bash.enable = lib.mkEnableOption "Bash";
+    fish.enable = lib.mkEnableOption "fish";
+    zsh.enable = lib.mkEnableOption "Z shell";
   };
-  config = lib.mkIf enable {
+  config = {
     home.shellAliases = shellAliases;
     home.sessionVariables = rec {
       DEV_HOME = "${config.home.homeDirectory}/Developer";
@@ -67,10 +66,10 @@ in
     # starship - The minimal, blazing-fast, and infinitely customizable prompt for any shell!
     # GitHub Repository: https://github.com/starship/starship
     programs.starship = {
-      enable = enable;
+      enable = true;
       enableBashIntegration = cfg.bash.enable;
-      enableZshIntegration = cfg.zsh.enable;
       enableFishIntegration = cfg.fish.enable;
+      enableZshIntegration = cfg.zsh.enable;
       settings = {
         aws.disabled = true;
         gcloud.disabled = true;
@@ -79,7 +78,7 @@ in
     # fzf - A command-line fuzzy finder
     # GitHub Repository: https://github.com/junegunn/fzf
     programs.fzf = {
-      enable = enable;
+      enable = true;
       enableBashIntegration = cfg.bash.enable;
       enableZshIntegration = cfg.zsh.enable;
       enableFishIntegration = cfg.fish.enable;
@@ -88,13 +87,20 @@ in
     # zoxide - A smarter cd command.
     # GitHub Repository: https://github.com/ajeetdsouza/zoxide
     programs.zoxide = {
-      enable = enable;
+      enable = true;
       enableBashIntegration = cfg.bash.enable;
-      enableZshIntegration = cfg.zsh.enable;
       enableFishIntegration = cfg.fish.enable;
+      enableZshIntegration = cfg.zsh.enable;
+    };
+    # eza - A modern alternative to ls
+    # GitHub Repository: https://github.com/eza-community/eza
+    programs.eza = {
+      enable = true;
+      enableBashIntegration = cfg.bash.enable;
+      enableFishIntegration = cfg.fish.enable;
+      enableZshIntegration = cfg.zsh.enable;
     };
     home.packages = with pkgs; [
-      eza
       bat
       delta
       fd
