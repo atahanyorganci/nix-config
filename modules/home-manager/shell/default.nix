@@ -64,6 +64,10 @@ in
     };
     programs.nushell = lib.mkIf cfg.nushell.enable {
       enable = true;
+      settings = {
+        show_banner = false;
+        buffer_editor = "code";
+      };
     };
     # starship - The minimal, blazing-fast, and infinitely customizable prompt for any shell!
     # GitHub Repository: https://github.com/starship/starship
