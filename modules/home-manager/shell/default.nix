@@ -97,6 +97,10 @@ in
         show_banner = false;
         buffer_editor = "code";
       };
+      plugins = with pkgs.nushellPlugins; [
+        skim
+        polars
+      ];
       autoLoadFiles = nuLibFiles;
     };
     # starship - The minimal, blazing-fast, and infinitely customizable prompt for any shell!
