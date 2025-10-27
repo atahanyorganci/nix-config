@@ -21,6 +21,7 @@ in
   options.shell = {
     bash.enable = lib.mkEnableOption "Bash";
     fish.enable = lib.mkEnableOption "fish";
+    nushell.enable = lib.mkEnableOption "Nushell";
     zsh.enable = lib.mkEnableOption "Z shell";
   };
   config = {
@@ -63,12 +64,16 @@ in
         }
       ];
     };
+    programs.nushell = lib.mkIf cfg.fish.nushell {
+      enable = true;
+    };
     # starship - The minimal, blazing-fast, and infinitely customizable prompt for any shell!
     # GitHub Repository: https://github.com/starship/starship
     programs.starship = {
       enable = true;
       enableBashIntegration = cfg.bash.enable;
       enableFishIntegration = cfg.fish.enable;
+      enableNushellIntegration = cfg.nushell.enable;
       enableZshIntegration = cfg.zsh.enable;
       settings = {
         aws.disabled = true;
@@ -90,6 +95,7 @@ in
       enable = true;
       enableBashIntegration = cfg.bash.enable;
       enableFishIntegration = cfg.fish.enable;
+      enableNushellIntegration = cfg.nushell.enable;
       enableZshIntegration = cfg.zsh.enable;
     };
     # eza - A modern alternative to ls
@@ -98,6 +104,7 @@ in
       enable = true;
       enableBashIntegration = cfg.bash.enable;
       enableFishIntegration = cfg.fish.enable;
+      enableNushellIntegration = cfg.nushell.enable;
       enableZshIntegration = cfg.zsh.enable;
     };
     home.packages = with pkgs; [
