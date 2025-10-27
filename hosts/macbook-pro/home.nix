@@ -7,8 +7,7 @@
   home.packages = with inputs.nix-casks.packages.${pkgs.system}; [
     raycast
     whatsapp
-    brave-browser
-    vlc
+    iina
   ];
   ffmpeg.enable = true;
   firefox.enable = true;
