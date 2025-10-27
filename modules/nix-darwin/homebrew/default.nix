@@ -1,12 +1,9 @@
-{ lib, config, ... }:
-let
-  casks = config.homebrew.casks;
-  masApps = config.homebrew.masApps or { };
-  enabled = builtins.length casks > 0 || builtins.length (lib.attrNames masApps) > 0;
-in
-{
+{ lib, config, ... }: {
   config = {
-    homebrew = lib.mkIf enabled {
+    environment.systemPath = [
+      "/opt/homebrew/bin"
+    ];
+    homebrew = {
       enable = true;
       caskArgs.no_quarantine = true;
       onActivation = {
