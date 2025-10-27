@@ -64,7 +64,7 @@ in
         }
       ];
     };
-    programs.nushell = lib.mkIf cfg.fish.nushell {
+    programs.nushell = lib.mkIf cfg.nushell.enable {
       enable = true;
     };
     # starship - The minimal, blazing-fast, and infinitely customizable prompt for any shell!
