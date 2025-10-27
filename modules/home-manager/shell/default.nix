@@ -167,6 +167,13 @@ in
         "--disable-ctrl-r"
       ];
     };
+    programs.delta = {
+      enable = true;
+      enableGitIntegration = config.git.enable;
+      options = {
+        navigate = true;
+      };
+    };
     home.packages = with pkgs; [
       bat
       delta
