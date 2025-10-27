@@ -14,6 +14,13 @@ in
       "orbstack"
       "cloudflare-warp"
     ];
+    taps = [
+      "hashicorp/tap"
+    ];
+    brews = [
+      "hashicorp/tap/terraform"
+      "hashicorp/tap/packer"
+    ];
     masApps = {
       "Amphetamine" = 937984704;
     };
