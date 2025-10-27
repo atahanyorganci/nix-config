@@ -151,6 +151,18 @@ in
       enableNushellIntegration = cfg.nushell.enable;
       enableZshIntegration = cfg.zsh.enable;
     };
+    # atuin - ✨ Magical shell history
+    # GitHub Repository: https://github.com/atuinsh/atuin
+    programs.atuin = {
+      enable = true;
+      enableBashIntegration = cfg.bash.enable;
+      enableFishIntegration = cfg.fish.enable;
+      enableNushellIntegration = cfg.nushell.enable;
+      enableZshIntegration = cfg.zsh.enable;
+      settings = {
+        sync_address = "http://localhost:8888";
+      };
+    };
     home.packages = with pkgs; [
       bat
       delta
