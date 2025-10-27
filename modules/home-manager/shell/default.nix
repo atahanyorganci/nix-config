@@ -142,6 +142,15 @@ in
       enableFishIntegration = cfg.fish.enable;
       enableZshIntegration = cfg.zsh.enable;
     };
+    # carapace - A multi-shell completion binary.
+    # GitHub Repository: https://github.com/carapace-sh/carapace-bin
+    programs.carapace = {
+      enable = true;
+      enableBashIntegration = cfg.bash.enable;
+      enableFishIntegration = cfg.fish.enable;
+      enableNushellIntegration = cfg.nushell.enable;
+      enableZshIntegration = cfg.zsh.enable;
+    };
     home.packages = with pkgs; [
       bat
       delta
