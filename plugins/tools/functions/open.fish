@@ -1,5 +1,5 @@
 function open --description 'Open file in its default application'
-    switch (os)
+    switch (uname -o)
         case Darwin
             set -f command open
         case "*Linux*"
