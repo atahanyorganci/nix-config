@@ -14,13 +14,41 @@ let
     # `nd` - activate a development shell with default shell
     nd = "nix develop --command ${user.shell}";
   };
+  # Create attribute set of files to linked into `.config/nushell/autoload/`
+  nushellFiles = map
+    (p:
+      let
+        baseName = builtins.baseNameOf p;
+      in
+      { name = ".config/nushell/autoload/${baseName}"; value = { source = p; }; }
+    )
+    config.programs.nushell.autoLoadFiles;
+  homeFiles = builtins.listToAttrs nushellFiles;
+  # Get `*.nu` files from library directory.
+  nuLibEntries = builtins.readDir ../../../nu;
+  nuLibEntryNames = builtins.attrNames nuLibEntries;
+  nuLibFileNames = builtins.filter (name: lib.strings.hasSuffix ".nu" name) nuLibEntryNames;
+  nuLibFiles = builtins.map (name: ../../../nu/${name}) nuLibFileNames;
 in
 {
-  options.shell = {
-    bash.enable = lib.mkEnableOption "Bash";
-    fish.enable = lib.mkEnableOption "fish";
-    nushell.enable = lib.mkEnableOption "Nushell";
-    zsh.enable = lib.mkEnableOption "Z shell";
+  options = {
+    shell = {
+      bash.enable = lib.mkEnableOption "Bash";
+      fish.enable = lib.mkEnableOption "fish";
+      nushell.enable = lib.mkEnableOption "Nushell";
+      zsh.enable = lib.mkEnableOption "Z shell";
+    };
+    programs.nushell.autoLoadFiles = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [ ];
+      description = "List of Nushell files to be auto-loaded.";
+      example = lib.literalExpression ''
+        [
+          ./plugins/nu_plugin_query.nu
+          /plugins/nu/my_plugin.nu
+        ]
+      '';
+    };
   };
   config = {
     home.shellAliases = shellAliases;
@@ -28,6 +56,7 @@ in
       DEV_HOME = "${config.home.homeDirectory}/Developer";
       GITHUB_HOME = "${DEV_HOME}/GitHub";
     };
+    home.file = lib.mkIf cfg.nushell.enable homeFiles;
     programs.bash = lib.mkIf cfg.bash.enable {
       enable = true;
       enableCompletion = true;
@@ -68,6 +97,7 @@ in
         show_banner = false;
         buffer_editor = "code";
       };
+      autoLoadFiles = nuLibFiles;
     };
     # starship - The minimal, blazing-fast, and infinitely customizable prompt for any shell!
     # GitHub Repository: https://github.com/starship/starship
