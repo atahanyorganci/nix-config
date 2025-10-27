@@ -162,6 +162,10 @@ in
       settings = {
         sync_address = "http://localhost:8888";
       };
+      flags = [
+        "--disable-up-arrow"
+        "--disable-ctrl-r"
+      ];
     };
     home.packages = with pkgs; [
       bat
