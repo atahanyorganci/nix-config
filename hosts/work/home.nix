@@ -1,7 +1,7 @@
 { pkgs, user, inputs, ... }:
 {
   imports = [
-    inputs.firefox-darwin.darwinModules.home-manager
+    inputs.firefox-nix-darwin.darwinModules.home-manager
     ../../modules/home-manager
   ];
   home.packages = with inputs.nix-casks.packages.${pkgs.system}; [

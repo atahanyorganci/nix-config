@@ -6,7 +6,7 @@
       url = "github:LnL7/nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    firefox-darwin = {
+    firefox-nix-darwin = {
       url = "github:atahanyorganci/firefox-nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
     };
