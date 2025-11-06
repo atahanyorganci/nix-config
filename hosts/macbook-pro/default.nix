@@ -1,19 +1,30 @@
-{ pkgs, user, inputs, ... }:
-let
-  # User ID created by MacOS for the user use `id -u` to get it.
-  uid = 501;
-in
+{ pkgs
+, user
+, inputs
+, ...
+}:
 {
   # Disable `nix-darwin` documentation
   documentation.enable = false;
   # Allow `nix-darwin` to manage `nix`
   nix.enable = false;
   # Applications installed by Homebrew
-  homebrew.casks = [
-    "google-chrome"
-    "spotify"
-    "orbstack"
-  ];
+  homebrew = {
+    casks = [
+      "orbstack"
+      "cloudflare-warp"
+    ];
+    taps = [
+      "hashicorp/tap"
+    ];
+    brews = [
+      "hashicorp/tap/terraform"
+      "hashicorp/tap/packer"
+    ];
+    masApps = {
+      "Amphetamine" = 937984704;
+    };
+  };
   # Enable entering sudo mode with Touch ID.
   security.pam.services.sudo_local.touchIdAuth = true;
   # Set Git commit hash for darwin-version.
@@ -29,6 +40,7 @@ in
     description = user.name;
     home = "/Users/${user.username}";
     shell = pkgs.${user.shell};
-    uid = uid;
+    # User ID created by MacOS for the user use `id -u` to get it.
+    uid = 501;
   };
 }
