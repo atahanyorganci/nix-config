@@ -48,53 +48,17 @@
         email = "atahan.yorganci@synnada.ai";
         key = "EE530DF5F568D5EB";
       };
-      specialArgs = {
-        inherit user inputs;
-      };
+      flakePath = ./.;
       eachSystem = f: nixpkgs.lib.genAttrs (import systems) (system: f nixpkgs.legacyPackages.${system});
     in
     {
       formatter = eachSystem (pkgs: pkgs.nixpkgs-fmt);
-      darwinConfigurations."Atahan-MacBook-Pro" = nix-darwin.lib.darwinSystem {
-        system = "aarch64-darwin";
-        modules = [
-          ./hosts/macbook-pro
-          home-manager.darwinModules.home-manager
-          stylix.darwinModules.stylix
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.verbose = true;
-            home-manager.users.${user.username} = ./hosts/macbook-pro/home.nix;
-            home-manager.extraSpecialArgs = specialArgs;
-          }
-          ./modules/nix-darwin
-          ./modules/shared
-        ];
-        specialArgs = specialArgs;
-      };
-      darwinConfigurations."Atahans-Work-Macbook" = nix-darwin.lib.darwinSystem {
-        system = "aarch64-darwin";
-        modules = [
-          ./hosts/work
-          home-manager.darwinModules.home-manager
-          stylix.darwinModules.stylix
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.verbose = true;
-            home-manager.users.${user.username} = ./hosts/work/home.nix;
-            home-manager.extraSpecialArgs = {
-              inherit inputs;
-              user = workUser;
-            };
-          }
-          ./modules/nix-darwin
-          ./modules/shared
-        ];
-
-        specialArgs = {
-          inherit inputs;
+      darwinConfigurations = {
+        personal = import ./hosts/macbook-pro {
+          inherit inputs user flakePath;
+        };
+        work = import ./hosts/macbook-pro {
+          inherit inputs flakePath;
           user = workUser;
         };
       };
@@ -114,7 +78,9 @@
           ./modules/nixos
           ./modules/shared
         ];
-        specialArgs = specialArgs;
+        specialArgs = {
+          inherit inputs user;
+        };
       };
       nixosConfigurations.yoga = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
@@ -132,7 +98,9 @@
           ./modules/nixos
           ./modules/shared
         ];
-        specialArgs = specialArgs;
+        specialArgs = {
+          inherit inputs user;
+        };
       };
     };
 }
