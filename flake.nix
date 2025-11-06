@@ -2,7 +2,7 @@
   description = "NixOS configuration for Atahan's MacBook Pro";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    darwin = {
+    nix-darwin = {
       url = "github:LnL7/nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -30,7 +30,7 @@
   outputs =
     inputs@{ systems
     , nixpkgs
-    , darwin
+    , nix-darwin
     , home-manager
     , stylix
     , ...
@@ -55,7 +55,7 @@
     in
     {
       formatter = eachSystem (pkgs: pkgs.nixpkgs-fmt);
-      darwinConfigurations."Atahan-MacBook-Pro" = darwin.lib.darwinSystem {
+      darwinConfigurations."Atahan-MacBook-Pro" = nix-darwin.lib.darwinSystem {
         system = "aarch64-darwin";
         modules = [
           ./hosts/macbook-pro
@@ -73,7 +73,7 @@
         ];
         specialArgs = specialArgs;
       };
-      darwinConfigurations."Atahans-Work-Macbook" = darwin.lib.darwinSystem {
+      darwinConfigurations."Atahans-Work-Macbook" = nix-darwin.lib.darwinSystem {
         system = "aarch64-darwin";
         modules = [
           ./hosts/work
