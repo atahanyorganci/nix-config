@@ -23,6 +23,7 @@
     ];
     masApps = {
       "Amphetamine" = 937984704;
+      "Tailscale" = 1475387142;
     };
   };
   # Enable entering sudo mode with Touch ID.
