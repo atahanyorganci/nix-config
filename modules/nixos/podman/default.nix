@@ -1,4 +1,8 @@
-{ lib, config, ... }:
+{ lib
+, config
+, pkgs
+, ...
+}:
 {
   options.podman.enable = lib.mkEnableOption "Podman";
   config = lib.mkIf config.podman.enable {
@@ -13,5 +17,8 @@
         defaultNetwork.settings.dns_enabled = true;
       };
     };
+    environment.systemPackages = with pkgs; [
+      podman-compose
+    ];
   };
 }
