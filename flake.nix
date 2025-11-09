@@ -42,6 +42,9 @@
         username = "atahan";
         shell = "fish";
         key = "F3F2B2EDB7562F09";
+        authorizedKeys = [
+          "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJpxbjpFmE5twzeMoite14xhWxJumHMMILZTcpp7EHO+Nv6gDG0/aAGpLI69Gq+Gl/yCaBBeuW4Ihgf/WwbiU3B3bI53pigvc3bc9ntANrz3YtpQntQNnXW8kTQuPllLQNOfjfsXt6jHel+Rdpg/ImEZGbsks4JMcNTAm7fUGKjdHYz2ByRTbS2Nshq3eFKMzcXWZHCDPveX9WQY0W3JCxZqHzcpTbATHWoMCi5/VZmg23P9IhrmkFGHtf0rC2uLGBYEwcq+IfcBcWcifbpkdbOo9putm+3z2GNTZ03rrDmpPdKiD08pkBzYCy1cC7S71PoGI2ybx/5LfjDSyPecyzItMw0yLVB02inqEUqV8CPzcPf11krTXGVg+9/ay1k/hbnvHNvuPRnO078QsZKdHp/6yA5ornHOh9GAyl/UlJ3T0hm2XJWGY7QOr2LQkjirBxH8v7UKG6rSi9P2J3rMo1OXxFo4OqTgz8g9SfBijxT3R7TMUmX4ZvY/EyPxYUTkoBTWzApEnfyMyy0BkHUGOaRY+75iAJrD1TshFYR+OXxjWWhbteBGLHp98SxfSJobF/hxLFMVR9CnOabI3m7rg1VKK15A8JCSts+Bl0vqwjpM4Q7CfGbQYtSldJFp8uj2yHKgvtiU8iB94XRFvQkqT6p+I+qznWUDdN6Mzrav8CtQ=="
+        ];
       };
       workUser = {
         inherit (user) name username shell;

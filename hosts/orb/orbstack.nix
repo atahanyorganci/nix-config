@@ -27,8 +27,6 @@
     useDHCP = false;
     useHostResolvConf = false;
   };
-  # Disable sshd
-  services.openssh.enable = false;
   # systemd
   systemd.network = {
     enable = true;

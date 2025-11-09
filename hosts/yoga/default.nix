@@ -44,9 +44,7 @@
     isNormalUser = true;
     description = user.name;
     extraGroups = [ "networkmanager" "wheel" ];
-    packages = with pkgs; [
-      bitwarden-desktop
-    ];
+    openssh.authorizedKeys.keys = builtins.map (key: "${key} ${user.username}@${config.networking.hostName}") user.authorizedKeys;
   };
   # Enable GPG for SSH and commit signing
   programs.gnupg.agent = {
@@ -60,4 +58,6 @@
     enable = true;
     layout = "tr";
   };
+  # Enable SSH server
+  ssh.enable = true;
 }

@@ -25,6 +25,7 @@
       home = "/home/${user.username}";
       homeMode = "700";
       shell = pkgs.${user.shell};
+      openssh.authorizedKeys.keys = builtins.map (key: "${key} ${user.username}@${config.networking.hostName}") user.authorizedKeys;
     };
   };
   programs.${user.shell}.enable = true;
@@ -49,10 +50,6 @@
   time.timeZone = "Europe/Istanbul";
   # NixOS version
   system.stateVersion = "24.05";
-  # Enable Jellyfin media server
-  jellyfin.enable = true;
-  # Arr Stack
-  prowlarr.enable = true;
-  radarr.enable = true;
-  sonarr.enable = true;
+  # Allow SSH
+  ssh.enable = true;
 }
