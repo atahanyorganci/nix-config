@@ -7,9 +7,7 @@
     username = user.username;
     homeDirectory = "/home/${user.username}";
   };
-  alacritty.enable = true;
   ffmpeg.enable = true;
-  firefox.enable = true;
   git = {
     enable = true;
     aliases.enable = true;
@@ -17,7 +15,6 @@
       inherit (user) name email key;
     };
   };
-  gnome.enable = true;
   gum.enable = true;
   python.enable = true;
   shell = {
@@ -27,6 +24,5 @@
   };
   tools.enable = true;
   uutils.enable = true;
-  vscode.enable = true;
   wget.enable = true;
 }

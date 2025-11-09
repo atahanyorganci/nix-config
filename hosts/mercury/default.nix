@@ -1,14 +1,18 @@
-{ config, pkgs, user, inputs, ... }:
+{ config
+, pkgs
+, user
+, ...
+}:
 {
   imports = [
     ./hardware-configuration.nix
   ];
-  # Bootloader
+  # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   # Networking
   networking = {
-    hostName = "yoga";
+    hostName = "mercury";
     networkmanager.enable = true;
   };
   # Time Zone
@@ -26,19 +30,13 @@
     LC_TELEPHONE = "tr_TR.UTF-8";
     LC_TIME = "tr_TR.UTF-8";
   };
+  # Configure keymap in X11
+  services.xserver.xkb = {
+    layout = "tr";
+    variant = "";
+  };
   # Configure console keymap
   console.keyMap = "trq";
-  # Enable CUPS to print documents.
-  services.printing.enable = true;
-  # Enable sound with pipewire.
-  hardware.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-  };
   # Default user
   users.users.${user.username} = {
     isNormalUser = true;
@@ -46,6 +44,10 @@
     extraGroups = [ "networkmanager" "wheel" ];
     openssh.authorizedKeys.keys = builtins.map (key: "${key} ${user.username}@${config.networking.hostName}") user.authorizedKeys;
   };
+  # Enable automatic login for the user.
+  services.getty.autologinUser = "atahan";
+  # Allow unfree packages
+  nixpkgs.config.allowUnfree = true;
   # Enable GPG for SSH and commit signing
   programs.gnupg.agent = {
     enable = true;
@@ -53,13 +55,8 @@
   };
   # Enable Podman containerization
   podman.enable = true;
-  # Enable Gnome DE
-  gnome = {
-    enable = true;
-    layout = "tr";
-  };
   # Enable SSH server
   ssh.enable = true;
-  # Visiual Studio Server
+  # Enable VSCode Server
   services.vscode-server.enable = true;
 }

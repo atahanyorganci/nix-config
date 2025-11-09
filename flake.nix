@@ -90,10 +90,10 @@
           inherit inputs user;
         };
       };
-      nixosConfigurations.yoga = nixpkgs.lib.nixosSystem {
+      nixosConfigurations.mercury = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
-          ./hosts/yoga
+          ./hosts/mercury
           vscode-server.nixosModules.default
           home-manager.nixosModules.home-manager
           stylix.nixosModules.stylix
@@ -101,7 +101,7 @@
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.verbose = true;
-            home-manager.users.${user.username} = ./hosts/yoga/home.nix;
+            home-manager.users.${user.username} = ./hosts/mercury/home.nix;
             home-manager.extraSpecialArgs = { inherit user inputs; };
           }
           ./modules/nixos
