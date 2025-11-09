@@ -60,4 +60,6 @@
   };
   # Enable SSH server
   ssh.enable = true;
+  # Visiual Studio Server
+  services.vscode-server.enable = true;
 }

@@ -37,6 +37,7 @@
     , nix-darwin
     , home-manager
     , stylix
+    , vscode-server
     , ...
     }:
     let
@@ -93,6 +94,7 @@
         system = "x86_64-linux";
         modules = [
           ./hosts/yoga
+          vscode-server.nixosModules.default
           home-manager.nixosModules.home-manager
           stylix.nixosModules.stylix
           {
