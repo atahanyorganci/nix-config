@@ -1,6 +1,5 @@
 { inputs
 , user
-, flakePath
 , ...
 }:
 inputs.nix-darwin.lib.darwinSystem {
@@ -18,8 +17,8 @@ inputs.nix-darwin.lib.darwinSystem {
         inherit user inputs;
       };
     }
-    (flakePath + /modules/nix-darwin)
-    (flakePath + /modules/shared)
+    (inputs.self + /modules/nix-darwin)
+    (inputs.self + /modules/shared)
   ];
   specialArgs = {
     inherit user inputs;

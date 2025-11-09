@@ -56,17 +56,16 @@
         email = "atahan.yorganci@synnada.ai";
         key = "EE530DF5F568D5EB";
       };
-      flakePath = ./.;
       eachSystem = f: nixpkgs.lib.genAttrs (import systems) (system: f nixpkgs.legacyPackages.${system});
     in
     {
       formatter = eachSystem (pkgs: pkgs.nixpkgs-fmt);
       darwinConfigurations = {
         personal = import ./hosts/macbook-pro {
-          inherit inputs user flakePath;
+          inherit inputs user;
         };
         work = import ./hosts/macbook-pro {
-          inherit inputs flakePath;
+          inherit inputs;
           user = workUser;
         };
       };
