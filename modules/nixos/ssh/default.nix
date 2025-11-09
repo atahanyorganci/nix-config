@@ -21,11 +21,8 @@
         LoginGraceTime = "20s";
         # Only allows known user
         AllowUsers = [ user.username ];
-        # Disable additional features
-        AllowAgentForwarding = false;
-        AllowTcpForwarding = "no";
+        # Disable X11 display server forwarding
         X11Forwarding = false;
-        PermitTunnel = "no";
         # Server-client alive checks
         ClientAliveInterval = 300;
         ClientAliveCountMax = 3;
