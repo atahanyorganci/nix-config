@@ -12,5 +12,6 @@
     ./radarr
     ./sonarr
     ./ssh
+    ./tailscale
   ];
 }

@@ -59,4 +59,9 @@
   ssh.enable = true;
   # Enable VSCode Server
   services.vscode-server.enable = true;
+  # Enable Tailscale
+  tailscale = {
+    enable = true;
+    domain = "jackal-mercat.ts.net";
+  };
 }
