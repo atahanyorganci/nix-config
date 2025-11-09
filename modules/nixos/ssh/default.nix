@@ -32,6 +32,8 @@
         # Maximum verbosity
         LogLevel = "VERBOSE";
       };
+      ports = [ 22 ];
     };
+    networking.firewall.allowedTCPPorts = [ 22 ];
   };
 }
