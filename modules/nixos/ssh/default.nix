@@ -10,7 +10,7 @@
       enable = true;
       settings = {
         # Disable root login
-        PermitRootLogin = "no";
+        PermitRootLogin = lib.mkDefault "no";
         # Allow only public key login
         PasswordAuthentication = false;
         KbdInteractiveAuthentication = false;

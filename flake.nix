@@ -30,6 +30,10 @@
       url = "github:nix-community/nixos-vscode-server";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixos-generators = {
+      url = "github:nix-community/nixos-generators";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
   outputs =
     inputs@{ systems
@@ -38,6 +42,7 @@
     , home-manager
     , stylix
     , vscode-server
+    , nixos-generators
     , ...
     }:
     let
@@ -101,6 +106,28 @@
             home-manager.useUserPackages = true;
             home-manager.verbose = true;
             home-manager.users.${user.username} = ./hosts/mercury/home.nix;
+            home-manager.extraSpecialArgs = { inherit user inputs; };
+          }
+          ./modules/nixos
+          ./modules/shared
+        ];
+        specialArgs = {
+          inherit inputs user;
+        };
+      };
+      nixosConfigurations.venus = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          ./hosts/venus
+          vscode-server.nixosModules.default
+          home-manager.nixosModules.home-manager
+          stylix.nixosModules.stylix
+          nixos-generators.nixosModules.all-formats
+          {
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.verbose = true;
+            home-manager.users.${user.username} = ./hosts/venus/home.nix;
             home-manager.extraSpecialArgs = { inherit user inputs; };
           }
           ./modules/nixos
