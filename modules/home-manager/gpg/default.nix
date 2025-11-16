@@ -8,6 +8,11 @@
     enable = true;
     includes = [ "~/.orbstack/ssh/config" ];
   };
+  home.packages = with pkgs; [
+    openssl
+    yubikey-personalization
+    yubikey-manager
+  ];
   services.gpg-agent = {
     enable = true;
     enableSshSupport = true;
