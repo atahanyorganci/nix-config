@@ -12,6 +12,9 @@
     openssl
     yubikey-personalization
     yubikey-manager
+    sops
+    age
+    age-plugin-yubikey
   ];
   services.gpg-agent = {
     enable = true;
