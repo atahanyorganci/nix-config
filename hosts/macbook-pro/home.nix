@@ -27,6 +27,7 @@
     nushell.enable = true;
     zsh.enable = true;
   };
+  syncthing.enable = true;
   tools.enable = true;
   vscode.enable = true;
   uutils.enable = true;

@@ -20,6 +20,7 @@
     ./pass
     ./python
     ./shell
+    ./syncthing
     ./terminal
     ./tools
     ./uutils
