@@ -8,6 +8,7 @@ inputs.nix-darwin.lib.darwinSystem {
     ./system.nix
     inputs.home-manager.darwinModules.home-manager
     inputs.stylix.darwinModules.stylix
+    inputs.sops-nix.darwinModules.sops
     {
       home-manager.useGlobalPkgs = true;
       home-manager.useUserPackages = true;

@@ -1,5 +1,6 @@
 { ... }: {
   imports = [
     ./stylix
+    ./sops
   ];
 }
