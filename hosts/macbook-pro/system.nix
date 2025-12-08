@@ -13,6 +13,8 @@
     casks = [
       "orbstack"
       "cloudflare-warp"
+      "cursor"
+      "slack"
     ];
     taps = [
       "hashicorp/tap"
