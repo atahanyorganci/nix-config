@@ -8,6 +8,7 @@
     raycast
     whatsapp
     iina
+    calibre
   ];
   ffmpeg.enable = true;
   firefox.enable = true;
