@@ -29,6 +29,7 @@
     zsh.enable = true;
   };
   tools.enable = true;
+  opencode.enable = true;
   vscode.enable = true;
   uutils.enable = true;
   wget.enable = true;

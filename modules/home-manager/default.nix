@@ -18,6 +18,7 @@
     ./kitty
     ./node
     ./pass
+    ./opencode
     ./python
     ./shell
     ./terminal
