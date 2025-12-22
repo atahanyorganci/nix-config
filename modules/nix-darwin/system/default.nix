@@ -12,9 +12,12 @@ in
         persistent-apps = [
           { app = "${userAppDir}/Helium.app"; }
           { app = "${userAppDir}/Visual Studio Code.app"; }
+          { app = "${userAppDir}/Cursor.app"; }
           { app = "${userAppDir}/Ghostty.app"; }
           { app = "${userAppDir}/Whatsapp.app"; }
+          { app = "${userAppDir}/Slack.app"; }
           { app = "${systemAppDir}/Mail.app"; }
+          { app = "${systemAppDir}/Calendar.app"; }
           { app = "${systemAppDir}/Notes.app"; }
           { app = "${systemAppDir}/System Settings.app"; }
         ];
