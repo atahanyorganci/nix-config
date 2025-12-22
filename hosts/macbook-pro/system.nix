@@ -6,7 +6,7 @@
 {
   # Disable `nix-darwin` documentation
   documentation.enable = false;
-  # Allow `nix-darwin` to manage `nix`
+  # Disable `nix-darwin` to manage Nix because of Determinate Systems Nix
   nix.enable = false;
   # Applications installed by Homebrew
   homebrew = {
