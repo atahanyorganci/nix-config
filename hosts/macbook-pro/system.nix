@@ -12,9 +12,6 @@
   homebrew = {
     casks = [
       "orbstack"
-      "cloudflare-warp"
-      "slack"
-      "cursor"
     ];
     taps = [
       "hashicorp/tap"

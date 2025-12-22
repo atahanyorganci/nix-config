@@ -10,6 +10,8 @@
     iina
     calibre
     helium-browser
+    cursor
+    slack
   ];
   ffmpeg.enable = true;
   ghostty.enable = true;
