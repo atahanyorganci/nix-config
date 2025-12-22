@@ -34,6 +34,7 @@ in
         "window-position-x" = config.terminal.position.x;
         "window-position-y" = config.terminal.position.y;
         "font-style" = config.terminal.font.style;
+        "font-size" = config.terminal.font.size;
         keybind = [
           "global:shift+alt+r=reload_config"
         ];
