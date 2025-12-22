@@ -10,7 +10,7 @@ in
       dock = {
         mru-spaces = false;
         persistent-apps = [
-          { app = "${userAppDir}/Firefox.app"; }
+          { app = "${userAppDir}/Helium.app"; }
           { app = "${userAppDir}/Visual Studio Code.app"; }
           { app = "${userAppDir}/Ghostty.app"; }
           { app = "${userAppDir}/Whatsapp.app"; }

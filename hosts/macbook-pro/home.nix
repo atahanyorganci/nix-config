@@ -9,9 +9,9 @@
     whatsapp
     iina
     calibre
+    helium-browser
   ];
   ffmpeg.enable = true;
-  firefox.enable = true;
   ghostty.enable = true;
   git = {
     enable = true;
