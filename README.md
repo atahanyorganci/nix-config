@@ -2,9 +2,13 @@
 
 Nix flake for managing system and home configuration for various host machines.
 
-- [`nix-darwin`][nix-darwin] for [MacBook Pro](./hosts/macbook-pro/default.nix)
-- NixOS config ofr [OrbStack NixOs VM](./hosts/orb/home.nix)
-- [`home-manager`][home-manager] for [Lenovo Yoga Laptop](./hosts/yoga/home.nix).
+| Host                      |  OS & Architecture | Description                 |
+| ------------------------- | ------------------ | --------------------------- |
+| [`personal`][macbook-pro] | `aarch64-darwin`   | Personal computer           |
+| [`work`][macbook-pro]     | `aarch64-darwin`   | Work computer               |
+| [`orb`][orb]              | `aarch64-linux`    | OrbStack VM for development |
+| [`mercury`][mercury]      | `aarch64-linux`    | Home sever                  |
 
-[nix-darwin]: https://github.com/LnL7/nix-darwin
-[home-manager]: https://github.com/nix-community/home-manager
+[macbook-pro]: ./hosts/macbook-pro/default.nix
+[orb]: ./hosts/orb/default.nix
+[mercury]: ./hosts/mercury/default.nix
