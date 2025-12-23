@@ -21,6 +21,7 @@
     ./opencode
     ./python
     ./shell
+    ./syncthing
     ./terminal
     ./tools
     ./uutils
