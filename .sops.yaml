@@ -1,0 +1,9 @@
+keys:
+  - &personal DC47AAEBB2632BEE427C6077277004B9D6B7DCE3
+  - &work     9C3352B886FFAFCD07A2596FEE530DF5F568D5EB
+creation_rules:
+  - path_regex: secrets/.*\.(yaml|yml|json|env)$
+    key_groups:
+      - pgp:
+          - *personal
+          - *work
