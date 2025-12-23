@@ -34,6 +34,7 @@ in {
     fish.enable = true;
     zsh.enable = true;
   };
+  syncthing.enable = true;
   tools.enable = true;
   opencode.enable = true;
   vscode.enable = true;
