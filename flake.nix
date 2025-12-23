@@ -59,6 +59,9 @@
         inherit (user) name username shell;
         email = "atahan.yorganci@synnada.ai";
         key = "EE530DF5F568D5EB";
+        authorizedKeys = [
+          "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC75O5TAYx+fWkSe58f8ULmSUHoJyF8Gul83AM0TYuuHZrGMa3w29AaFCInnZYtKMblLcE1DqJrdaDOSfgILjnEpqpRZNklZKyZXLXNRaCBZjgvfJetNin+EgH0iJRy8ZMfWq17vvsQJ+b0xvYSmfGk6RX4z73Pelmim9+l+yXyZZHUgA2R6zYq3J3RL/m1NtyWSxkY2e22ZX5/hhV8mJCuSsNzF+BTSg0HO332MM5QyNajaTZ+19ieytmWlixGYlq228Co7yBazAL3Sh4kS12r2g0cB0P+YWdc8LOa1+0QrEVtLTo/pDso3kb9v3GD5BoEmIWRyOd0DyGYG5x7T9aIiJgXjFNhtavHpEa38a0nvD55b0St9UDB1XjPSRNJHtRSoYl9K/OQcX6Pa3VlRcwnIa4pwH4ZAz4QJF9JgX51EPRFXlUCOYX7m9utUe3Qvp9F1BG5mE3v+Rti0NnCMoFQ4eJwoGSsbtlse+SkvniGnprw3EmVcMmTl2RLKuq+oyL6nmhQxctXDUBnk4iUWx/+z4Ly1Lot7nw/y4CQBOTqmXAXzQCcOr6aTHJmVZoCABnbkJgvCRhd45EKCmbv6FfqpfiDkRrvLYmCB4lySnYynbYt3pfGJP6ivWz0RaIoC8mHDcsVFv7S7fYqZJi9vZDxF11SDo0ImQFxSAa2MRRS8Q=="
+        ];
       };
       eachSystem = f: nixpkgs.lib.genAttrs (import systems) (system: f nixpkgs.legacyPackages.${system});
     in
