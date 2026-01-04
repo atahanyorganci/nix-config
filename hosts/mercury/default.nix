@@ -45,7 +45,11 @@
     openssh.authorizedKeys.keys = builtins.map (key: "${key} ${user.username}@${config.networking.hostName}") user.authorizedKeys;
   };
   # Enable automatic login for the user.
-  services.getty.autologinUser = "atahan";
+  services.getty.autologinUser = user.username;
+  # Execute user's shell on interactive session
+  environment.interactiveShellInit = ''
+    ${pkgs.${user.shell}}
+  '';
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
   # Enable GPG for SSH and commit signing
