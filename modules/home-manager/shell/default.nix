@@ -2,6 +2,7 @@
 , lib
 , config
 , user
+, inputs
 , ...
 }:
 let
@@ -25,10 +26,10 @@ let
     config.programs.nushell.autoLoadFiles;
   homeFiles = builtins.listToAttrs nushellFiles;
   # Get `*.nu` files from library directory.
-  nuLibEntries = builtins.readDir ../../../nu;
+  nuLibEntries = builtins.readDir ../../../shell/nu;
   nuLibEntryNames = builtins.attrNames nuLibEntries;
   nuLibFileNames = builtins.filter (name: lib.strings.hasSuffix ".nu" name) nuLibEntryNames;
-  nuLibFiles = builtins.map (name: ../../../nu/${name}) nuLibFileNames;
+  nuLibFiles = builtins.map (name: ../../../shell/nu/${name}) nuLibFileNames;
 in
 {
   options = {
@@ -83,11 +84,11 @@ in
         }
         {
           name = "${user.username}-config";
-          src = ../../../fish/plugins/config;
+          src = inputs.self + /shell/fish/plugins/config;
         }
         {
           name = "${user.username}-tools";
-          src = ../../../fish/plugins/tools;
+          src = inputs.self + /shell/fish/plugins/tools;
         }
       ];
     };
