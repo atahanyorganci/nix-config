@@ -26,6 +26,7 @@ in
   };
   # Individual imports
   imports = [
+    ./docker
     ./gnome
     ./jellyfin
     ./podman

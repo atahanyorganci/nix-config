@@ -48,8 +48,8 @@
     enable = true;
     enableSSHSupport = true;
   };
-  # Enable Podman containerization
-  podman.enable = true;
+  # Enable Docker runtime
+  docker.enable = true;
   # Enable SSH server
   ssh.enable = true;
   # Enable VSCode Server
