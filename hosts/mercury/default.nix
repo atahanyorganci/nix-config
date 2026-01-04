@@ -37,19 +37,10 @@
   };
   # Configure console keymap
   console.keyMap = "trq";
-  # Default user
-  users.users.${user.username} = {
-    isNormalUser = true;
-    description = user.name;
-    extraGroups = [ "networkmanager" "wheel" ];
-    openssh.authorizedKeys.keys = builtins.map (key: "${key} ${user.username}@${config.networking.hostName}") user.authorizedKeys;
-  };
+  # Add default user to `networkmanager` group
+  users.users.${user.username}.extraGroups = [ "networkmanager" ];
   # Enable automatic login for the user.
   services.getty.autologinUser = user.username;
-  # Execute user's shell on interactive session
-  environment.interactiveShellInit = ''
-    ${pkgs.${user.shell}}
-  '';
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
   # Enable GPG for SSH and commit signing
