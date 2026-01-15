@@ -1,17 +1,15 @@
 { pkgs
+, config
 , lib
 , ...
 }:
-let
-  aliases = {
-    ffmpeg = "${pkgs.ffmpeg}/bin/ffmpeg -hide_banner";
-    ffprobe = "${pkgs.ffmpeg}/bin/ffprobe -hide_banner";
-  };
-in
 {
-  options.ffmpeg = lib.mkEnableOption "FFmpeg";
-  config = {
-    home.shellAliases = aliases;
+  options.ffmpeg.enable = lib.mkEnableOption "FFmpeg";
+  config = lib.mkIf config.ffmpeg.enable {
+    home.shellAliases = {
+      ffmpeg = "${pkgs.ffmpeg}/bin/ffmpeg -hide_banner";
+      ffprobe = "${pkgs.ffmpeg}/bin/ffprobe -hide_banner";
+    };
     home.packages = [ pkgs.ffmpeg ];
   };
 }
