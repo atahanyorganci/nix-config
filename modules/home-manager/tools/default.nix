@@ -14,6 +14,7 @@
       qrencode
       scc
       nixpkgs-fmt
+      mmv
     ];
   };
 }

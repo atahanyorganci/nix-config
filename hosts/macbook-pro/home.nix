@@ -12,6 +12,7 @@
     helium-browser
     cursor
     slack
+    zed
   ];
   ffmpeg.enable = true;
   ghostty.enable = true;
