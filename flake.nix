@@ -56,6 +56,7 @@
         ./lib.nix
         ./treefmt.nix
         ./hosts/mercury
+        ./hosts/mini
         ./hosts/orb
         ./hosts/personal
         ./modules/darwin
