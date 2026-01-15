@@ -10,7 +10,7 @@ in
   # Enable flakes and nix commands
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
   # NixOS version
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
   # Default user
   users = {
     # This being `true` leads to a few nasty bugs, change at your own risk!

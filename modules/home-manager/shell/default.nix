@@ -65,6 +65,7 @@ in
     programs.zsh = lib.mkIf cfg.zsh.enable {
       enable = true;
       enableCompletion = true;
+      dotDir = "${config.xdg.configHome}/zsh";
       history = {
         path = "${config.xdg.dataHome}/zsh/history";
         share = true;
