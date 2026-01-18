@@ -53,6 +53,7 @@
       };
       imports = [
         inputs.treefmt-nix.flakeModule
+        ./lib.nix
         ./treefmt.nix
         ./hosts/macbook-pro
         ./hosts/orb
