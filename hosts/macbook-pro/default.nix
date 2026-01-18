@@ -21,7 +21,10 @@ in
           inherit user inputs;
         };
       }
-      (inputs.self + /modules/nix-darwin)
+      config.flake.darwinModules.firefox
+      config.flake.darwinModules.homebrew
+      config.flake.darwinModules.shell
+      config.flake.darwinModules.system
       (inputs.self + /modules/shared)
     ];
     specialArgs = {
