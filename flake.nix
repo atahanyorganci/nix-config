@@ -31,6 +31,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     flake-parts.url = "github:hercules-ci/flake-parts";
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
   outputs =
     inputs@{ self
@@ -40,6 +44,7 @@
     , stylix
     , vscode-server
     , flake-parts
+    , treefmt-nix
     , ...
     }:
     inputs.flake-parts.lib.mkFlake { inherit inputs; } {
@@ -56,6 +61,8 @@
         };
       };
       imports = [
+        treefmt-nix.flakeModule
+        ./treefmt.nix
         ./hosts/macbook-pro
         ./hosts/orb
         ./modules/darwin
