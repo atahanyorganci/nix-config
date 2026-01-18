@@ -1,4 +1,4 @@
-{ lib, config, user, ... }:
+{ user, ... }:
 let
   userAppDir = "/Users/${user.username}/Applications/Home Manager Apps";
   systemAppDir = "/System/Applications";

@@ -37,16 +37,7 @@
     };
   };
   outputs =
-    inputs@{ self
-    , nixpkgs
-    , nix-darwin
-    , home-manager
-    , stylix
-    , vscode-server
-    , flake-parts
-    , treefmt-nix
-    , ...
-    }:
+    inputs:
     inputs.flake-parts.lib.mkFlake { inherit inputs; } {
       flake = {
         me = {
@@ -61,7 +52,7 @@
         };
       };
       imports = [
-        treefmt-nix.flakeModule
+        inputs.treefmt-nix.flakeModule
         ./treefmt.nix
         ./hosts/macbook-pro
         ./hosts/orb
@@ -69,8 +60,8 @@
         ./modules/nixos
       ];
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
-      perSystem = { lib, system, ... }: {
-        _module.args.pkgs = import self.inputs.nixpkgs {
+      perSystem = { system, ... }: {
+        _module.args.pkgs = import inputs.nixpkgs {
           inherit system;
           config = {
             allowUnfree = true;

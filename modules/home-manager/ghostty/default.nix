@@ -6,7 +6,6 @@
 }:
 let
   isDarwin = lib.strings.hasSuffix "darwin" pkgs.system;
-  isLinux = lib.strings.hasSuffix "linux" pkgs.system;
   caskName = "ghostty";
   pkg =
     if isDarwin
