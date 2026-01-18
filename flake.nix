@@ -51,23 +51,12 @@
           "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQEQWwP1aWkv4t/nzin3rRn7ueC7HWR+g9Tec1nwuS"
         ];
       };
-      workUser = {
-        inherit (user) name username shell;
-        email = "atahan.yorganci@synnada.ai";
-        key = "EE530DF5F568D5EB";
-      };
       eachSystem = f: nixpkgs.lib.genAttrs (import systems) (system: f nixpkgs.legacyPackages.${system});
     in
     {
       formatter = eachSystem (pkgs: pkgs.nixpkgs-fmt);
-      darwinConfigurations = {
-        personal = import ./hosts/macbook-pro {
-          inherit inputs user;
-        };
-        work = import ./hosts/macbook-pro {
-          inherit inputs;
-          user = workUser;
-        };
+      darwinConfigurations.personal = import ./hosts/macbook-pro {
+        inherit inputs user;
       };
       nixosConfigurations.orb = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";

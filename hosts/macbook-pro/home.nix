@@ -11,7 +11,6 @@
     calibre
     helium-browser
     cursor
-    slack
     zed
   ];
   ffmpeg.enable = true;

@@ -4,26 +4,16 @@
 , ...
 }:
 {
-  # Disable `nix-darwin` documentation
-  documentation.enable = false;
-  # Disable `nix-darwin` to manage Nix because of Determinate Systems Nix
-  nix.enable = false;
   # Applications installed by Homebrew
   homebrew = {
     casks = [
       "orbstack"
     ];
-    taps = [
-      "hashicorp/tap"
-    ];
-    brews = [
-      "hashicorp/tap/terraform"
-      "hashicorp/tap/packer"
-    ];
-    masApps = {
-      "Amphetamine" = 937984704;
-    };
   };
+  # Disable `nix-darwin` documentation
+  documentation.enable = false;
+  # Disable `nix-darwin` to manage Nix because of Determinate Systems Nix
+  nix.enable = false;
   # Enable entering sudo mode with Touch ID.
   security.pam.services.sudo_local.touchIdAuth = true;
   # Set Git commit hash for darwin-version.
