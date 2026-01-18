@@ -57,6 +57,7 @@
       };
       imports = [
         ./hosts/macbook-pro
+        ./hosts/orb
         ./modules/darwin
         ./modules/nixos
       ];
