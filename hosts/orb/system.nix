@@ -1,7 +1,6 @@
 { pkgs
 , modulesPath
 , user
-, inputs
 , ...
 }:
 {
@@ -17,14 +16,6 @@
     enable = true;
     pinentryPackage = pkgs.pinentry-tty;
     enableSSHSupport = true;
-  };
-  # Enable Home Manager for the user
-  home-manager.useGlobalPkgs = true;
-  home-manager.useUserPackages = true;
-  home-manager.verbose = true;
-  home-manager.users.${user.username} = ./home.nix;
-  home-manager.extraSpecialArgs = {
-    inherit user inputs;
   };
   # Hostname of the system
   networking.hostName = "orb";

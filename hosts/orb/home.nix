@@ -1,8 +1,7 @@
-{ user, ... }:
+{ user
+, ...
+}:
 {
-  imports = [
-    ../../modules/home-manager
-  ];
   ffmpeg.enable = true;
   git = {
     enable = true;
