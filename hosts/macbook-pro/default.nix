@@ -21,10 +21,7 @@ in
           inherit user inputs;
         };
       }
-      config.flake.darwinModules.firefox
-      config.flake.darwinModules.homebrew
-      config.flake.darwinModules.shell
-      config.flake.darwinModules.system
+      config.flake.darwinModules.default
       (inputs.self + /modules/shared)
     ];
     specialArgs = {
