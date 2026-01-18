@@ -27,7 +27,7 @@ in
         };
       }
       config.flake.nixosModules.default
-      ../../modules/shared
+      config.flake.nixosModules.shared
     ];
     specialArgs = {
       inherit inputs user;

@@ -27,7 +27,7 @@ in
         };
       }
       config.flake.darwinModules.default
-      (inputs.self + /modules/shared)
+      config.flake.darwinModules.shared
     ];
     specialArgs = {
       inherit inputs user;

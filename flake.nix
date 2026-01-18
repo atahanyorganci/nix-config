@@ -57,8 +57,9 @@
         ./hosts/macbook-pro
         ./hosts/orb
         ./modules/darwin
-        ./modules/nixos
         ./modules/home
+        ./modules/nixos
+        ./modules/shared
       ];
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       perSystem = { system, ... }: {
