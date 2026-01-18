@@ -42,19 +42,22 @@
     , flake-parts
     , ...
     }:
-    let
-      user = {
-        name = "Atahan Yorgancı";
-        email = "atahanyorganci@hotmail.com";
-        username = "atahan";
-        shell = "fish";
-        key = "277004B9D6B7DCE3";
-        authorizedKeys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQEQWwP1aWkv4t/nzin3rRn7ueC7HWR+g9Tec1nwuS"
-        ];
-      };
-    in
     inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      flake = {
+        me = {
+          name = "Atahan Yorgancı";
+          email = "atahanyorganci@hotmail.com";
+          username = "atahan";
+          shell = "fish";
+          key = "277004B9D6B7DCE3";
+          authorizedKeys = [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQEQWwP1aWkv4t/nzin3rRn7ueC7HWR+g9Tec1nwuS"
+          ];
+        };
+      };
+      imports = [
+        ./hosts/macbook-pro
+      ];
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       perSystem = { lib, system, ... }: {
         _module.args.pkgs = import self.inputs.nixpkgs {
