@@ -55,9 +55,9 @@
         inputs.treefmt-nix.flakeModule
         ./lib.nix
         ./treefmt.nix
-        ./hosts/macbook-pro
-        ./hosts/orb
         ./hosts/mercury
+        ./hosts/orb
+        ./hosts/personal
         ./modules/darwin
         ./modules/home
         ./modules/nixos
