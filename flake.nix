@@ -30,14 +30,16 @@
       url = "github:nix-community/nixos-vscode-server";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    flake-parts.url = "github:hercules-ci/flake-parts";
   };
   outputs =
-    inputs@{ systems
+    inputs@{ self
     , nixpkgs
     , nix-darwin
     , home-manager
     , stylix
     , vscode-server
+    , flake-parts
     , ...
     }:
     let
@@ -51,52 +53,16 @@
           "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQEQWwP1aWkv4t/nzin3rRn7ueC7HWR+g9Tec1nwuS"
         ];
       };
-      eachSystem = f: nixpkgs.lib.genAttrs (import systems) (system: f nixpkgs.legacyPackages.${system});
     in
-    {
-      formatter = eachSystem (pkgs: pkgs.nixpkgs-fmt);
-      darwinConfigurations.personal = import ./hosts/macbook-pro {
-        inherit inputs user;
-      };
-      nixosConfigurations.orb = nixpkgs.lib.nixosSystem {
-        system = "aarch64-linux";
-        modules = [
-          ./hosts/orb
-          home-manager.nixosModules.home-manager
-          stylix.nixosModules.stylix
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.verbose = true;
-            home-manager.users.${user.username} = ./hosts/orb/home.nix;
-            home-manager.extraSpecialArgs = { inherit user inputs; };
-          }
-          ./modules/nixos
-          ./modules/shared
-        ];
-        specialArgs = {
-          inherit inputs user;
-        };
-      };
-      nixosConfigurations.mercury = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          ./hosts/mercury
-          vscode-server.nixosModules.default
-          home-manager.nixosModules.home-manager
-          stylix.nixosModules.stylix
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.verbose = true;
-            home-manager.users.${user.username} = ./hosts/mercury/home.nix;
-            home-manager.extraSpecialArgs = { inherit user inputs; };
-          }
-          ./modules/nixos
-          ./modules/shared
-        ];
-        specialArgs = {
-          inherit inputs user;
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+      perSystem = { lib, system, ... }: {
+        _module.args.pkgs = import self.inputs.nixpkgs {
+          inherit system;
+          config = {
+            allowUnfree = true;
+            allowBroken = true;
+          };
         };
       };
     };
