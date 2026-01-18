@@ -1,60 +1,38 @@
-{ user
+{ config
+, inputs
 , ...
 }:
+let
+  user = config.flake.me;
+in
 {
-  imports = [
-    ./hardware-configuration.nix
-  ];
-  # Bootloader.
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-  # Networking
-  networking = {
-    hostName = "mercury";
-    networkmanager.enable = true;
-  };
-  # Time Zone
-  time.timeZone = "Europe/Istanbul";
-  # Internationalization
-  i18n.defaultLocale = "en_US.UTF-8";
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "tr_TR.UTF-8";
-    LC_IDENTIFICATION = "tr_TR.UTF-8";
-    LC_MEASUREMENT = "tr_TR.UTF-8";
-    LC_MONETARY = "tr_TR.UTF-8";
-    LC_NAME = "tr_TR.UTF-8";
-    LC_NUMERIC = "tr_TR.UTF-8";
-    LC_PAPER = "tr_TR.UTF-8";
-    LC_TELEPHONE = "tr_TR.UTF-8";
-    LC_TIME = "tr_TR.UTF-8";
-  };
-  # Configure keymap in X11
-  services.xserver.xkb = {
-    layout = "tr";
-    variant = "";
-  };
-  # Configure console keymap
-  console.keyMap = "trq";
-  # Add default user to `networkmanager` group
-  users.users.${user.username}.extraGroups = [ "networkmanager" ];
-  # Enable automatic login for the user.
-  services.getty.autologinUser = user.username;
-  # Allow unfree packages
-  nixpkgs.config.allowUnfree = true;
-  # Enable GPG for SSH and commit signing
-  programs.gnupg.agent = {
-    enable = true;
-    enableSSHSupport = true;
-  };
-  # Enable Docker runtime
-  docker.enable = true;
-  # Enable SSH server
-  ssh.enable = true;
-  # Enable VSCode Server
-  services.vscode-server.enable = true;
-  # Enable Tailscale
-  tailscale = {
-    enable = true;
-    domain = "jackal-mercat.ts.net";
+  flake.nixosConfigurations.mercury = inputs.nixpkgs.lib.nixosSystem {
+    system = "x86_64-linux";
+    modules = [
+      ./system.nix
+      ./hardware-configuration.nix
+      inputs.stylix.nixosModules.stylix
+      inputs.vscode-server.nixosModules.default
+      inputs.home-manager.nixosModules.home-manager
+      {
+        home-manager.useGlobalPkgs = true;
+        home-manager.useUserPackages = true;
+        home-manager.verbose = true;
+        home-manager.users.${user.username} = { ... }: {
+          imports = [
+            config.flake.homeModules.default
+            ./home.nix
+          ];
+        };
+        home-manager.extraSpecialArgs = {
+          inherit user inputs;
+        };
+      }
+      config.flake.nixosModules.default
+      config.flake.nixosModules.shared
+    ];
+    specialArgs = {
+      inherit inputs user;
+    };
   };
 }

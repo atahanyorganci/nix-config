@@ -56,6 +56,7 @@
         ./treefmt.nix
         ./hosts/macbook-pro
         ./hosts/orb
+        ./hosts/mercury
         ./modules/darwin
         ./modules/home
         ./modules/nixos
