@@ -15,6 +15,9 @@
       scc
       nixpkgs-fmt
       mmv
+      # Nix language server
+      nixd
+      nil
     ];
   };
 }
