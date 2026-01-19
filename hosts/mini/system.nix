@@ -28,4 +28,6 @@
   };
   # Orbstack OCI runtime
   orbstack.enable = true;
+  # Jellyfin Media Server
+  services.jellyfin.enable = true;
 }
