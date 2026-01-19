@@ -9,6 +9,10 @@ in
 {
   options = {
     flake = {
+      darwinConfigurations = mkOption {
+        type = types.lazyAttrsOf types.raw;
+        default = { };
+      };
       darwinModules = mkOption {
         type = types.lazyAttrsOf types.deferredModule;
         default = { };
