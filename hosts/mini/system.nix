@@ -26,4 +26,6 @@
     # User ID created by MacOS for the user use `id -u` to get it.
     uid = 501;
   };
+  # Orbstack OCI runtime
+  orbstack.enable = true;
 }

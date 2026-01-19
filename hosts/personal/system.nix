@@ -4,12 +4,6 @@
 , ...
 }:
 {
-  # Applications installed by Homebrew
-  homebrew = {
-    casks = [
-      "orbstack"
-    ];
-  };
   # Disable `nix-darwin` documentation
   documentation.enable = false;
   # Disable `nix-darwin` to manage Nix because of Determinate Systems Nix
@@ -32,4 +26,6 @@
     # User ID created by MacOS for the user use `id -u` to get it.
     uid = 501;
   };
+  # Orbstack OCI runtime
+  orbstack.enable = true;
 }
