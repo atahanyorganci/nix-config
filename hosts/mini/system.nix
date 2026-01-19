@@ -30,4 +30,6 @@
   orbstack.enable = true;
   # Jellyfin Media Server
   services.jellyfin.enable = true;
+  # Transmission BitTorrent client
+  services.transmission.enable = true;
 }
