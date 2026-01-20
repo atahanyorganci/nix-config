@@ -26,6 +26,8 @@
     # User ID created by MacOS for the user use `id -u` to get it.
     uid = 501;
   };
+  # Tailscale VPN
+  tailscale.enable = true;
   # Orbstack OCI runtime
   orbstack.enable = true;
   # Jellyfin Media Server
