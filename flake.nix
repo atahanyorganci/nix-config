@@ -20,11 +20,13 @@
     };
     stylix = {
       url = "github:danth/stylix";
-      inputs.home-manager.follows = "home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nix-casks = {
       url = "github:atahanyorganci/nix-casks/archive";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.treefmt-nix.follows = "treefmt-nix";
     };
     vscode-server = {
       url = "github:nix-community/nixos-vscode-server";
