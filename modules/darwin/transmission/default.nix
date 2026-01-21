@@ -1,12 +1,12 @@
-{ config
-, lib
-, pkgs
-, user
-, ...
-}:
-
-let
-  inherit (lib)
+{
+  config,
+  lib,
+  pkgs,
+  user,
+  ...
+}: let
+  inherit
+    (lib)
     mkEnableOption
     mkOption
     types
@@ -14,26 +14,27 @@ let
     mkIf
     ;
   cfg = config.services.transmission;
-  settingsFormat = pkgs.formats.json { };
+  settingsFormat = pkgs.formats.json {};
   settingsFile = settingsFormat.generate "settings.json" cfg.settings;
-in
-{
+in {
   options = {
     services.transmission = {
-      enable = mkEnableOption "transmission" // {
-        description = ''
-          Whether to enable the headless Transmission BitTorrent daemon.
+      enable =
+        mkEnableOption "transmission"
+        // {
+          description = ''
+            Whether to enable the headless Transmission BitTorrent daemon.
 
-          Transmission daemon can be controlled via the RPC interface using
-          transmission-remote, the WebUI (http://127.0.0.1:9091/ by default),
-          or other clients like stig or tremc.
-        '';
-      };
+            Transmission daemon can be controlled via the RPC interface using
+            transmission-remote, the WebUI (http://127.0.0.1:9091/ by default),
+            or other clients like stig or tremc.
+          '';
+        };
       settings = mkOption {
         description = ''
           Settings whose options overwrite fields in `config/settings.json`
         '';
-        default = { };
+        default = {};
         type = types.submodule {
           options = {
             download-dir = mkOption {
@@ -84,8 +85,8 @@ in
       };
       extraFlags = mkOption {
         type = types.listOf types.str;
-        default = [ ];
-        example = [ "--log-debug" ];
+        default = [];
+        example = ["--log-debug"];
         description = "Extra flags passed to the transmission command in the service definition.";
       };
     };
@@ -108,25 +109,27 @@ in
     launchd.user.agents.transmission = {
       serviceConfig = {
         Label = "com.transmissionbt.daemon";
-        ProgramArguments = [
-          "${cfg.package}/bin/transmission-daemon"
-          "--foreground"
-          "--config-dir"
-          "${cfg.configDir}"
-          "--logfile"
-          "${cfg.logDir}/transmission.log"
-          "--no-auth"
-          "--port"
-          "${builtins.toString cfg.settings.rpc-port}"
-          "--bind-address-ipv4"
-          "${cfg.settings.rpc-bind-address}"
-          "--download-dir"
-          "${cfg.settings.download-dir}"
-          "--incomplete-dir"
-          "${cfg.settings.incomplete-dir}"
-          "--watch-dir"
-          "${cfg.settings.watch-dir}"
-        ] ++ cfg.extraFlags;
+        ProgramArguments =
+          [
+            "${cfg.package}/bin/transmission-daemon"
+            "--foreground"
+            "--config-dir"
+            "${cfg.configDir}"
+            "--logfile"
+            "${cfg.logDir}/transmission.log"
+            "--no-auth"
+            "--port"
+            "${builtins.toString cfg.settings.rpc-port}"
+            "--bind-address-ipv4"
+            "${cfg.settings.rpc-bind-address}"
+            "--download-dir"
+            "${cfg.settings.download-dir}"
+            "--incomplete-dir"
+            "${cfg.settings.incomplete-dir}"
+            "--watch-dir"
+            "${cfg.settings.watch-dir}"
+          ]
+          ++ cfg.extraFlags;
         WorkingDirectory = cfg.configDir;
         RunAtLoad = true;
         KeepAlive = {
@@ -140,6 +143,6 @@ in
       };
     };
     # Make transmission CLI tools available in PATH
-    environment.systemPackages = [ cfg.package ];
+    environment.systemPackages = [cfg.package];
   };
 }

@@ -1,9 +1,9 @@
-{ pkgs
-, lib
-, config
-, ...
-}:
-let
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}: let
   versions = {
     "3.9" = pkgs.python39;
     "3.10" = pkgs.python310;
@@ -15,8 +15,7 @@ let
   sortedVersions = builtins.sort (a: b: (builtins.compareVersions a b) < 0) availableVersions;
   latestVersion = builtins.elemAt sortedVersions (builtins.length sortedVersions - 1);
   python = versions.${config.python.version};
-in
-{
+in {
   options.python = {
     enable = lib.mkEnableOption "Python";
     version = lib.mkOption {
@@ -30,7 +29,7 @@ in
       PYTHONSTARTUP = "${config.xdg.configHome}/python/startup.py";
       PYTHONHISTFILE = "${config.xdg.cacheHome}/python/history.py";
     };
-    home.packages = [ python pkgs.uv ];
+    home.packages = [python pkgs.uv];
     home.file = {
       ".config/ipython/profile_default/ipython_config.py" = {
         enable = true;

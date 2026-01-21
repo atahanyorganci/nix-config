@@ -1,12 +1,12 @@
-{ config
-, lib
-, pkgs
-, user
-, ...
-}:
-
-let
-  inherit (lib)
+{
+  config,
+  lib,
+  pkgs,
+  user,
+  ...
+}: let
+  inherit
+    (lib)
     mkEnableOption
     mkOption
     types
@@ -14,18 +14,19 @@ let
     mkIf
     ;
   cfg = config.services.radarr;
-in
-{
+in {
   options = {
     services.radarr = {
-      enable = mkEnableOption "radarr" // {
-        description = ''
-          Whether to enable Radarr, a Usenet/BitTorrent movie downloader.
+      enable =
+        mkEnableOption "radarr"
+        // {
+          description = ''
+            Whether to enable Radarr, a Usenet/BitTorrent movie downloader.
 
-          Radarr can be controlled via the WebUI (http://127.0.0.1:7878/ by default).
-        '';
-      };
-      package = mkPackageOption pkgs "radarr" { };
+            Radarr can be controlled via the WebUI (http://127.0.0.1:7878/ by default).
+          '';
+        };
+      package = mkPackageOption pkgs "radarr" {};
       dataDir = mkOption {
         type = types.path;
         default = "/Users/${user.username}/Library/Application Support/Radarr";
@@ -40,7 +41,7 @@ in
       };
       settings = mkOption {
         description = "Settings for Radarr configuration.";
-        default = { };
+        default = {};
         type = types.submodule {
           options = {
             bind-address = mkOption {
@@ -58,8 +59,8 @@ in
       };
       extraFlags = mkOption {
         type = types.listOf types.str;
-        default = [ ];
-        example = [ "--nobrowser" ];
+        default = [];
+        example = ["--nobrowser"];
         description = "Extra flags passed to the Radarr command in the service definition.";
       };
     };
@@ -76,11 +77,13 @@ in
     launchd.user.agents.radarr = {
       serviceConfig = {
         Label = "io.radarr.daemon";
-        ProgramArguments = [
-          "${lib.getExe cfg.package}"
-          "-nobrowser"
-          "-data=${cfg.dataDir}"
-        ] ++ cfg.extraFlags;
+        ProgramArguments =
+          [
+            "${lib.getExe cfg.package}"
+            "-nobrowser"
+            "-data=${cfg.dataDir}"
+          ]
+          ++ cfg.extraFlags;
         WorkingDirectory = cfg.dataDir;
         RunAtLoad = true;
         KeepAlive = {
@@ -99,6 +102,6 @@ in
     };
 
     # Make Radarr available in PATH
-    environment.systemPackages = [ cfg.package ];
+    environment.systemPackages = [cfg.package];
   };
 }

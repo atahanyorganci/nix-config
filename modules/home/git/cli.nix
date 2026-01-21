@@ -1,11 +1,10 @@
-{ lib
-, config
-, ...
-}:
-let
-  signingEnabled = config.git.user.key != null;
-in
 {
+  lib,
+  config,
+  ...
+}: let
+  signingEnabled = config.git.user.key != null;
+in {
   options.git.user = {
     name = lib.mkOption {
       type = lib.types.str;
@@ -29,7 +28,7 @@ in
           key = config.git.user.key;
           signByDefault = signingEnabled;
         };
-        ignores = [ ".DS_Store" ];
+        ignores = [".DS_Store"];
         settings = {
           user = {
             name = config.git.user.name;

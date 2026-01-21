@@ -1,11 +1,10 @@
-{ lib
-, config
-, ...
-}:
-let
-  cfg = config.tailscale;
-in
 {
+  lib,
+  config,
+  ...
+}: let
+  cfg = config.tailscale;
+in {
   options.tailscale = {
     enable = lib.mkEnableOption "Tailscale";
     domain = lib.mkOption {
@@ -17,8 +16,8 @@ in
   };
   config = lib.mkIf cfg.enable {
     networking = {
-      nameservers = [ "100.100.100.100" "8.8.8.8" "1.1.1.1" ];
-      search = lib.optionals (cfg.domain != null) [ cfg.domain ];
+      nameservers = ["100.100.100.100" "8.8.8.8" "1.1.1.1"];
+      search = lib.optionals (cfg.domain != null) [cfg.domain];
     };
     services.tailscale.enable = true;
   };

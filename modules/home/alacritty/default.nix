@@ -1,14 +1,13 @@
-{ lib
-, config
-, user
-, pkgs
-, ...
-}:
-let
+{
+  lib,
+  config,
+  user,
+  pkgs,
+  ...
+}: let
   shell = pkgs.${user.shell};
   shellBin = "${shell}/bin/${user.shell}";
-in
-{
+in {
   options.alacritty = {
     enable = lib.mkEnableOption "Alacritty Terminal";
   };
@@ -17,7 +16,7 @@ in
       enable = true;
       settings = {
         terminal.shell = {
-          args = [ "-l" ];
+          args = ["-l"];
           program = shellBin;
         };
         font = {

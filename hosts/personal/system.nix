@@ -1,9 +1,9 @@
-{ pkgs
-, user
-, inputs
-, ...
-}:
 {
+  pkgs,
+  user,
+  inputs,
+  ...
+}: {
   # Disable `nix-darwin` documentation
   documentation.enable = false;
   # Disable `nix-darwin` to manage Nix because of Determinate Systems Nix
@@ -17,7 +17,7 @@
   # User used for options that previously applied to the user running `darwin-rebuild`
   system.primaryUser = user.username;
   # Users managed by Nix
-  users.knownUsers = [ user.username ];
+  users.knownUsers = [user.username];
   users.users.${user.username} = {
     name = user.username;
     description = user.name;

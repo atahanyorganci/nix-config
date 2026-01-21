@@ -1,8 +1,8 @@
-{ lib
-, config
-, ...
-}:
 {
+  lib,
+  config,
+  ...
+}: {
   environment.shellInit = ''
     . /opt/orbstack-guest/etc/profile-early
     . /opt/orbstack-guest/etc/profile-late

@@ -1,13 +1,13 @@
-{ pkgs
-, config
-, ...
-}:
 {
+  pkgs,
+  config,
+  ...
+}: {
   programs.gpg.enable = true;
   programs.ssh = {
     enable = true;
     enableDefaultConfig = false;
-    includes = [ "~/.orbstack/ssh/config" ];
+    includes = ["~/.orbstack/ssh/config"];
   };
   home.packages = with pkgs; [
     openssl

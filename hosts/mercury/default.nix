@@ -1,11 +1,10 @@
-{ config
-, inputs
-, ...
-}:
-let
-  user = config.flake.me;
-in
 {
+  config,
+  inputs,
+  ...
+}: let
+  user = config.flake.me;
+in {
   flake.nixosConfigurations.mercury = inputs.nixpkgs.lib.nixosSystem {
     system = "x86_64-linux";
     modules = [
@@ -18,7 +17,7 @@ in
         home-manager.useGlobalPkgs = true;
         home-manager.useUserPackages = true;
         home-manager.verbose = true;
-        home-manager.users.${user.username} = { ... }: {
+        home-manager.users.${user.username} = {...}: {
           imports = [
             config.flake.homeModules.default
             ./home.nix

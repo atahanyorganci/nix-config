@@ -1,12 +1,12 @@
-{ config
-, lib
-, pkgs
-, user
-, ...
-}:
-
-let
-  inherit (lib)
+{
+  config,
+  lib,
+  pkgs,
+  user,
+  ...
+}: let
+  inherit
+    (lib)
     mkEnableOption
     mkOption
     types
@@ -14,18 +14,19 @@ let
     mkIf
     ;
   cfg = config.services.sonarr;
-in
-{
+in {
   options = {
     services.sonarr = {
-      enable = mkEnableOption "sonarr" // {
-        description = ''
-          Whether to enable the Sonarr PVR for Usenet and BitTorrent users.
+      enable =
+        mkEnableOption "sonarr"
+        // {
+          description = ''
+            Whether to enable the Sonarr PVR for Usenet and BitTorrent users.
 
-          Sonarr can be controlled via the WebUI (http://127.0.0.1:8989/ by default).
-        '';
-      };
-      package = mkPackageOption pkgs "sonarr" { };
+            Sonarr can be controlled via the WebUI (http://127.0.0.1:8989/ by default).
+          '';
+        };
+      package = mkPackageOption pkgs "sonarr" {};
       dataDir = mkOption {
         type = types.path;
         default = "/Users/${user.username}/Library/Application Support/Sonarr";
@@ -40,7 +41,7 @@ in
       };
       settings = mkOption {
         description = "Settings for Sonarr configuration.";
-        default = { };
+        default = {};
         type = types.submodule {
           options = {
             bind-address = mkOption {
@@ -58,8 +59,8 @@ in
       };
       extraFlags = mkOption {
         type = types.listOf types.str;
-        default = [ ];
-        example = [ "--nobrowser" ];
+        default = [];
+        example = ["--nobrowser"];
         description = "Extra flags passed to the Sonarr command in the service definition.";
       };
     };
@@ -76,11 +77,13 @@ in
     launchd.user.agents.sonarr = {
       serviceConfig = {
         Label = "io.sonarr.daemon";
-        ProgramArguments = [
-          "${lib.getExe cfg.package}"
-          "--nobrowser"
-          "--data=${cfg.dataDir}"
-        ] ++ cfg.extraFlags;
+        ProgramArguments =
+          [
+            "${lib.getExe cfg.package}"
+            "--nobrowser"
+            "--data=${cfg.dataDir}"
+          ]
+          ++ cfg.extraFlags;
         WorkingDirectory = cfg.dataDir;
         RunAtLoad = true;
         KeepAlive = {
@@ -99,6 +102,6 @@ in
     };
 
     # Make Sonarr available in PATH
-    environment.systemPackages = [ cfg.package ];
+    environment.systemPackages = [cfg.package];
   };
 }

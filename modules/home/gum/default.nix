@@ -1,8 +1,8 @@
-{ pkgs
-, lib
-, ...
-}:
-let
+{
+  pkgs,
+  lib,
+  ...
+}: let
   aliases = {
     debug = "${pkgs.gum}/bin/gum log -t timeonly -l debug";
     info = "${pkgs.gum}/bin/gum log -t timeonly -l info";
@@ -10,11 +10,10 @@ let
     error = "${pkgs.gum}/bin/gum log -t timeonly -l error";
     fatal = "${pkgs.gum}/bin/gum log -t timeonly -l fatal";
   };
-in
-{
+in {
   options.gum = lib.mkEnableOption "gum";
   config = {
     home.shellAliases = aliases;
-    home.packages = [ pkgs.gum ];
+    home.packages = [pkgs.gum];
   };
 }

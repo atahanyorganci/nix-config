@@ -1,7 +1,4 @@
-{ user
-, ...
-}:
-{
+{user, ...}: {
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -33,7 +30,7 @@
   # Configure console keymap
   console.keyMap = "trq";
   # Add default user to `networkmanager` group
-  users.users.${user.username}.extraGroups = [ "networkmanager" ];
+  users.users.${user.username}.extraGroups = ["networkmanager"];
   # Enable automatic login for the user.
   services.getty.autologinUser = user.username;
   # Allow unfree packages

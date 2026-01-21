@@ -1,9 +1,9 @@
-{ lib
-, config
-, user
-, ...
-}:
 {
+  lib,
+  config,
+  user,
+  ...
+}: {
   options.ssh.enable = lib.mkEnableOption "SSH";
   config = lib.mkIf config.ssh.enable {
     services.openssh = {
@@ -20,7 +20,7 @@
         MaxSessions = 3;
         LoginGraceTime = "20s";
         # Only allows known user
-        AllowUsers = [ user.username ];
+        AllowUsers = [user.username];
         # Disable X11 display server forwarding
         X11Forwarding = false;
         # Server-client alive checks
@@ -29,8 +29,8 @@
         # Maximum verbosity
         LogLevel = "VERBOSE";
       };
-      ports = [ 22 ];
+      ports = [22];
     };
-    networking.firewall.allowedTCPPorts = [ 22 ];
+    networking.firewall.allowedTCPPorts = [22];
   };
 }

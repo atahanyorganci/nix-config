@@ -1,9 +1,9 @@
-{ pkgs
-, lib
-, config
-, ...
-}:
-let
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}: let
   versions = {
     "18" = pkgs.nodejs_18;
     "20" = pkgs.nodejs_20;
@@ -14,8 +14,7 @@ let
   latestVersion = builtins.elemAt sortedVersions (builtins.length sortedVersions - 1);
   node = versions.${config.node.version};
   corepackHome = "${config.xdg.dataHome}/corepack";
-in
-{
+in {
   options.node = {
     enable = lib.mkEnableOption "Node.js";
     version = lib.mkOption {
@@ -29,7 +28,7 @@ in
       NODE_REPL_HISTORY = "${config.xdg.stateHome}/node_repl_history";
       COREPACK_HOME = corepackHome;
     };
-    home.sessionPath = [ corepackHome ];
-    home.packages = [ node ];
+    home.sessionPath = [corepackHome];
+    home.packages = [node];
   };
 }

@@ -1,7 +1,4 @@
-{ lib
-, ...
-}:
-{
+{lib, ...}: {
   options.terminal = {
     font = {
       style = lib.mkOption {

@@ -1,11 +1,11 @@
 {
-  perSystem = { pkgs, ... }: {
+  perSystem = {pkgs, ...}: {
     treefmt = {
       projectRootFile = "flake.nix";
       programs = {
         deadnix.enable = true;
         mdsh.enable = true;
-        nixpkgs-fmt.enable = true;
+        alejandra.enable = true;
         shellcheck.enable = pkgs.hostPlatform.system != "riscv64-linux";
         shfmt = {
           enable = pkgs.hostPlatform.system != "riscv64-linux";
@@ -13,7 +13,7 @@
         };
       };
       settings.formatter = {
-        shellcheck.options = [ "--exclude=SC2154" "--exclude=SC2148" ];
+        shellcheck.options = ["--exclude=SC2154" "--exclude=SC2148"];
         shfmt.options = [
           "--case-indent"
           "--space-redirects"

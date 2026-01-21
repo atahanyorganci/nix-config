@@ -1,21 +1,20 @@
-{ inputs
-, pkgs
-, lib
-, config
-, ...
-}:
-let
+{
+  inputs,
+  pkgs,
+  lib,
+  config,
+  ...
+}: let
   system = pkgs.stdenv.hostPlatform.system;
   pkg =
     if pkgs.stdenv.isDarwin
     then inputs.nix-casks.packages.${system}.ghostty
     else pkgs.ghostty;
-in
-{
+in {
   options.ghostty.enable = lib.mkEnableOption "Ghostty Terminal";
   config = lib.mkIf config.ghostty.enable {
     home = {
-      packages = [ pkg ];
+      packages = [pkg];
       sessionVariables.EDITOR = "code --wait";
     };
     programs.ghostty = {

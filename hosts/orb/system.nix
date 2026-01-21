@@ -1,16 +1,16 @@
-{ pkgs
-, modulesPath
-, user
-, ...
-}:
 {
+  pkgs,
+  modulesPath,
+  user,
+  ...
+}: {
   imports = [
     # Include the default lxd configuration.
     "${modulesPath}/virtualisation/lxc-container.nix"
     # Include the OrbStack-specific configuration.
     ./orbstack.nix
   ];
-  users.users.${user.username}.extraGroups = [ "wheel" ];
+  users.users.${user.username}.extraGroups = ["wheel"];
   programs.${user.shell}.enable = true;
   programs.gnupg.agent = {
     enable = true;

@@ -1,9 +1,9 @@
-{ lib
-, config
-, pkgs
-, ...
-}:
 {
+  lib,
+  config,
+  pkgs,
+  ...
+}: {
   options.podman.enable = lib.mkEnableOption "Podman";
   config = lib.mkIf config.podman.enable {
     virtualisation = {

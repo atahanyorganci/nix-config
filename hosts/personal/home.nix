@@ -1,12 +1,11 @@
-{ pkgs
-, user
-, inputs
-, ...
-}:
-let
-  system = pkgs.stdenv.hostPlatform.system;
-in
 {
+  pkgs,
+  user,
+  inputs,
+  ...
+}: let
+  system = pkgs.stdenv.hostPlatform.system;
+in {
   imports = [
     inputs.firefox-nix-darwin.darwinModules.home-manager
   ];

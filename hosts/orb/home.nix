@@ -1,7 +1,4 @@
-{ user
-, ...
-}:
-{
+{user, ...}: {
   ffmpeg.enable = true;
   git = {
     enable = true;

@@ -1,11 +1,11 @@
-{ pkgs
-, lib
-, config
-, user
-, inputs
-, ...
-}:
-let
+{
+  pkgs,
+  lib,
+  config,
+  user,
+  inputs,
+  ...
+}: let
   cfg = config.shell;
   shellAliases = {
     # `ll` - list files with long format with `eza`
@@ -16,12 +16,15 @@ let
     nd = "nix develop --command ${user.shell}";
   };
   # Create attribute set of files to linked into `.config/nushell/autoload/`
-  nushellFiles = map
-    (p:
-      let
+  nushellFiles =
+    map
+    (
+      p: let
         baseName = builtins.baseNameOf p;
-      in
-      { name = ".config/nushell/autoload/${baseName}"; value = { source = p; }; }
+      in {
+        name = ".config/nushell/autoload/${baseName}";
+        value = {source = p;};
+      }
     )
     config.programs.nushell.autoLoadFiles;
   homeFiles = builtins.listToAttrs nushellFiles;
@@ -30,8 +33,7 @@ let
   nuLibEntryNames = builtins.attrNames nuLibEntries;
   nuLibFileNames = builtins.filter (name: lib.strings.hasSuffix ".nu" name) nuLibEntryNames;
   nuLibFiles = builtins.map (name: ../../../shell/nu/${name}) nuLibFileNames;
-in
-{
+in {
   options = {
     shell = {
       bash.enable = lib.mkEnableOption "Bash";
@@ -41,7 +43,7 @@ in
     };
     programs.nushell.autoLoadFiles = lib.mkOption {
       type = lib.types.listOf lib.types.path;
-      default = [ ];
+      default = [];
       description = "List of Nushell files to be auto-loaded.";
       example = lib.literalExpression ''
         [
@@ -125,7 +127,7 @@ in
       enableBashIntegration = cfg.bash.enable;
       enableZshIntegration = cfg.zsh.enable;
       enableFishIntegration = cfg.fish.enable;
-      historyWidgetOptions = [ "--prompt='History> '" ];
+      historyWidgetOptions = ["--prompt='History> '"];
     };
     # zoxide - A smarter cd command.
     # GitHub Repository: https://github.com/ajeetdsouza/zoxide

@@ -1,5 +1,8 @@
-{ lib, config, ... }:
 {
+  lib,
+  config,
+  ...
+}: {
   options.kitty.enable = lib.mkEnableOption "Kitty terminal emulator";
   config.programs.kitty = lib.mkIf config.kitty.enable {
     enable = config.kitty.enable;

@@ -1,17 +1,16 @@
-{ pkgs
-, lib
-, config
-, user
-, inputs
-, ...
-}:
-let
-  system = pkgs.stdenv.hostPlatform.system;
-in
 {
+  pkgs,
+  lib,
+  config,
+  user,
+  inputs,
+  ...
+}: let
+  system = pkgs.stdenv.hostPlatform.system;
+in {
   options.firefox.enable = lib.mkEnableOption "Firefox";
   config = lib.mkIf config.firefox.enable {
-    stylix.targets.firefox.profileNames = [ user.username ];
+    stylix.targets.firefox.profileNames = [user.username];
     # This is patch for Firefox to allow downgrading to profiles.ini.
     #
     # Usefull links
@@ -94,15 +93,20 @@ in
           force = true;
           default = "ddg";
           privateDefault = "ddg";
-          order = [ "ddg" ];
+          order = ["ddg"];
           engines = {
             "ddg" = {
-              urls = [{
-                template = "https://duckduckgo.com";
-                params = [
-                  { name = "q"; value = "{searchTerms}"; }
-                ];
-              }];
+              urls = [
+                {
+                  template = "https://duckduckgo.com";
+                  params = [
+                    {
+                      name = "q";
+                      value = "{searchTerms}";
+                    }
+                  ];
+                }
+              ];
             };
             "bing".metaData.hidden = true;
             "google".metaData.hidden = true;

@@ -1,24 +1,22 @@
-{ user, ... }:
-let
+{user, ...}: let
   userAppDir = "/Users/${user.username}/Applications/Home Manager Apps";
   systemAppDir = "/System/Applications";
-in
-{
+in {
   config = {
     system.defaults = {
       NSGlobalDomain."com.apple.trackpad.enableSecondaryClick" = true;
       dock = {
         mru-spaces = false;
         persistent-apps = [
-          { app = "${userAppDir}/Helium.app"; }
-          { app = "${userAppDir}/Visual Studio Code.app"; }
-          { app = "${userAppDir}/Cursor.app"; }
-          { app = "${userAppDir}/Ghostty.app"; }
-          { app = "${userAppDir}/Whatsapp.app"; }
-          { app = "${systemAppDir}/Mail.app"; }
-          { app = "${systemAppDir}/Calendar.app"; }
-          { app = "${systemAppDir}/Notes.app"; }
-          { app = "${systemAppDir}/System Settings.app"; }
+          {app = "${userAppDir}/Helium.app";}
+          {app = "${userAppDir}/Visual Studio Code.app";}
+          {app = "${userAppDir}/Cursor.app";}
+          {app = "${userAppDir}/Ghostty.app";}
+          {app = "${userAppDir}/Whatsapp.app";}
+          {app = "${systemAppDir}/Mail.app";}
+          {app = "${systemAppDir}/Calendar.app";}
+          {app = "${systemAppDir}/Notes.app";}
+          {app = "${systemAppDir}/System Settings.app";}
         ];
         show-recents = false;
         tilesize = 48;

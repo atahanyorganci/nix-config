@@ -1,5 +1,4 @@
-{ ... }:
-{
+{...}: {
   # This is patch for Firefox to allow downgrading to profiles.ini.
   #
   # Usefull links

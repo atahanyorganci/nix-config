@@ -1,5 +1,8 @@
-{ lib, config, ... }:
-let
+{
+  lib,
+  config,
+  ...
+}: let
   aliases = {
     g = "git";
     # `git add`
@@ -55,8 +58,7 @@ let
     gtl = "git tag --list";
   };
   enabled = config.git.enable && config.git.aliases.enable;
-in
-{
+in {
   options.git.aliases.enable = lib.mkEnableOption "git aliases";
   config = lib.mkIf enabled {
     home.shellAliases = aliases;

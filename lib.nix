@@ -1,25 +1,28 @@
-{ lib, moduleLocation, ... }:
-let
-  inherit (lib)
+{
+  lib,
+  moduleLocation,
+  ...
+}: let
+  inherit
+    (lib)
     mapAttrs
     mkOption
     types
     ;
-in
-{
+in {
   options = {
     flake = {
       darwinConfigurations = mkOption {
         type = types.lazyAttrsOf types.raw;
-        default = { };
+        default = {};
       };
       darwinModules = mkOption {
         type = types.lazyAttrsOf types.deferredModule;
-        default = { };
+        default = {};
         apply = mapAttrs (k: v: {
           _class = "darwin";
           _file = "${toString moduleLocation}#darwinModules.${k}";
-          imports = [ v ];
+          imports = [v];
         });
       };
     };

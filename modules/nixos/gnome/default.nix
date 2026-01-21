@@ -1,5 +1,9 @@
-{ lib, config, pkgs, ... }:
 {
+  lib,
+  config,
+  pkgs,
+  ...
+}: {
   options.gnome = {
     enable = lib.mkEnableOption "Gnome desktop environment";
     layout = lib.mkOption {
@@ -24,7 +28,7 @@
       };
     };
     # Remove Gnome default applications
-    environment.gnome.excludePackages = (with pkgs; [
+    environment.gnome.excludePackages = with pkgs; [
       gnome-photos
       gnome-tour
       gnome-calendar
@@ -38,6 +42,6 @@
       gnome-characters
       totem
       yelp
-    ]);
+    ];
   };
 }

@@ -1,11 +1,12 @@
-{ config
-, pkgs
-, lib
-, user
-, ...
-}:
-let
-  inherit (lib)
+{
+  config,
+  pkgs,
+  lib,
+  user,
+  ...
+}: let
+  inherit
+    (lib)
     mkIf
     getExe
     mkEnableOption
@@ -14,12 +15,11 @@ let
     ;
   inherit (lib.types) path;
   cfg = config.services.jellyfin;
-in
-{
+in {
   options = {
     services.jellyfin = {
       enable = mkEnableOption "Jellyfin Media Server";
-      package = mkPackageOption pkgs "jellyfin" { };
+      package = mkPackageOption pkgs "jellyfin" {};
       dataDir = mkOption {
         type = path;
         default = "/Users/${user.username}/Library/Application Support/Jellyfin";
