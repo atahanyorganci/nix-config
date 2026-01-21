@@ -2,7 +2,6 @@
 , lib
 , pkgs
 , user
-, options
 , ...
 }:
 
@@ -15,7 +14,6 @@ let
     mkIf
     ;
   cfg = config.services.transmission;
-  opt = options.services.transmission;
   settingsFormat = pkgs.formats.json { };
   settingsFile = settingsFormat.generate "settings.json" cfg.settings;
 in
