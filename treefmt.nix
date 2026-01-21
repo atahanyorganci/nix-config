@@ -11,6 +11,7 @@
           enable = pkgs.hostPlatform.system != "riscv64-linux";
           indent_size = 4;
         };
+        terraform.enable = true;
       };
       settings.formatter = {
         shellcheck.options = ["--exclude=SC2154" "--exclude=SC2148"];
