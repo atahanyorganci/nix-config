@@ -5,11 +5,10 @@
 , ...
 }:
 let
-  isDarwin = lib.strings.hasSuffix "darwin" pkgs.system;
-  caskName = "ghostty";
+  system = pkgs.stdenv.hostPlatform.system;
   pkg =
-    if isDarwin
-    then inputs.nix-casks.packages.${pkgs.system}.${caskName}
+    if pkgs.stdenv.isDarwin
+    then inputs.nix-casks.packages.${system}.ghostty
     else pkgs.ghostty;
 in
 {

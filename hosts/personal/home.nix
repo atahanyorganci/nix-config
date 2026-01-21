@@ -3,11 +3,14 @@
 , inputs
 , ...
 }:
+let
+  system = pkgs.stdenv.hostPlatform.system;
+in
 {
   imports = [
     inputs.firefox-nix-darwin.darwinModules.home-manager
   ];
-  home.packages = with inputs.nix-casks.packages.${pkgs.system}; [
+  home.packages = with inputs.nix-casks.packages.${system}; [
     raycast
     whatsapp
     iina

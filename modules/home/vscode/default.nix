@@ -5,12 +5,10 @@
 , ...
 }:
 let
-  isDarwin = lib.strings.hasSuffix "darwin" pkgs.system;
-  isLinux = lib.strings.hasSuffix "linux" pkgs.system;
-  caskName = "visual-studio-code";
+  system = pkgs.stdenv.hostPlatform.system;
   pkg =
-    if isDarwin
-    then inputs.nix-casks.packages.${pkgs.system}.${caskName}
+    if pkgs.stdenv.isDarwin
+    then inputs.nix-casks.packages.${system}.visual-studio-code
     else pkgs.vscode;
 in
 {
@@ -20,7 +18,7 @@ in
       packages = [ pkg ];
       sessionVariables.EDITOR = "code --wait";
     };
-    programs.vscode = lib.mkIf isLinux {
+    programs.vscode = lib.mkIf pkgs.stdenv.isLinux {
       package = pkg;
       enable = true;
       enableUpdateCheck = true;

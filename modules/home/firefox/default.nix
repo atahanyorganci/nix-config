@@ -1,4 +1,13 @@
-{ pkgs, lib, config, user, inputs, ... }:
+{ pkgs
+, lib
+, config
+, user
+, inputs
+, ...
+}:
+let
+  system = pkgs.stdenv.hostPlatform.system;
+in
 {
   options.firefox.enable = lib.mkEnableOption "Firefox";
   config = lib.mkIf config.firefox.enable {
@@ -100,7 +109,7 @@
             "wikipedia".metaData.hidden = true;
           };
         };
-        extensions.packages = with inputs.firefox-addons.packages.${pkgs.system}; [
+        extensions.packages = with inputs.firefox-addons.packages.${system}; [
           bitwarden
           ublock-origin
           sponsorblock
