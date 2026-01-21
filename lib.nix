@@ -22,15 +22,6 @@ in
           imports = [ v ];
         });
       };
-      homeModules = mkOption {
-        type = types.lazyAttrsOf types.deferredModule;
-        default = { };
-        apply = mapAttrs (k: v: {
-          _class = "homeManager";
-          _file = "${toString moduleLocation}#homeModules.${k}";
-          imports = [ v ];
-        });
-      };
     };
   };
 }

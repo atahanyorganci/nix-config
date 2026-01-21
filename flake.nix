@@ -53,6 +53,7 @@
       };
       imports = [
         inputs.treefmt-nix.flakeModule
+        inputs.home-manager.flakeModules.home-manager
         ./lib.nix
         ./treefmt.nix
         ./hosts/mercury
