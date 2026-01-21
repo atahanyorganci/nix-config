@@ -55,16 +55,17 @@
       imports = [
         inputs.treefmt-nix.flakeModule
         inputs.home-manager.flakeModules.home-manager
-        ./lib.nix
-        ./treefmt.nix
         ./hosts/mercury
         ./hosts/mini
         ./hosts/orb
         ./hosts/personal
+        ./infra/shell.nix
         ./modules/darwin
         ./modules/home
         ./modules/nixos
         ./modules/shared
+        ./lib.nix
+        ./treefmt.nix
       ];
       systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
       perSystem = {system, ...}: {
