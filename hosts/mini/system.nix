@@ -30,8 +30,6 @@
   tailscale.enable = true;
   # Orbstack OCI runtime
   orbstack.enable = true;
-  # Jellyfin Media Server
-  services.jellyfin.enable = true;
-  # Transmission BitTorrent client
-  services.transmission.enable = true;
+  # Arr Stack
+  arr-stack.enable = true;
 }
