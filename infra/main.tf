@@ -35,7 +35,7 @@ data "cloudflare_zero_trust_tunnel_cloudflared_token" "jellyfin" {
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id
 }
 
-# Tunnel configuration - routes watch.<domain> to local Jellyfin
+# Tunnel configuration - routes services to local ports
 resource "cloudflare_zero_trust_tunnel_cloudflared_config" "jellyfin" {
   account_id = var.cloudflare_account_id
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id
@@ -46,16 +46,68 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "jellyfin" {
         service  = "http://localhost:8096"
       },
       {
+        hostname = "download.${var.domain}"
+        service  = "http://localhost:9091"
+      },
+      {
+        hostname = "film.${var.domain}"
+        service  = "http://localhost:7878"
+      },
+      {
+        hostname = "tv.${var.domain}"
+        service  = "http://localhost:8989"
+      },
+      {
+        hostname = "indexer.${var.domain}"
+        service  = "http://localhost:9696"
+      },
+      {
         service = "http_status:404"
       }
     ]
   }
 }
 
-# DNS CNAME record pointing to the tunnel
+# DNS CNAME records pointing to the tunnel
 resource "cloudflare_dns_record" "jellyfin" {
   zone_id = var.cloudflare_zone_id
   name    = "watch"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id}.cfargotunnel.com"
+  type    = "CNAME"
+  ttl     = 1
+  proxied = true
+}
+
+resource "cloudflare_dns_record" "transmission" {
+  zone_id = var.cloudflare_zone_id
+  name    = "download"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id}.cfargotunnel.com"
+  type    = "CNAME"
+  ttl     = 1
+  proxied = true
+}
+
+resource "cloudflare_dns_record" "radarr" {
+  zone_id = var.cloudflare_zone_id
+  name    = "film"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id}.cfargotunnel.com"
+  type    = "CNAME"
+  ttl     = 1
+  proxied = true
+}
+
+resource "cloudflare_dns_record" "sonarr" {
+  zone_id = var.cloudflare_zone_id
+  name    = "tv"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id}.cfargotunnel.com"
+  type    = "CNAME"
+  ttl     = 1
+  proxied = true
+}
+
+resource "cloudflare_dns_record" "prowlarr" {
+  zone_id = var.cloudflare_zone_id
+  name    = "indexer"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id}.cfargotunnel.com"
   type    = "CNAME"
   ttl     = 1
@@ -81,12 +133,64 @@ resource "cloudflare_zero_trust_access_policy" "allow_emails" {
   ]
 }
 
-# Access application for Jellyfin
+# Access applications
 resource "cloudflare_zero_trust_access_application" "jellyfin" {
   account_id = var.cloudflare_account_id
   type       = "self_hosted"
   name       = "Jellyfin"
   domain     = "watch.${var.domain}"
+  policies = [
+    {
+      id         = cloudflare_zero_trust_access_policy.allow_emails.id
+      precedence = 1
+    }
+  ]
+}
+
+resource "cloudflare_zero_trust_access_application" "transmission" {
+  account_id = var.cloudflare_account_id
+  type       = "self_hosted"
+  name       = "Transmission"
+  domain     = "download.${var.domain}"
+  policies = [
+    {
+      id         = cloudflare_zero_trust_access_policy.allow_emails.id
+      precedence = 1
+    }
+  ]
+}
+
+resource "cloudflare_zero_trust_access_application" "radarr" {
+  account_id = var.cloudflare_account_id
+  type       = "self_hosted"
+  name       = "Radarr"
+  domain     = "film.${var.domain}"
+  policies = [
+    {
+      id         = cloudflare_zero_trust_access_policy.allow_emails.id
+      precedence = 1
+    }
+  ]
+}
+
+resource "cloudflare_zero_trust_access_application" "sonarr" {
+  account_id = var.cloudflare_account_id
+  type       = "self_hosted"
+  name       = "Sonarr"
+  domain     = "tv.${var.domain}"
+  policies = [
+    {
+      id         = cloudflare_zero_trust_access_policy.allow_emails.id
+      precedence = 1
+    }
+  ]
+}
+
+resource "cloudflare_zero_trust_access_application" "prowlarr" {
+  account_id = var.cloudflare_account_id
+  type       = "self_hosted"
+  name       = "Prowlarr"
+  domain     = "indexer.${var.domain}"
   policies = [
     {
       id         = cloudflare_zero_trust_access_policy.allow_emails.id
