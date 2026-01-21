@@ -21,7 +21,14 @@
       sonarr.enable = true;
       radarr.enable = true;
       prowlarr.enable = true;
-      transmission.enable = true;
+      transmission = {
+        enable = true;
+        settings = {
+          rpc_host_whitelist_enabled = true;
+          rpc_host_whitelist = "*.yorganci.dev,yorganci.dev";
+          message_level = 6;
+        };
+      };
       jellyfin.enable = true;
     };
   };
