@@ -29,5 +29,8 @@
   # Orbstack OCI runtime
   orbstack.enable = true;
   # Arr Stack
-  arr-stack.enable = true;
+  arr-stack = {
+    enable = true;
+    domain = "yorganci.dev";
+  };
 }

@@ -2,21 +2,37 @@
   config,
   lib,
   ...
-}: {
-  options.arr-stack.enable =
-    lib.mkEnableOption "Arr Stack"
-    // {
-      description = ''
-        Whether to enable the Arr Stack, a collection of services for managing media libraries.
-        Arr Stack includes:
-        - Sonarr
-        - Radarr
-        - Prowlarr
-        - Transmission
-        - Jellyfin
-      '';
+}: let
+  cfg = config.arr-stack;
+  inherit
+    (lib)
+    mkEnableOption
+    mkOption
+    types
+    mkIf
+    ;
+in {
+  options.arr-stack = {
+    enable =
+      mkEnableOption "Arr Stack"
+      // {
+        description = ''
+          Whether to enable the Arr Stack, a collection of services for managing media libraries.
+          Arr Stack includes:
+          - Sonarr
+          - Radarr
+          - Prowlarr
+          - Transmission
+          - Jellyfin
+        '';
+      };
+    domain = mkOption {
+      type = types.str;
+      description = "The domain name for the Arr Stack.";
+      example = "yorganci.dev";
     };
-  config = lib.mkIf config.arr-stack.enable {
+  };
+  config = mkIf cfg.enable {
     services = {
       sonarr.enable = true;
       radarr.enable = true;
@@ -25,8 +41,7 @@
         enable = true;
         settings = {
           rpc-host-whitelist-enabled = true;
-          rpc-host-whitelist = "*.yorganci.dev,yorganci.dev";
-          message-level = 6;
+          rpc-host-whitelist = "download.${cfg.domain}";
         };
       };
       jellyfin.enable = true;
