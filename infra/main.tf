@@ -134,19 +134,6 @@ resource "cloudflare_zero_trust_access_policy" "allow_emails" {
 }
 
 # Access applications
-resource "cloudflare_zero_trust_access_application" "jellyfin" {
-  account_id = var.cloudflare_account_id
-  type       = "self_hosted"
-  name       = "Jellyfin"
-  domain     = "watch.${var.domain}"
-  policies = [
-    {
-      id         = cloudflare_zero_trust_access_policy.allow_emails.id
-      precedence = 1
-    }
-  ]
-}
-
 resource "cloudflare_zero_trust_access_application" "transmission" {
   account_id = var.cloudflare_account_id
   type       = "self_hosted"
