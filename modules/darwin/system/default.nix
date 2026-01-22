@@ -1,5 +1,10 @@
-{user, ...}: let
-  userAppDir = "/Users/${user.username}/Applications/Home Manager Apps";
+{
+  inputs,
+  pkgs,
+  ...
+}: let
+  system = pkgs.stdenv.hostPlatform.system;
+  casks = inputs.nix-casks.packages.${system};
   systemAppDir = "/System/Applications";
 in {
   config = {
@@ -8,11 +13,11 @@ in {
       dock = {
         mru-spaces = false;
         persistent-apps = [
-          {app = "${userAppDir}/Helium.app";}
-          {app = "${userAppDir}/Visual Studio Code.app";}
-          {app = "${userAppDir}/Cursor.app";}
-          {app = "${userAppDir}/Ghostty.app";}
-          {app = "${userAppDir}/Whatsapp.app";}
+          {app = "${casks.helium-browser}/Applications/Helium.app";}
+          {app = "${casks.visual-studio-code}/Applications/Visual Studio Code.app";}
+          {app = "${casks.cursor}/Applications/Cursor.app";}
+          {app = "${casks.ghostty}/Applications/Ghostty.app";}
+          {app = "${casks.whatsapp}/Applications/Whatsapp.app";}
           {app = "${systemAppDir}/Mail.app";}
           {app = "${systemAppDir}/Calendar.app";}
           {app = "${systemAppDir}/Notes.app";}
