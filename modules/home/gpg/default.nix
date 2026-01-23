@@ -9,6 +9,14 @@
     if isDarwin
     then ["~/.orbstack/ssh/config"]
     else [];
+  keyDirContents = builtins.readDir ./keys;
+  keyFileNames = builtins.attrNames keyDirContents;
+  publicKeys =
+    builtins.map (key: {
+      source = ./keys/${key};
+      trust = 5;
+    })
+    keyFileNames;
 in {
   options.gpg.enable = lib. mkOption {
     type = lib.types.bool;
@@ -16,7 +24,11 @@ in {
     description = "Enable GPG";
   };
   config = lib.mkIf config.gpg.enable {
-    programs.gpg.enable = true;
+    programs.gpg = {
+      enable = true;
+      mutableTrust = false;
+      inherit publicKeys;
+    };
     programs.ssh = {
       enable = true;
       enableDefaultConfig = false;
