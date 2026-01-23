@@ -19,6 +19,8 @@
       scc
       alejandra
       mmv
+      gitleaks
+      btop
       # Nix language server
       nixd
       nil
