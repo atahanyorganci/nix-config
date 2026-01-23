@@ -17,13 +17,13 @@ in {
       mkEnableOption "Arr Stack"
       // {
         description = ''
-          Whether to enable the Arr Stack, a collection of services for managing media libraries.
-          Arr Stack includes:
+          Enable Arr Stack services including:
           - Sonarr
           - Radarr
           - Prowlarr
           - Transmission
           - Jellyfin
+          - Cloudflare Tunnel
         '';
       };
     domain = mkOption {
@@ -45,6 +45,7 @@ in {
         };
       };
       jellyfin.enable = true;
+      cloudflared.enable = true;
     };
   };
 }
