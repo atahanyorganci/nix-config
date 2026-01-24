@@ -472,6 +472,9 @@ in {
         StandardErrorPath = "${cfg.logDir}/launchd-stderr.log";
         ProcessType = "Background";
         ThrottleInterval = 15;
+        # Increase file descriptor limits to prevent "Too many open files" errors
+        SoftResourceLimits.NumberOfFiles = 8192;
+        HardResourceLimits.NumberOfFiles = 65535;
       };
     };
     # Make transmission CLI tools available in PATH
