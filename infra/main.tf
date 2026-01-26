@@ -15,6 +15,10 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 5"
     }
+    doppler = {
+      source  = "DopplerHQ/doppler"
+      version = "~> 1"
+    }
   }
 }
 
