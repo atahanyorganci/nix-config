@@ -4,6 +4,7 @@
       buildInputs = with pkgs; [
         terraform
         awscli2
+        doppler
       ];
     };
   };
