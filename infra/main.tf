@@ -22,8 +22,20 @@ terraform {
   }
 }
 
+# Read Doppler configuration from doppler.yaml
+locals {
+  doppler_config      = yamldecode(file("${path.module}/doppler.yaml"))
+  doppler_setup       = local.doppler_config.setup[0]
+  doppler_project     = local.doppler_setup.project
+  doppler_config_name = local.doppler_setup.config
+}
+
 provider "cloudflare" {
   api_token = var.cloudflare_api_token
+}
+
+provider "doppler" {
+  doppler_token = var.doppler_token
 }
 
 # Cloudflare Tunnel for Jellyfin
@@ -37,6 +49,14 @@ resource "cloudflare_zero_trust_tunnel_cloudflared" "jellyfin" {
 data "cloudflare_zero_trust_tunnel_cloudflared_token" "jellyfin" {
   account_id = var.cloudflare_account_id
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id
+}
+
+# Export tunnel token to Doppler
+resource "doppler_secret" "cloudflare_tunnel_token" {
+  project = local.doppler_project
+  config  = local.doppler_config_name
+  name    = "CLOUDFLARE_TUNNEL_TOKEN"
+  value   = data.cloudflare_zero_trust_tunnel_cloudflared_token.jellyfin.token
 }
 
 # Tunnel configuration - routes services to local ports

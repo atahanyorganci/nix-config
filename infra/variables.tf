@@ -18,3 +18,9 @@ variable "domain" {
   description = "Domain name"
   type        = string
 }
+
+variable "doppler_token" {
+  description = "Doppler API token for authentication"
+  type        = string
+  sensitive   = true
+}
