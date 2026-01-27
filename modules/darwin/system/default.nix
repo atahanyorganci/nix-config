@@ -8,6 +8,14 @@
   systemAppDir = "/System/Applications";
 in {
   config = {
+    environment.systemPackages = with casks; [
+      raycast
+      whatsapp
+      iina
+      helium-browser
+      cursor
+      zed
+    ];
     system.defaults = {
       NSGlobalDomain."com.apple.trackpad.enableSecondaryClick" = true;
       dock = {

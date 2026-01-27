@@ -1,22 +1,10 @@
 {
-  pkgs,
   user,
   inputs,
   ...
-}: let
-  system = pkgs.stdenv.hostPlatform.system;
-in {
+}: {
   imports = [
     inputs.firefox-nix-darwin.darwinModules.home-manager
-  ];
-  home.packages = with inputs.nix-casks.packages.${system}; [
-    raycast
-    whatsapp
-    iina
-    calibre
-    helium-browser
-    cursor
-    zed
   ];
   ffmpeg.enable = true;
   ghostty.enable = true;
