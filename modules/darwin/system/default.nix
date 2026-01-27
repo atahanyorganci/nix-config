@@ -9,11 +9,12 @@
 in {
   config = {
     environment.systemPackages = with casks; [
-      raycast
-      whatsapp
-      iina
-      helium-browser
       cursor
+      helium-browser
+      iina
+      raycast
+      slack
+      whatsapp
       zed
     ];
     system.defaults = {
@@ -25,6 +26,7 @@ in {
           {app = "${casks.visual-studio-code}/Applications/Visual Studio Code.app";}
           {app = "${casks.cursor}/Applications/Cursor.app";}
           {app = "${casks.ghostty}/Applications/Ghostty.app";}
+          {app = "${casks.slack}/Applications/Slack.app";}
           {app = "${casks.whatsapp}/Applications/Whatsapp.app";}
           {app = "${systemAppDir}/Mail.app";}
           {app = "${systemAppDir}/Calendar.app";}
