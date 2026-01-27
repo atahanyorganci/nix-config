@@ -87,11 +87,7 @@ in {
         }
         {
           name = "${user.username}-config";
-          src = inputs.self + /shell/fish/plugins/config;
-        }
-        {
-          name = "${user.username}-tools";
-          src = inputs.self + /shell/fish/plugins/tools;
+          src = inputs.self + /shell/fish;
         }
       ];
     };
