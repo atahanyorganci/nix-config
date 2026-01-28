@@ -86,6 +86,10 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "jellyfin" {
         service  = "http://localhost:9696"
       },
       {
+        hostname = "library.${var.domain}"
+        service  = "http://localhost:8083"
+      },
+      {
         service = "http_status:404"
       }
     ]
@@ -132,6 +136,15 @@ resource "cloudflare_dns_record" "sonarr" {
 resource "cloudflare_dns_record" "prowlarr" {
   zone_id = var.cloudflare_zone_id
   name    = "indexer"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id}.cfargotunnel.com"
+  type    = "CNAME"
+  ttl     = 1
+  proxied = true
+}
+
+resource "cloudflare_dns_record" "calibre_web" {
+  zone_id = var.cloudflare_zone_id
+  name    = "library"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.jellyfin.id}.cfargotunnel.com"
   type    = "CNAME"
   ttl     = 1
@@ -202,6 +215,19 @@ resource "cloudflare_zero_trust_access_application" "prowlarr" {
   type       = "self_hosted"
   name       = "Prowlarr"
   domain     = "indexer.${var.domain}"
+  policies = [
+    {
+      id         = cloudflare_zero_trust_access_policy.allow_emails.id
+      precedence = 1
+    }
+  ]
+}
+
+resource "cloudflare_zero_trust_access_application" "calibre_web" {
+  account_id = var.cloudflare_account_id
+  type       = "self_hosted"
+  name       = "Calibre-Web"
+  domain     = "library.${var.domain}"
   policies = [
     {
       id         = cloudflare_zero_trust_access_policy.allow_emails.id
