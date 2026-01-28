@@ -4,6 +4,8 @@
   inputs,
   ...
 }: {
+  # Hostname
+  networking.hostName = "mini";
   # Disable `nix-darwin` documentation
   documentation.enable = false;
   # Disable `nix-darwin` to manage Nix because of Determinate Systems Nix
@@ -38,4 +40,6 @@
     enable = true;
     options.enableBookUploading = true;
   };
+  # SSH
+  ssh.enable = true;
 }
