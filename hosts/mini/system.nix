@@ -33,4 +33,9 @@
     enable = true;
     domain = "yorganci.dev";
   };
+  # Calibre
+  calibre-web = {
+    enable = true;
+    options.enableBookUploading = true;
+  };
 }
