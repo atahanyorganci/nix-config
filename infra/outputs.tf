@@ -15,5 +15,6 @@ output "services" {
     radarr       = "https://film.${var.domain}"
     sonarr       = "https://tv.${var.domain}"
     prowlarr     = "https://indexer.${var.domain}"
+    calibre_web  = "https://library.${var.domain}"
   }
 }
