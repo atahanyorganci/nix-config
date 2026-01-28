@@ -17,8 +17,6 @@
         system.stateVersion = "26.05";
         # Default user
         users = {
-          # This being `true` leads to a few nasty bugs, change at your own risk!
-          mutableUsers = false;
           users.${user.username} = {
             isNormalUser = true;
             description = user.name;
