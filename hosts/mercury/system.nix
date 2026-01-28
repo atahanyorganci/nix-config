@@ -7,6 +7,8 @@
     hostName = "mercury";
     networkmanager.enable = true;
   };
+  # Enable mDNS (mercury.local hostname resolution)
+  mdns.enable = true;
   # Time Zone
   time.timeZone = "Europe/Istanbul";
   # Internationalization
