@@ -24,14 +24,14 @@ in {
       enableZshIntegration = config.shell.zsh.enable;
       enableFishIntegration = config.shell.fish.enable;
       settings = {
-        "window-width" = config.terminal.dimensions.columns;
-        "window-height" = config.terminal.dimensions.lines;
-        "window-padding-x" = config.terminal.padding.x;
-        "window-padding-y" = config.terminal.padding.y;
-        "window-position-x" = config.terminal.position.x;
-        "window-position-y" = config.terminal.position.y;
-        "font-style" = config.terminal.font.style;
-        "font-size" = config.terminal.font.size;
+        window-width = config.terminal.dimensions.columns;
+        window-height = config.terminal.dimensions.lines;
+        window-padding-x = config.terminal.padding.x;
+        window-padding-y = config.terminal.padding.y;
+        window-position-x = config.terminal.position.x;
+        window-position-y = config.terminal.position.y;
+        font-style = config.terminal.font.style;
+        font-size = config.terminal.font.size;
         keybind = [
           "global:shift+alt+r=reload_config"
         ];
