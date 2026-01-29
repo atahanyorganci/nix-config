@@ -13,6 +13,12 @@
 in {
   options.ghostty.enable = lib.mkEnableOption "Ghostty Terminal";
   config = lib.mkIf config.ghostty.enable {
+    # This is hack to override Stylix's font size calculation.
+    #
+    # See: https://github.com/nix-community/stylix/blob/cb2e9c4fc23b4e73e4d77b9122d685896c042802/modules/ghostty/hm.nix#L16-L24
+    stylix.targets.ghostty.fonts.override = {
+      sizes.terminal = config.terminal.font.size / 4 * 3;
+    };
     home = {
       packages = [pkg];
       sessionVariables.EDITOR = "code --wait";
@@ -31,7 +37,6 @@ in {
         window-position-x = config.terminal.position.x;
         window-position-y = config.terminal.position.y;
         font-style = config.terminal.font.style;
-        font-size = config.terminal.font.size;
         keybind = [
           "global:shift+alt+r=reload_config"
         ];
