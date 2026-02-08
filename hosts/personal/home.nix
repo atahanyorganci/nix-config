@@ -1,11 +1,4 @@
-{
-  user,
-  inputs,
-  ...
-}: {
-  imports = [
-    inputs.firefox-nix-darwin.darwinModules.home-manager
-  ];
+{user, ...}: {
   ffmpeg.enable = true;
   ghostty.enable = true;
   git = {
