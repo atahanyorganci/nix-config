@@ -21,9 +21,11 @@
       mmv
       gitleaks
       btop
-      # Nix language server
+      # Nix LSP
       nixd
       nil
+      # Just LSP
+      just-lsp
     ];
   };
 }
