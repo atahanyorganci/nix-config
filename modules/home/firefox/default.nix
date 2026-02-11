@@ -10,9 +10,6 @@
 in {
   options.firefox.enable = lib.mkEnableOption "Firefox";
   config = lib.mkIf config.firefox.enable {
-    imports = [
-      inputs.firefox-nix-darwin.darwinModules.home-manager
-    ];
     stylix.targets.firefox.profileNames = [user.username];
     # This is patch for Firefox to allow downgrading to profiles.ini.
     #
