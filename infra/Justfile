@@ -1,0 +1,30 @@
+set dotenv-load := true
+set export := true
+
+@init *ARGS:
+    terraform init -reconfigure -backend-config="bucket=$AWS_BUCKET_NAME" {{ARGS}}
+
+tf CMD *ARGS:
+    #!/usr/bin/env bash
+
+    terraform {{CMD}}  \
+        -var cloudflare_api_token="$CLOUDFLARE_API_TOKEN" \
+        -var cloudflare_account_id="$CLOUDFLARE_ACCOUNT_ID" \
+        -var cloudflare_zone_id="$CLOUDFLARE_ZONE_ID" \
+        -var domain="$DOMAIN" \
+        -var doppler_token="$DOPPLER_TOKEN" \
+        {{ARGS}}
+
+@plan *ARGS:
+    just tf plan {{ARGS}}
+
+[confirm("Are you sure you want to apply these changes?")]
+@apply *ARGS:
+    just tf apply -auto-approve {{ARGS}}
+
+[confirm("Are you sure you want to destroy these changes?")]
+@destroy *ARGS:
+    just tf destroy -auto-approve {{ARGS}}
+
+@output *ARGS:
+    terraform output {{ARGS}}
