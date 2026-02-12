@@ -89,6 +89,28 @@ module "arr_stack_tunnel" {
   ]
 }
 
+
+module "dokploy_tunnel" {
+  source = "./modules/cloudflare_tunnel"
+
+  tunnel_name           = "dokploy-tunnel"
+  cloudflare_account_id = var.cloudflare_account_id
+  cloudflare_zone_id    = var.cloudflare_zone_id
+  services = [
+    {
+      name    = "dokploy"
+      domain  = "dokploy.${var.domain}"
+      service = "http://localhost:3000"
+
+    },
+    {
+      name    = "dokploy-http"
+      domain  = "*.${var.domain}"
+      service = "http://127.0.0.1:80"
+    }
+  ]
+}
+
 resource "cloudflare_zero_trust_access_policy" "allow_emails" {
   account_id = var.cloudflare_account_id
   name       = "Allow email addresses"
@@ -119,4 +141,11 @@ resource "doppler_secret" "arr_stack_tunnel_token" {
   config  = local.doppler_config_name
   name    = "ARR_STACK_TUNNEL_TOKEN"
   value   = module.arr_stack_tunnel.tunnel_token
+}
+
+resource "doppler_secret" "dokploy_tunnel_token" {
+  project = local.doppler_project
+  config  = local.doppler_config_name
+  name    = "DOKPLOY_TUNNEL_TOKEN"
+  value   = module.dokploy_tunnel.tunnel_token
 }
