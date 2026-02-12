@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  user,
   ...
 }: let
   cfg = config.arr-stack;
@@ -45,7 +46,19 @@ in {
         };
       };
       jellyfin.enable = true;
-      cloudflared.enable = true;
+      cloudflared = {
+        enable = true;
+        tunnels = {
+          arr = {
+            tokenFile = "/Users/${user.username}/.local/share/cloudflared/arr.token";
+            logDir = "/Users/${user.username}/Library/Logs/cloudflared/arr";
+          };
+          media = {
+            tokenFile = "/Users/${user.username}/.local/share/cloudflared/media.token";
+            logDir = "/Users/${user.username}/Library/Logs/cloudflared/media";
+          };
+        };
+      };
     };
   };
 }
