@@ -151,6 +151,23 @@ in {
       enableNushellIntegration = cfg.nushell.enable;
       enableZshIntegration = cfg.zsh.enable;
     };
+    # atuin - Magical shell history
+    # GitHub Repository: https://github.com/atuinsh/atuin
+    programs.atuin = {
+      enable = true;
+      enableBashIntegration = cfg.bash.enable;
+      enableFishIntegration = cfg.fish.enable;
+      enableNushellIntegration = cfg.nushell.enable;
+      enableZshIntegration = cfg.zsh.enable;
+      flags = [
+        "--disable-up-arrow"
+        "--disable-ctrl-r"
+      ];
+      forceOverwriteSettings = true;
+      settings = {
+        sync_address = "https://atuin.yorganci.dev";
+      };
+    };
     programs.delta = {
       enable = true;
       enableGitIntegration = config.git.enable;
