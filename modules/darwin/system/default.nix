@@ -9,13 +9,14 @@
 in {
   config = {
     environment.systemPackages = with casks; [
-      cursor
       helium-browser
-      iina
-      raycast
+      visual-studio-code
+      cursor
+      ghostty
       slack
       whatsapp
-      zed
+      iina
+      raycast
     ];
     system.defaults = {
       NSGlobalDomain."com.apple.trackpad.enableSecondaryClick" = true;
