@@ -21,6 +21,7 @@ in {
     system.defaults = {
       NSGlobalDomain."com.apple.trackpad.enableSecondaryClick" = true;
       dock = {
+        autohide = true;
         mru-spaces = false;
         persistent-apps = [
           {app = "${casks.helium-browser}/Applications/Helium.app";}
