@@ -37,6 +37,12 @@
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    brightness = {
+      url = "github:atahanyorganci/brightness-cli";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.treefmt-nix.follows = "treefmt-nix";
+    };
   };
   outputs = inputs:
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {

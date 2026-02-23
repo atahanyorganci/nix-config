@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "advisory-db": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1771056836,
+        "narHash": "sha256-9HuNt5Duw9+8M5vLz94omzewVEgyxQW9R5ZugNxnGKc=",
+        "owner": "rustsec",
+        "repo": "advisory-db",
+        "rev": "239486fba25c17d7588488348ea8ee6ebebc1cf4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rustsec",
+        "repo": "advisory-db",
+        "type": "github"
+      }
+    },
     "base16": {
       "inputs": {
         "fromYaml": "fromYaml"
@@ -65,6 +81,50 @@
         "owner": "tinted-theming",
         "repo": "base16-vim",
         "rev": "577fe8125d74ff456cf942c733a85d769afe58b7",
+        "type": "github"
+      }
+    },
+    "brightness": {
+      "inputs": {
+        "advisory-db": "advisory-db",
+        "crane": "crane",
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "rust-overlay": "rust-overlay",
+        "treefmt-nix": [
+          "treefmt-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1771873910,
+        "narHash": "sha256-LKpOpJBnoDUhKP0O0gjxE8TUvb/3eeqt0yOd+9JlSa4=",
+        "owner": "atahanyorganci",
+        "repo": "brightness-cli",
+        "rev": "bb4e0287fe14f8fc7109083abcb9df3af8a1a2d2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "atahanyorganci",
+        "repo": "brightness-cli",
+        "type": "github"
+      }
+    },
+    "crane": {
+      "locked": {
+        "lastModified": 1771121070,
+        "narHash": "sha256-aIlv7FRXF9q70DNJPI237dEDAznSKaXmL5lfK/Id/bI=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "a2812c19f1ed2e5ed5ce2ef7109798b575c180e1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipetkov",
+        "repo": "crane",
         "type": "github"
       }
     },
@@ -343,6 +403,7 @@
     },
     "root": {
       "inputs": {
+        "brightness": "brightness",
         "firefox-addons": "firefox-addons",
         "firefox-nix-darwin": "firefox-nix-darwin",
         "flake-parts": "flake-parts",
@@ -353,6 +414,27 @@
         "stylix": "stylix",
         "treefmt-nix": "treefmt-nix",
         "vscode-server": "vscode-server"
+      }
+    },
+    "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "brightness",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1771470520,
+        "narHash": "sha256-PvytHcaYN5cPUll7FB70mXv1rRsIBRmu47fFfq3haxA=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "a1d4cc1f264c45d3745af0d2ca5e59d460e58777",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
       }
     },
     "stylix": {

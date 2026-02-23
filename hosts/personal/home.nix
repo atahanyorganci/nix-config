@@ -1,4 +1,12 @@
-{user, ...}: {
+{
+  user,
+  inputs,
+  pkgs,
+  ...
+}: {
+  home.packages = [
+    inputs.brightness.packages.${pkgs.stdenv.hostPlatform.system}.default
+  ];
   ffmpeg.enable = true;
   ghostty.enable = true;
   git = {
