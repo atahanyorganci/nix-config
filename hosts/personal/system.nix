@@ -3,7 +3,15 @@
   user,
   inputs,
   ...
-}: {
+}: let
+  system = pkgs.stdenv.hostPlatform.system;
+  casks = with inputs.nix-casks.packages.${system}; [
+    responsively
+    lm-studio
+    osaurus
+  ];
+in {
+  environment.systemPackages = casks;
   # Disable `nix-darwin` documentation
   documentation.enable = false;
   # Disable `nix-darwin` to manage Nix because of Determinate Systems Nix

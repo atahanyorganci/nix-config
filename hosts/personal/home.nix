@@ -4,12 +4,11 @@
   pkgs,
   ...
 }: let
-  brightness = inputs.brightness.packages.${pkgs.stdenv.hostPlatform.system}.default;
-  responsively = inputs.nix-casks.packages.${pkgs.stdenv.hostPlatform.system}.responsively;
+  system = pkgs.stdenv.hostPlatform.system;
+  brightness = inputs.brightness.packages.${system}.default;
 in {
   home.packages = [
     brightness
-    responsively
   ];
   ffmpeg.enable = true;
   ghostty.enable = true;
