@@ -18,7 +18,12 @@ in {
       iina
       raycast
     ];
+    system.keyboard = {
+      enableKeyMapping = true;
+      remapCapsLockToControl = true;
+    };
     system.defaults = {
+      universalaccess.reduceMotion = true;
       NSGlobalDomain."com.apple.trackpad.enableSecondaryClick" = true;
       dock = {
         autohide = true;
