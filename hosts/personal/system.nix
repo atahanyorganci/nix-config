@@ -36,6 +36,4 @@ in {
   };
   # Orbstack OCI runtime
   orbstack.enable = true;
-  # Tailscale
-  tailscale.enable = true;
 }

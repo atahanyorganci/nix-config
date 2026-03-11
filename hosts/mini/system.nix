@@ -42,6 +42,4 @@
   };
   # SSH
   ssh.enable = true;
-  # Tailscale
-  tailscale.enable = true;
 }
