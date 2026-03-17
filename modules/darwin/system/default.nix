@@ -17,6 +17,9 @@ in {
       whatsapp
       iina
       raycast
+      claude
+      notion
+      responsively
     ];
     system.defaults = {
       NSGlobalDomain."com.apple.trackpad.enableSecondaryClick" = true;
@@ -27,6 +30,7 @@ in {
           {app = "${casks.helium-browser}/Applications/Helium.app";}
           {app = "${casks.visual-studio-code}/Applications/Visual Studio Code.app";}
           {app = "${casks.cursor}/Applications/Cursor.app";}
+          {app = "${casks.notion}/Applications/Notion.app";}
           {app = "${casks.ghostty}/Applications/Ghostty.app";}
           {app = "${casks.slack}/Applications/Slack.app";}
           {app = "${casks.whatsapp}/Applications/Whatsapp.app";}

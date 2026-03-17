@@ -1,15 +1,4 @@
-{
-  user,
-  inputs,
-  pkgs,
-  ...
-}: let
-  system = pkgs.stdenv.hostPlatform.system;
-  brightness = inputs.brightness.packages.${system}.default;
-in {
-  home.packages = [
-    brightness
-  ];
+{user, ...}: {
   ffmpeg.enable = true;
   ghostty.enable = true;
   git = {
