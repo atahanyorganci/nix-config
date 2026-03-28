@@ -17,8 +17,7 @@ in {
         dust
         hyperfine
         tokei
-        onefetch
-        neofetch
+        fastfetch
         go-task
         pandoc
         qrencode
