@@ -1,4 +1,5 @@
 {user, ...}: {
+  codex.enable = true;
   ffmpeg.enable = true;
   ghostty.enable = true;
   git = {
