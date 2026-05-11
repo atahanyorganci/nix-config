@@ -1,5 +1,5 @@
 {user, ...}: {
-  codex.enable = true;
+  agents.enable = true;
   ffmpeg.enable = true;
   ghostty.enable = true;
   git = {
@@ -17,7 +17,6 @@
     zsh.enable = true;
   };
   tools.enable = true;
-  opencode.enable = true;
   uutils.enable = true;
   wget.enable = true;
 }
