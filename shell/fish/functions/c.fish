@@ -1,7 +1,7 @@
-function c --description "Visual Studio Code" --wraps code
+function c --description Cursor --wraps cursor
     if test (count $argv) -gt 0
-        command code $argv
+        command cursor $argv
     else
-        command code .
+        command cursor .
     end
 end

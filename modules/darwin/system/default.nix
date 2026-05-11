@@ -28,7 +28,6 @@ in {
         mru-spaces = false;
         persistent-apps = [
           {app = "${casks.helium-browser}/Applications/Helium.app";}
-          {app = "${casks.visual-studio-code}/Applications/Visual Studio Code.app";}
           {app = "${casks.cursor}/Applications/Cursor.app";}
           {app = "${casks.notion}/Applications/Notion.app";}
           {app = "${casks.ghostty}/Applications/Ghostty.app";}

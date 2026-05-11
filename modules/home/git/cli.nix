@@ -53,7 +53,7 @@ in {
           };
           init.defaultBranch = "main";
           merge.conflictStyle = "zdiff3";
-          core.editor = "code --wait";
+          core.editor = "cursor --wait";
           help.autocorrect = "prompt";
           rebase = {
             autoStash = true;

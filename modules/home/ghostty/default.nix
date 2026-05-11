@@ -21,7 +21,6 @@ in {
     };
     home = {
       packages = [pkg];
-      sessionVariables.EDITOR = "code --wait";
     };
     programs.ghostty = {
       enable = true;
