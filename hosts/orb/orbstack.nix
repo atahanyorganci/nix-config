@@ -16,6 +16,7 @@
   environment.etc."resolv.conf".source = "/opt/orbstack-guest/etc/resolv.conf";
   # Faster DHCP - OrbStack uses SLAAC exclusively
   networking = {
+    resolvconf.enable = false;
     dhcpcd = {
       enable = false;
       extraConfig = ''
