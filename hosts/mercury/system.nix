@@ -35,8 +35,6 @@
   users.users.${user.username}.extraGroups = ["networkmanager"];
   # Enable automatic login for the user.
   services.getty.autologinUser = user.username;
-  # Allow unfree packages
-  nixpkgs.config.allowUnfree = true;
   # Enable GPG for SSH and commit signing
   programs.gnupg.agent = {
     enable = true;

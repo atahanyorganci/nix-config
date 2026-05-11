@@ -1,4 +1,4 @@
-{...}: let
+{withSystem, ...}: let
   contents = builtins.readDir ./.;
   directories = builtins.filter (name: contents.${name} == "directory") (builtins.attrNames contents);
   modules = builtins.listToAttrs (builtins.map (name: {
@@ -9,7 +9,10 @@
   modulesWithDefault =
     modules
     // {
-      default = {...}: {
+      default = {config, ...}: {
+        nixpkgs.pkgs = withSystem config.nixpkgs.system (
+          {pkgs, ...}: pkgs
+        );
         imports = builtins.attrValues modules;
       };
     };

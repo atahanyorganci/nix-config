@@ -1,4 +1,8 @@
-{config, ...}: let
+{
+  withSystem,
+  config,
+  ...
+}: let
   user = config.flake.me;
   contents = builtins.readDir ./.;
   directories = builtins.filter (name: contents.${name} == "directory") (builtins.attrNames contents);
@@ -11,6 +15,9 @@
     modules
     // {
       default = {config, ...}: {
+        nixpkgs.pkgs = withSystem config.nixpkgs.system (
+          {pkgs, ...}: pkgs
+        );
         # Enable flakes and nix commands
         nix.settings.experimental-features = ["nix-command" "flakes"];
         # NixOS version
