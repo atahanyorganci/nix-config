@@ -23,9 +23,9 @@
     description = user.name;
     home = "/Users/${user.username}";
     shell = pkgs.${user.shell};
-    # User ID created by MacOS for the user use `id -u` to get it.
+    # User ID created by MacOS for the user use `id -u` to get it.
     uid = 501;
   };
-  # Orbstack OCI runtime
+  # Orbstack OCI runtime
   orbstack.enable = true;
 }
