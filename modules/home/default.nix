@@ -14,6 +14,11 @@
         home.stateVersion = "26.05";
         # Let Home Manager install and manage itself.
         programs.home-manager.enable = true;
+        # Disable man pages
+        programs.man = {
+          enable = false;
+          man-db.enable = false;
+        };
         # Setup XDG directories and environment variables
         xdg.enable = true;
         imports = builtins.attrValues modules;
