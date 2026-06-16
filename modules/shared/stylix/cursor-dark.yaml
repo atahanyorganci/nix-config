@@ -1,0 +1,21 @@
+system: "base16"
+name: "Cursor Dark"
+author: "Anysphere (https://cursor.com), mapped for Stylix"
+variant: "dark"
+palette:
+  base00: "#141414" # sidebar, title bar, terminal bg
+  base01: "#181818" # editor / active tab bg
+  base02: "#262626" # line highlight, selection-adjacent
+  base03: "#505050" # inactive line numbers, comments
+  base04: "#8A8A8A" # muted foreground
+  base05: "#E4E4E4" # primary foreground
+  base06: "#F5F5F5" # light foreground
+  base07: "#FFFFFF" # light background
+  base08: "#FC6B83" # red / errors
+  base09: "#EFB080" # orange / functions
+  base0A: "#F1B467" # yellow / warnings
+  base0B: "#3FA266" # green / success
+  base0C: "#82D2CE" # cyan / keywords
+  base0D: "#87C3FF" # blue / classes
+  base0E: "#E394DC" # magenta / strings
+  base0F: "#AAA0FA" # purple / methods, attributes
