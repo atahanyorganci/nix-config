@@ -123,7 +123,7 @@ in {
       enableBashIntegration = cfg.bash.enable;
       enableZshIntegration = cfg.zsh.enable;
       enableFishIntegration = cfg.fish.enable;
-      historyWidgetOptions = ["--prompt='History> '"];
+      historyWidget.options = ["--prompt='History> '"];
     };
     # zoxide - A smarter cd command.
     # GitHub Repository: https://github.com/ajeetdsouza/zoxide
