@@ -45,4 +45,9 @@
   };
   # SSH
   ssh.enable = true;
+  # Self-hosted NetBird mesh
+  netbird = {
+    enable = true;
+    setupKeyFile = "/var/lib/netbird-client/setup.key";
+  };
 }
