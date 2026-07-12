@@ -28,9 +28,7 @@ in {
           inherit user inputs;
         };
       }
-      nixos.base
-      nixos.stylix
-      nixos.ssh
+      nixos.default
     ];
     specialArgs = {
       inherit inputs user;

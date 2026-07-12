@@ -9,7 +9,10 @@ in {
     nixpkgs.pkgs = withSystem config.nixpkgs.system (
       {pkgs, ...}: pkgs
     );
-    nix.settings.experimental-features = ["nix-command" "flakes"];
+    nix.settings = {
+      experimental-features = ["nix-command" "flakes"];
+      trusted-users = ["root" "@wheel"];
+    };
     system.stateVersion = "26.05";
     users.users.${user.username} = {
       isNormalUser = true;

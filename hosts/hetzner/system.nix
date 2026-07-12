@@ -78,4 +78,9 @@
   # Key-only SSH; allow remote nixos-rebuild --use-remote-sudo.
   ssh.enable = true;
   security.sudo.wheelNeedsPassword = false;
+  netbird-server = {
+    enable = true;
+    domain = "netbird.yorganci.dev";
+    acmeEmail = user.email;
+  };
 }
