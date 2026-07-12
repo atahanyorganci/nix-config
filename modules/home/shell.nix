@@ -178,7 +178,6 @@
       };
       home.packages = with pkgs; [
         bat
-        delta
         fd
         sd
         ripgrep
