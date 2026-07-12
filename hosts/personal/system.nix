@@ -31,6 +31,11 @@
   };
   # Orbstack OCI runtime
   orbstack.enable = true;
+  # Self-hosted NetBird mesh (daemon + UI)
+  netbird = {
+    enable = true;
+    package = pkgs.netbird-app;
+  };
   homebrew.casks = [
     "fluidvoice"
     "spotify"
