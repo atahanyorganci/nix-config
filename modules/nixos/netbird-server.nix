@@ -7,45 +7,6 @@
   }: let
     cfg = config.netbird-server;
 
-    netbird-server = pkgs.buildGoModule rec {
-      pname = "netbird-server";
-      version = "0.74.2";
-
-      src = pkgs.fetchFromGitHub {
-        owner = "netbirdio";
-        repo = "netbird";
-        tag = "v${version}";
-        hash = "sha256-+BGWZzw6a8Fp8NlhtbX81OA3hCTcQ9r6nLuXTsbXCZ8=";
-      };
-
-      vendorHash = "sha256-5dZu6lmfwaUHusAlFS1qqorFbpa4anCUQDtg4Tv5mxw=";
-
-      subPackages = ["combined"];
-
-      ldflags = [
-        "-s"
-        "-w"
-        "-X github.com/netbirdio/netbird/version.version=v${version}"
-        "-X main.builtBy=nix"
-      ];
-
-      # SQLite (mattn/go-sqlite3) needs CGO, matching upstream Docker builds.
-      env.CGO_ENABLED = "1";
-
-      doCheck = false;
-
-      postInstall = ''
-        mv $out/bin/combined $out/bin/netbird-server
-      '';
-
-      meta = {
-        description = "Combined NetBird management, signal, relay, and STUN server";
-        homepage = "https://netbird.io";
-        license = pkgs.lib.licenses.agpl3Only;
-        mainProgram = "netbird-server";
-      };
-    };
-
     stateDir = "/var/lib/netbird";
     secretsDir = "${stateDir}/secrets";
     runtimeDir = "/run/netbird-server";
@@ -199,8 +160,8 @@
 
       package = lib.mkOption {
         type = lib.types.package;
-        default = netbird-server;
-        defaultText = lib.literalExpression "netbird-server";
+        default = pkgs.netbird-server;
+        defaultText = lib.literalExpression "pkgs.netbird-server";
         description = "Combined NetBird server package.";
       };
     };
