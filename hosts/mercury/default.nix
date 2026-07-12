@@ -19,7 +19,7 @@ in {
         home-manager.verbose = true;
         home-manager.users.${user.username} = {...}: {
           imports = [
-            config.flake.homeModules.default
+            config.flake.modules.homeManager.default
             ./home.nix
           ];
         };
@@ -27,8 +27,7 @@ in {
           inherit user inputs;
         };
       }
-      config.flake.nixosModules.default
-      config.flake.nixosModules.shared
+      config.flake.modules.nixos.default
     ];
     specialArgs = {
       inherit inputs user;

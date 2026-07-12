@@ -1,29 +1,11 @@
-{...}: let
-  contents = builtins.readDir ./.;
-  directories = builtins.filter (name: contents.${name} == "directory") (builtins.attrNames contents);
-  modules = builtins.listToAttrs (builtins.map (name: {
-      name = name;
-      value = import ./${name};
-    })
-    directories);
-  modulesWithDefault =
-    modules
-    // {
-      default = {...}: {
-        # Compatibility with NixOS
-        home.stateVersion = "26.05";
-        # Let Home Manager install and manage itself.
-        programs.home-manager.enable = true;
-        # Disable man pages
-        programs.man = {
-          enable = false;
-          man-db.enable = false;
-        };
-        # Setup XDG directories and environment variables
-        xdg.enable = true;
-        imports = builtins.attrValues modules;
-      };
-    };
-in {
-  flake.homeModules = modulesWithDefault;
+{
+  config,
+  lib,
+  ...
+}: {
+  flake.modules.homeManager.default = {
+    imports = lib.attrValues (
+      lib.filterAttrs (n: _: n != "default") config.flake.modules.homeManager
+    );
+  };
 }

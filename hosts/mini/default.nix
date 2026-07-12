@@ -17,7 +17,7 @@ in {
         home-manager.verbose = true;
         home-manager.users.${user.username} = {...}: {
           imports = [
-            config.flake.homeModules.default
+            config.flake.modules.homeManager.default
             ./home.nix
           ];
         };
@@ -25,8 +25,7 @@ in {
           inherit user inputs;
         };
       }
-      config.flake.darwinModules.default
-      config.flake.darwinModules.shared
+      config.flake.modules.darwin.default
     ];
     specialArgs = {
       inherit inputs user;

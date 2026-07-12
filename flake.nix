@@ -1,5 +1,5 @@
 {
-  description = "NixOS configuration for Atahan's MacBook Pro";
+  description = "NixOS / nix-darwin configuration for Atahan";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nix-darwin = {
@@ -33,6 +33,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     flake-parts.url = "github:hercules-ci/flake-parts";
+    import-tree.url = "github:vic/import-tree";
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -46,42 +47,12 @@
   };
   outputs = inputs:
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
-      flake = {
-        me = {
-          name = "Atahan Yorgancı";
-          email = "atahanyorganci@hotmail.com";
-          username = "atahan";
-          shell = "fish";
-          key = "277004B9D6B7DCE3";
-          authorizedKeys = [
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQEQWwP1aWkv4t/nzin3rRn7ueC7HWR+g9Tec1nwuS"
-          ];
-        };
-      };
       imports = [
-        inputs.treefmt-nix.flakeModule
-        inputs.home-manager.flakeModules.home-manager
+        (inputs.import-tree ./modules)
         ./hosts/mercury
         ./hosts/mini
         ./hosts/orb
         ./hosts/personal
-        ./infra/shell.nix
-        ./modules/darwin
-        ./modules/home
-        ./modules/nixos
-        ./modules/shared
-        ./lib.nix
-        ./treefmt.nix
       ];
-      systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
-      perSystem = {system, ...}: {
-        _module.args.pkgs = import inputs.nixpkgs {
-          inherit system;
-          config = {
-            allowUnfree = true;
-            allowBroken = true;
-          };
-        };
-      };
     };
 }
