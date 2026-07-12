@@ -9,6 +9,7 @@
       inherit (user) name email key;
     };
   };
+  gpg.enable = true;
   gum.enable = true;
   python.enable = true;
   shell = {

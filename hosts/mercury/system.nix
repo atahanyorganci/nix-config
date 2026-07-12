@@ -35,11 +35,6 @@
   users.users.${user.username}.extraGroups = ["networkmanager"];
   # Enable automatic login for the user.
   services.getty.autologinUser = user.username;
-  # Enable GPG for SSH and commit signing
-  programs.gnupg.agent = {
-    enable = true;
-    enableSSHSupport = true;
-  };
   # Enable Docker runtime
   docker.enable = true;
   # Enable SSH server

@@ -19,10 +19,13 @@
       })
       keyFileNames;
   in {
-    options.gpg.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Enable GPG";
+    options.gpg = {
+      enable = lib.mkEnableOption "GPG";
+      agent.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Run a local gpg-agent (disable on remotes that use agent forwarding)";
+      };
     };
     config = lib.mkIf config.gpg.enable {
       programs.gpg = {
@@ -40,16 +43,16 @@
         yubikey-personalization
         yubikey-manager
       ];
-      services.gpg-agent = {
+      # SSH_AUTH_SOCK is set via HM sshAuthSock (from enableSshSupport), which
+      # preserves a forwarded agent when SSH_CONNECTION is set.
+      services.gpg-agent = lib.mkIf config.gpg.agent.enable {
         enable = true;
         enableSshSupport = true;
+        enableExtraSocket = true;
         enableBashIntegration = config.shell.bash.enable;
         enableFishIntegration = config.shell.fish.enable;
         enableNushellIntegration = config.shell.fish.enable;
         enableZshIntegration = config.shell.zsh.enable;
-      };
-      home.sessionVariables = {
-        SSH_AUTH_SOCK = "${config.home.homeDirectory}/.gnupg/S.gpg-agent.ssh";
       };
     };
   };

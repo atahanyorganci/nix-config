@@ -7,8 +7,8 @@
       inherit (user) name email key;
     };
   };
+  gpg.enable = true;
   gum.enable = true;
-  node.enable = true;
   python.enable = true;
   shell = {
     bash.enable = true;

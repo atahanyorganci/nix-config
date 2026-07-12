@@ -3,6 +3,9 @@
     username = user.username;
     homeDirectory = "/home/${user.username}";
   };
+  # Public keys + gpg CLI; no local agent (use forwarded YubiKey from personal).
+  gpg.enable = true;
+  gpg.agent.enable = false;
   ffmpeg.enable = true;
   git = {
     enable = true;

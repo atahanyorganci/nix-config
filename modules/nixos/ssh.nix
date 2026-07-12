@@ -24,6 +24,9 @@
           AllowUsers = [user.username];
           # Disable X11 display server forwarding
           X11Forwarding = false;
+          # Allow SSH agent and GPG socket forwarding
+          AllowAgentForwarding = true;
+          StreamLocalBindUnlink = "yes";
           # Server-client alive checks
           ClientAliveInterval = 300;
           ClientAliveCountMax = 3;

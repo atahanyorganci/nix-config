@@ -23,6 +23,8 @@
           LoginGraceTime 20s
           # Only allows known user
           AllowUsers ${user.username}
+          AllowAgentForwarding yes
+          StreamLocalBindUnlink yes
           # Server-client alive checks
           ClientAliveInterval 300
           ClientAliveCountMax 3
