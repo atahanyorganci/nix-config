@@ -41,9 +41,9 @@
   ssh.enable = true;
   # Enable VSCode Server
   services.vscode-server.enable = true;
-  # Tailscale
-  tailscale = {
+  # Self-hosted NetBird mesh
+  netbird = {
     enable = true;
-    domain = "jackal-mercat.ts.net";
+    setupKeyFile = "/var/lib/netbird-client/setup.key";
   };
 }
