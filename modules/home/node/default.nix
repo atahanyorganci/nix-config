@@ -5,9 +5,10 @@
   ...
 }: let
   versions = {
-    "18" = pkgs.nodejs_18;
     "20" = pkgs.nodejs_20;
     "22" = pkgs.nodejs_22;
+    "24" = pkgs.nodejs_24;
+    "26" = pkgs.nodejs_26;
   };
   availableVersions = builtins.attrNames versions;
   sortedVersions = builtins.sort (a: b: (builtins.compareVersions a b) < 0) availableVersions;

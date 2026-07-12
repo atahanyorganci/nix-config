@@ -20,5 +20,6 @@
   };
   tools.enable = true;
   uutils.enable = true;
+  node.enable = true;
   wget.enable = true;
 }
