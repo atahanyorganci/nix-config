@@ -31,4 +31,8 @@
   };
   # Orbstack OCI runtime
   orbstack.enable = true;
+  homebrew.casks = [
+    "fluidvoice"
+    "spotify"
+  ];
 }

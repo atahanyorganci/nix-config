@@ -29,7 +29,6 @@ in {
         persistent-apps = [
           {app = "${casks.helium-browser}/Applications/Helium.app";}
           {app = "${casks.cursor}/Applications/Cursor.app";}
-          {app = "${casks.notion}/Applications/Notion.app";}
           {app = "${casks.ghostty}/Applications/Ghostty.app";}
           {app = "${casks.slack}/Applications/Slack.app";}
           {app = "${casks.whatsapp}/Applications/Whatsapp.app";}
