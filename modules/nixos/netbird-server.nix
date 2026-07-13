@@ -14,6 +14,8 @@
     healthcheckPort = 9000;
     metricsPort = 9090;
     stunPort = 3478;
+    # Avoid Traefik's historical default API port (:8080).
+    dashboardPort = 8090;
 
     # Placeholders are replaced at service start so secrets stay out of the Nix store.
     configTemplate = pkgs.writeText "netbird-server-config.yaml" ''
@@ -164,6 +166,13 @@
         defaultText = lib.literalExpression "pkgs.netbird-server";
         description = "Combined NetBird server package.";
       };
+
+      # When true, Traefik TCP-passthroughs unknown SNI to netbird-proxy :8443.
+      enableProxyPassthrough = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable Traefik TLS passthrough for NetBird reverse proxy (HostSNI `*`).";
+      };
     };
 
     config = lib.mkIf cfg.enable {
@@ -180,66 +189,119 @@
         allowedUDPPorts = [stunPort];
       };
 
-      security.acme = {
-        acceptTerms = true;
-        defaults.email = cfg.acmeEmail;
+      # Local static file server for the dashboard SPA (Traefik terminates TLS publicly).
+      systemd.services.netbird-dashboard = {
+        description = "NetBird dashboard static files";
+        after = ["network.target"];
+        wantedBy = ["multi-user.target"];
+        serviceConfig = {
+          Type = "simple";
+          ExecStart = "${lib.getExe pkgs.static-web-server} --host 127.0.0.1 --port ${toString dashboardPort} --root ${dashboardDrv} --page-fallback ${dashboardDrv}/index.html --log-level error";
+          Restart = "on-failure";
+          RestartSec = "3s";
+          DynamicUser = true;
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          PrivateTmp = true;
+          NoNewPrivileges = true;
+        };
       };
 
-      services.nginx = {
+      services.traefik = {
         enable = true;
-        recommendedProxySettings = true;
-        recommendedTlsSettings = true;
-        virtualHosts.${cfg.domain} = {
-          forceSSL = true;
-          enableACME = true;
-          root = dashboardDrv;
-          extraConfig = ''
-            # Long-lived gRPC / WebSocket sessions.
-            client_header_timeout 1d;
-            client_body_timeout 1d;
-          '';
-          locations = {
-            "/".tryFiles = "$uri $uri.html $uri/ /index.html";
-
-            # WebSocket: relay + management/signal ws-proxy
-            "~ ^/(relay|ws-proxy/)".extraConfig = ''
-              proxy_pass http://127.0.0.1:${toString listenPort};
-              proxy_http_version 1.1;
-              proxy_set_header Upgrade $http_upgrade;
-              proxy_set_header Connection "upgrade";
-              proxy_set_header Host $host;
-              proxy_set_header X-Real-IP $remote_addr;
-              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto $scheme;
-              proxy_read_timeout 1d;
-            '';
-
-            # Native gRPC (HTTP/2)
-            "~ ^/(signalexchange\\.SignalExchange|management\\.ManagementService)/".extraConfig = ''
-              grpc_pass grpc://127.0.0.1:${toString listenPort};
-              grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              grpc_read_timeout 1d;
-              grpc_send_timeout 1d;
-              grpc_socket_keepalive on;
-            '';
-
-            # Management HTTP API + embedded Dex (OIDC)
-            "~ ^/(api|oauth2)".extraConfig = ''
-              proxy_pass http://127.0.0.1:${toString listenPort};
-              proxy_set_header Host $host;
-              proxy_set_header X-Real-IP $remote_addr;
-              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto $scheme;
-              proxy_set_header X-Forwarded-Host $host;
-            '';
+        staticConfigOptions = {
+          # Do not enable api/ping — both create a default :8080 "traefik" entrypoint.
+          entryPoints = {
+            web.address = ":80";
+            websecure.address = ":443";
+          };
+          certificatesResolvers.letsencrypt.acme = {
+            email = cfg.acmeEmail;
+            storage = "/var/lib/traefik/acme.json";
+            tlsChallenge = {};
           };
         };
+        dynamicConfigOptions =
+          {
+            http = {
+              middlewares.redirect-to-https.redirectScheme = {
+                scheme = "https";
+                permanent = true;
+              };
+              routers = {
+                # NetBird proxy HTTP-01 challenges (must win over HTTPS redirect).
+                netbird-proxy-acme = {
+                  rule = "PathPrefix(`/.well-known/acme-challenge/`)";
+                  entryPoints = ["web"];
+                  service = "netbird-proxy-acme";
+                  priority = 1000;
+                };
+                http-to-https = {
+                  rule = "PathPrefix(`/`)";
+                  entryPoints = ["web"];
+                  middlewares = ["redirect-to-https"];
+                  service = "netbird-dashboard";
+                  priority = 1;
+                };
+                netbird-dashboard = {
+                  rule = "Host(`${cfg.domain}`)";
+                  entryPoints = ["websecure"];
+                  service = "netbird-dashboard";
+                  tls.certResolver = "letsencrypt";
+                  priority = 10;
+                };
+                netbird-backend = {
+                  rule = "Host(`${cfg.domain}`) && (PathPrefix(`/relay`) || PathPrefix(`/ws-proxy/`) || PathPrefix(`/api`) || PathPrefix(`/oauth2`))";
+                  entryPoints = ["websecure"];
+                  service = "netbird-backend";
+                  tls.certResolver = "letsencrypt";
+                  priority = 100;
+                };
+                # Include ProxyService so remote proxies can reach management over TLS.
+                netbird-grpc = {
+                  rule = "Host(`${cfg.domain}`) && (PathPrefix(`/signalexchange.SignalExchange/`) || PathPrefix(`/management.ManagementService/`) || PathPrefix(`/management.ProxyService/`))";
+                  entryPoints = ["websecure"];
+                  service = "netbird-grpc";
+                  tls.certResolver = "letsencrypt";
+                  priority = 100;
+                };
+              };
+              services = {
+                netbird-dashboard.loadBalancer.servers = [
+                  {url = "http://127.0.0.1:${toString dashboardPort}";}
+                ];
+                netbird-backend.loadBalancer.servers = [
+                  {url = "http://127.0.0.1:${toString listenPort}";}
+                ];
+                netbird-grpc.loadBalancer.servers = [
+                  {url = "h2c://127.0.0.1:${toString listenPort}";}
+                ];
+                netbird-proxy-acme.loadBalancer.servers = [
+                  {url = "http://127.0.0.1:8085";}
+                ];
+              };
+            };
+          }
+          // lib.optionalAttrs cfg.enableProxyPassthrough {
+            tcp = {
+              routers.proxy-passthrough = {
+                entryPoints = ["websecure"];
+                rule = "HostSNI(`*`)";
+                service = "proxy-tls";
+                priority = 1;
+                tls.passthrough = true;
+              };
+              services.proxy-tls.loadBalancer.servers = [
+                {address = "127.0.0.1:8443";}
+              ];
+            };
+          };
       };
 
       systemd.services.netbird-server = {
         description = "NetBird combined management/signal/relay/STUN server";
         documentation = ["https://docs.netbird.io/selfhosted/selfhosted-quickstart"];
-        after = ["network-online.target" "nginx.service"];
+        after = ["network-online.target" "traefik.service"];
         wants = ["network-online.target"];
         wantedBy = ["multi-user.target"];
 

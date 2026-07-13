@@ -83,6 +83,11 @@
     domain = "netbird.yorganci.dev";
     acmeEmail = user.email;
   };
+  netbird-proxy = {
+    enable = true;
+    domain = "yorganci.dev";
+    tokenFile = "/var/lib/netbird-proxy/token";
+  };
   # Join the mesh as a peer so Pi-hole is reachable on wt0.
   netbird = {
     enable = true;
