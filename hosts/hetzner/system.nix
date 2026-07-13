@@ -83,4 +83,10 @@
     domain = "netbird.yorganci.dev";
     acmeEmail = user.email;
   };
+  # Join the mesh as a peer so Pi-hole is reachable on wt0.
+  netbird = {
+    enable = true;
+    setupKeyFile = "/var/lib/netbird-client/setup.key";
+  };
+  pihole.enable = true;
 }
