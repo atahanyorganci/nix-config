@@ -50,6 +50,11 @@
     enable = true;
     setupKeyFile = "/var/lib/netbird-client/setup.key";
   };
-  # Local LLM inference (Apple Silicon menu bar app + CLI)
-  environment.systemPackages = [pkgs.omlx];
+  services.omlx = {
+    enable = true;
+    settings = {
+      ssd-cache-max-size = "22GB";
+      skip-api-key-verification = true;
+    };
+  };
 }
