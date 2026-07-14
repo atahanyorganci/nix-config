@@ -52,13 +52,4 @@
   };
   # Local LLM inference (Apple Silicon menu bar app + CLI)
   environment.systemPackages = [pkgs.omlx];
-  # Upstream CLI/diagnostics hardcode /Applications/oMLX.app
-  system.activationScripts.postActivation.text = ''
-    echo "Installing oMLX.app to /Applications..."
-    rm -rf /Applications/oMLX.app
-    cp -a ${pkgs.omlx}/Applications/oMLX.app /Applications/oMLX.app
-    chmod -R u+w /Applications/oMLX.app
-    /usr/bin/codesign --force --deep --sign - /Applications/oMLX.app
-    chown -R ${user.username}:staff /Applications/oMLX.app
-  '';
 }

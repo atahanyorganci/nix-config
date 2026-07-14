@@ -36,8 +36,27 @@
           runHook preInstall
           mkdir -p $out/Applications $out/bin
           cp -R oMLX.app $out/Applications/
-          # Store paths are read-only after install; make writable for codesign.
+          # Store paths are read-only after install; make writable for codesign/patch.
           chmod -R u+w $out/Applications/oMLX.app
+
+          app=$out/Applications/oMLX.app
+          resources=$app/Contents/Resources
+          omlx=$resources/omlx
+          # Discover the .app from the running bundle instead of hardcoding /Applications.
+          substituteInPlace "$omlx/cli.py" \
+            --replace-fail 'app_path = Path("/Applications/oMLX.app")' \
+              'app_path = _app_bundle_path()' \
+            --replace-fail 'return Path("/Applications/oMLX.app")' \
+              'raise FileNotFoundError("oMLX.app bundle not found")'
+          substituteInPlace "$omlx/utils/install.py" \
+            --replace-fail \
+              'return Path("/Applications/oMLX.app/Contents/MacOS") / _APP_BUNDLE_CLI_NAME' \
+              'raise FileNotFoundError("oMLX.app bundle not found in path")'
+          # Force-refresh all .pyc with the bundled cpython so patched sources win at runtime
+          # (omlx-cli sets PYTHONDONTWRITEBYTECODE=1 and will prefer existing bytecode).
+          python=$resources/Python/cpython-3.11/bin/python3
+          "$python" -m compileall -f -q "$resources"
+
           # Nix store copy invalidates the upstream signature; ad-hoc re-sign.
           /usr/bin/codesign --force --deep --sign - "$out/Applications/oMLX.app"
           ln -s ../Applications/oMLX.app/Contents/MacOS/omlx-cli $out/bin/omlx
