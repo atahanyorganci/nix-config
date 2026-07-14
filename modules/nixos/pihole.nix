@@ -37,6 +37,13 @@
               "9.9.9.9"
             ];
           };
+          # NixOS already syncs time via systemd-timesyncd; FTL's NTP client
+          # often can't set the clock and just spam "No valid NTP replies".
+          ntp = {
+            ipv4.active = false;
+            ipv6.active = false;
+            sync.active = false;
+          };
         };
       };
 
