@@ -11,6 +11,11 @@
   in {
     options.pihole = {
       enable = lib.mkEnableOption "Pi-hole DNS for NetBird mesh peers";
+      hostName = lib.mkOption {
+        type = lib.types.str;
+        example = "mars.netbird.selfhosted";
+        description = "Hostname for the Pi-hole admin UI (services.pihole-web).";
+      };
     };
 
     config = lib.mkIf cfg.enable {
@@ -50,7 +55,7 @@
       # Admin UI on all interfaces; NixOS firewall limits access to NetBird.
       services.pihole-web = {
         enable = true;
-        hostName = "mars.netbird.selfhosted";
+        hostName = cfg.hostName;
         ports = [8053];
       };
 

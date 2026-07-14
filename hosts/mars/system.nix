@@ -1,4 +1,4 @@
-{user, ...}: {
+{user, ...}: rec {
   # Hetzner Cloud (KVM): virtio must be in the initrd or root never appears.
   boot.initrd.availableKernelModules = [
     "ahci"
@@ -93,5 +93,8 @@
     enable = true;
     setupKeyFile = "/var/lib/netbird-client/setup.key";
   };
-  pihole.enable = true;
+  pihole = {
+    enable = true;
+    hostName = "${networking.hostName}.netbird.selfhosted";
+  };
 }
