@@ -5,7 +5,7 @@
   ...
 }: {
   # Hostname
-  networking.hostName = "mini";
+  networking.hostName = "venus";
   # Disable `nix-darwin` documentation
   documentation.enable = false;
   # Work around nix-darwin manual generation failing with newer nixos-render-docs.

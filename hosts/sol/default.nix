@@ -5,12 +5,12 @@
 }: let
   user = config.flake.me;
 in {
-  flake.nixosConfigurations.orb = inputs.nixpkgs.lib.nixosSystem {
-    system = "aarch64-linux";
+  flake.darwinConfigurations.sol = inputs.nix-darwin.lib.darwinSystem {
+    system = "aarch64-darwin";
     modules = [
       ./system.nix
-      inputs.home-manager.nixosModules.home-manager
-      inputs.stylix.nixosModules.stylix
+      inputs.home-manager.darwinModules.home-manager
+      inputs.stylix.darwinModules.stylix
       {
         home-manager.useGlobalPkgs = true;
         home-manager.useUserPackages = true;
@@ -25,7 +25,7 @@ in {
           inherit user inputs;
         };
       }
-      config.flake.modules.nixos.default
+      config.flake.modules.darwin.default
     ];
     specialArgs = {
       inherit inputs user;

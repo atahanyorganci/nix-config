@@ -1,5 +1,5 @@
 {user, ...}: {
-  # Public keys + gpg CLI; no local agent (use forwarded YubiKey from personal).
+  # Public keys + gpg CLI; no local agent (use forwarded YubiKey from sol).
   gpg.enable = true;
   gpg.agent.enable = false;
   ffmpeg.enable = true;

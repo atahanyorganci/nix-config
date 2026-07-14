@@ -57,7 +57,7 @@
     };
   };
   networking = {
-    hostName = "hetzner";
+    hostName = "mars";
     useDHCP = true;
   };
   time.timeZone = "Europe/Istanbul";

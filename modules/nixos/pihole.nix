@@ -50,7 +50,7 @@
       # Admin UI on all interfaces; NixOS firewall limits access to NetBird.
       services.pihole-web = {
         enable = true;
-        hostName = "hetzner.netbird.selfhosted";
+        hostName = "mars.netbird.selfhosted";
         ports = [8053];
       };
 

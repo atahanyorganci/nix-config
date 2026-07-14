@@ -18,7 +18,7 @@
     enableSSHSupport = true;
   };
   # Hostname of the system
-  networking.hostName = "orb";
+  networking.hostName = "moon";
   # Disable password for `sudo` command.
   security.sudo.wheelNeedsPassword = false;
   # Timezone

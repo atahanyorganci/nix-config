@@ -53,11 +53,11 @@
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [
         (inputs.import-tree ./modules)
-        ./hosts/hetzner
         ./hosts/mercury
-        ./hosts/mini
-        ./hosts/orb
-        ./hosts/personal
+        ./hosts/venus
+        ./hosts/sol
+        ./hosts/moon
+        ./hosts/mars
       ];
     };
 }

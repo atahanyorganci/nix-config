@@ -5,7 +5,7 @@
 }: let
   user = config.flake.me;
 in {
-  flake.darwinConfigurations.personal = inputs.nix-darwin.lib.darwinSystem {
+  flake.darwinConfigurations.venus = inputs.nix-darwin.lib.darwinSystem {
     system = "aarch64-darwin";
     modules = [
       ./system.nix

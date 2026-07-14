@@ -6,7 +6,7 @@
   user = config.flake.me;
   inherit (config.flake.modules) nixos homeManager;
 in {
-  flake.nixosConfigurations.hetzner = inputs.nixpkgs.lib.nixosSystem {
+  flake.nixosConfigurations.mars = inputs.nixpkgs.lib.nixosSystem {
     system = "x86_64-linux";
     modules = [
       ./system.nix
