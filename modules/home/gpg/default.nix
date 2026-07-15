@@ -32,6 +32,10 @@
         enable = true;
         mutableTrust = false;
         inherit publicKeys;
+        # Keep a local agent from stealing a forwarded socket (wiki.gnupg.org/AgentForwarding).
+        settings = lib.mkIf (!config.gpg.agent.enable) {
+          no-autostart = true;
+        };
       };
       programs.ssh = {
         enable = true;
@@ -43,6 +47,12 @@
         yubikey-personalization
         yubikey-manager
       ];
+      # Ensure /run/user/$UID/gnupg exists so sshd can bind the forwarded socket.
+      home.activation.gpgCreateSocketDir = lib.mkIf (!config.gpg.agent.enable) (
+        lib.hm.dag.entryAfter ["writeBoundary"] ''
+          ${lib.getExe' pkgs.gnupg "gpgconf"} --create-socketdir || true
+        ''
+      );
       # SSH_AUTH_SOCK is set via HM sshAuthSock (from enableSshSupport), which
       # preserves a forwarded agent when SSH_CONNECTION is set.
       services.gpg-agent = lib.mkIf config.gpg.agent.enable {
