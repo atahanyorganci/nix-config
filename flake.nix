@@ -28,9 +28,12 @@
       inputs.flake-parts.follows = "flake-parts";
       inputs.treefmt-nix.follows = "treefmt-nix";
     };
+    # nixos-vscode-server evaluates all flake-utils platforms, including
+    # x86_64-darwin, which was removed from nixpkgs unstable in 26.11.
+    nixpkgs-vscode-server.url = "github:NixOS/nixpkgs/05988b07fb05cbcb50be6bce197b4b5f75b5e61b";
     vscode-server = {
       url = "github:nix-community/nixos-vscode-server";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "nixpkgs-vscode-server";
     };
     flake-parts.url = "github:hercules-ci/flake-parts";
     import-tree.url = "github:vic/import-tree";

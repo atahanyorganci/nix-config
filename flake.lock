@@ -409,6 +409,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-vscode-server": {
+      "locked": {
+        "lastModified": 1783475452,
+        "narHash": "sha256-3S92fSuv32mjJz2Qb2F4405c21J55F4NIphz5K6hxco=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "05988b07fb05cbcb50be6bce197b4b5f75b5e61b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "05988b07fb05cbcb50be6bce197b4b5f75b5e61b",
+        "type": "github"
+      }
+    },
     "nur": {
       "inputs": {
         "flake-parts": [
@@ -446,6 +462,7 @@
         "nix-casks": "nix-casks",
         "nix-darwin": "nix-darwin",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-vscode-server": "nixpkgs-vscode-server",
         "stylix": "stylix",
         "treefmt-nix": "treefmt-nix",
         "vscode-server": "vscode-server"
@@ -623,7 +640,7 @@
       "inputs": {
         "flake-utils": "flake-utils",
         "nixpkgs": [
-          "nixpkgs"
+          "nixpkgs-vscode-server"
         ]
       },
       "locked": {
