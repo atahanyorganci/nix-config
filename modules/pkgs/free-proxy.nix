@@ -1,8 +1,9 @@
-# free-proxy incorrectly lists pip-chill (author's freeze helper) as a runtime
-# dependency. pip-chill still imports pkg_resources, removed in setuptools 82,
-# which breaks calibre-web on Python 3.14.
+# Fixes for the calibre-web dependency chain on current nixpkgs/Python 3.14:
+# - free-proxy incorrectly lists pip-chill (freeze helper); pip-chill needs
+#   pkg_resources, removed in setuptools 82.
+# - calibre-web pins chardet/certifi tighter than nixpkgs ships.
 {
-  flake.overlays.free-proxy = final: prev: {
+  flake.overlays.free-proxy = _final: prev: {
     pythonPackagesExtensions =
       prev.pythonPackagesExtensions
       ++ [
@@ -17,5 +18,14 @@
           }
         )
       ];
+
+    calibre-web = prev.calibre-web.overridePythonAttrs (old: {
+      pythonRelaxDeps =
+        (old.pythonRelaxDeps or [])
+        ++ [
+          "chardet"
+          "certifi"
+        ];
+    });
   };
 }
