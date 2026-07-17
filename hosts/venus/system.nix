@@ -16,6 +16,9 @@
   nix.enable = false;
   # Enable entering sudo mode with Touch ID.
   security.pam.services.sudo_local.touchIdAuth = true;
+  security.sudo.extraConfig = ''
+    ${user.username} ALL=(ALL) NOPASSWD: ALL
+  '';
   # Set Git commit hash for darwin-version.
   system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
   # Ensures compatibility with defaults from NixOS
