@@ -51,6 +51,77 @@
         license = lib.licenses.mit;
       };
     };
+    # YAML HomeKit only — do not also add bridges via the UI (that spawns extra ports).
+    # TVs / media players that act as Televisions must use accessory mode (one entity each).
+    homekit = [
+      {
+        name = "Home";
+        port = 21063;
+        filter = {
+          include_entities = [
+            # Xiaomi Air Purifier 4 Compact
+            "fan.xiaomi_cpa4_37b1_air_purifier"
+            "sensor.xiaomi_cpa4_37b1_pm25_density"
+            "sensor.xiaomi_cpa4_37b1_filter_life_level"
+            "switch.xiaomi_cpa4_37b1_alarm"
+            "switch.xiaomi_cpa4_37b1_physical_control_locked"
+            # Arçelik dishwasher (HomeWhiz)
+            "switch.dishwasher"
+            "switch.dishwasher_halfload"
+            "switch.dishwasher_doormatic"
+            "binary_sensor.dishwasher_door_is_open"
+            "binary_sensor.dishwasher_no_salt"
+            "binary_sensor.dishwasher_no_rinse_aid"
+            "binary_sensor.dishwasher_no_water"
+            "binary_sensor.dishwasher_check_the_filter"
+            "binary_sensor.dishwasher_remote_control"
+          ];
+        };
+        entity_config = {
+          "fan.xiaomi_cpa4_37b1_air_purifier" = {
+            type = "air_purifier";
+            linked_filter_life_level_sensor = "sensor.xiaomi_cpa4_37b1_filter_life_level";
+            linked_pm25_sensor = "sensor.xiaomi_cpa4_37b1_pm25_density";
+          };
+          "switch.dishwasher" = {
+            name = "Dishwasher";
+          };
+        };
+      }
+      {
+        name = "Samsung Frame";
+        port = 21064;
+        mode = "accessory";
+        filter.include_entities = [
+          "media_player.living_room_samsung_frame_55"
+        ];
+        entity_config."media_player.living_room_samsung_frame_55" = {
+          name = "Samsung Frame";
+          feature_list = [
+            {feature = "on_off";}
+            {feature = "play_pause";}
+            {feature = "play_stop";}
+            {feature = "toggle_mute";}
+          ];
+        };
+      }
+      {
+        name = "Apple TV";
+        port = 21065;
+        mode = "accessory";
+        filter.include_entities = [
+          "media_player.living_room_living_room"
+        ];
+        entity_config."media_player.living_room_living_room" = {
+          name = "Apple TV";
+          feature_list = [
+            {feature = "on_off";}
+            {feature = "play_pause";}
+            {feature = "play_stop";}
+          ];
+        };
+      }
+    ];
   in {
     options.home-assistant = {
       enable = lib.mkEnableOption "Home Assistant";
@@ -169,12 +240,16 @@
             default = "info";
             logs."custom_components.auth_header" = "debug";
             logs."custom_components.homewhiz" = "info";
+            logs."homeassistant.components.homekit" = "info";
           };
+          # HomeKit bridges allows Apple's Home app to control the devices.
+          inherit homekit;
         };
       };
-
       # Expose the UI only to peers connected through NetBird.
       networking.firewall.interfaces."nb-wt0".allowedTCPPorts = [cfg.port];
+      # HomeKit HAP ports (derived from homekit bridge/accessory entries). mDNS UDP 5353 via mdns.
+      networking.firewall.allowedTCPPorts = map (bridge: bridge.port) homekit;
 
       systemd.services.home-assistant.serviceConfig.RestartSec = "5s";
     };
