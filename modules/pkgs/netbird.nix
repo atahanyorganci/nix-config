@@ -2,13 +2,13 @@
   flake.overlays.netbird = final: _prev: {
     netbird = final.buildGoModule rec {
       pname = "netbird";
-      version = "0.74.4";
+      version = "0.74.6";
 
       src = final.fetchFromGitHub {
         owner = "netbirdio";
         repo = "netbird";
         tag = "v${version}";
-        hash = "sha256-3V9w5/5mhoFHUt4W2epMJeL2O56W9wpbbJd/Edq73HA=";
+        hash = "sha256-KkmLeZgEZmUG7MpKqv7Dpk4ut40RiZ/lTdG/2x6n+Oo=";
       };
 
       # Share the go-modules derivation name across NetBird components.
