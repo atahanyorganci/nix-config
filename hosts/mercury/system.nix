@@ -39,6 +39,13 @@
   docker.enable = true;
   # Enable SSH server
   ssh.enable = true;
+  # Allow sudo authentication using a forwarded SSH agent. The trusted key is
+  # the user's declarative SSH authorized key; password authentication remains
+  # available as a fallback.
+  security.pam = {
+    rssh.enable = true;
+    services.sudo.rssh = true;
+  };
   # Enable VSCode Server
   services.vscode-server.enable = true;
   # Self-hosted NetBird mesh
