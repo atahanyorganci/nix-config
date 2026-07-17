@@ -47,6 +47,15 @@
         default = "127.0.0.1:8082";
         description = "Address for the proxy health probe endpoint.";
       };
+
+      private = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Advertise the Private capability (NB_PROXY_PRIVATE). Unlocks NetBird-Only
+          Access and Agent Network mesh endpoints; public reverse-proxy services remain available.
+        '';
+      };
     };
 
     config = lib.mkIf cfg.enable {
@@ -95,24 +104,26 @@
           Restart = "on-failure";
           RestartSec = "5s";
 
-          Environment = [
-            "NB_PROXY_DOMAIN=${cfg.domain}"
-            "NB_PROXY_MANAGEMENT_ADDRESS=${cfg.managementUrl}"
-            "NB_PROXY_ALLOW_INSECURE=true"
-            "NB_PROXY_ADDRESS=${cfg.listenAddress}"
-            "NB_PROXY_ACME_CERTIFICATES=true"
-            # HTTP-01 via Traefik :80 → 127.0.0.1:8085 (tls-alpn-01 hangs behind Traefik passthrough).
-            "NB_PROXY_ACME_CHALLENGE_TYPE=http-01"
-            "NB_PROXY_ACME_ADDRESS=127.0.0.1:8085"
-            "NB_PROXY_CERTIFICATE_DIRECTORY=${stateDir}/certs"
-            "NB_PROXY_HEALTH_ADDRESS=${cfg.healthAddress}"
-            "NB_PROXY_REQUIRE_SUBDOMAIN=true"
-            "NB_PROXY_GEO_DATA_DIR=${stateDir}/geolocation"
-            "HOME=${stateDir}"
-            "XDG_CONFIG_HOME=${stateDir}/.config"
-            "XDG_STATE_HOME=${stateDir}/.local/state"
-            "XDG_DATA_HOME=${stateDir}/.local/share"
-          ];
+          Environment =
+            [
+              "NB_PROXY_DOMAIN=${cfg.domain}"
+              "NB_PROXY_MANAGEMENT_ADDRESS=${cfg.managementUrl}"
+              "NB_PROXY_ALLOW_INSECURE=true"
+              "NB_PROXY_ADDRESS=${cfg.listenAddress}"
+              "NB_PROXY_ACME_CERTIFICATES=true"
+              # HTTP-01 via Traefik :80 → 127.0.0.1:8085 (tls-alpn-01 hangs behind Traefik passthrough).
+              "NB_PROXY_ACME_CHALLENGE_TYPE=http-01"
+              "NB_PROXY_ACME_ADDRESS=127.0.0.1:8085"
+              "NB_PROXY_CERTIFICATE_DIRECTORY=${stateDir}/certs"
+              "NB_PROXY_HEALTH_ADDRESS=${cfg.healthAddress}"
+              "NB_PROXY_REQUIRE_SUBDOMAIN=true"
+              "NB_PROXY_GEO_DATA_DIR=${stateDir}/geolocation"
+              "HOME=${stateDir}"
+              "XDG_CONFIG_HOME=${stateDir}/.config"
+              "XDG_STATE_HOME=${stateDir}/.local/state"
+              "XDG_DATA_HOME=${stateDir}/.local/share"
+            ]
+            ++ lib.optional cfg.private "NB_PROXY_PRIVATE=true";
 
           StateDirectory = "netbird-proxy";
           StateDirectoryMode = "0750";

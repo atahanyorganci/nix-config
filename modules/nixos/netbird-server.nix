@@ -65,6 +65,8 @@
         USE_AUTH0 = false;
         NETBIRD_MGMT_API_ENDPOINT = "https://${cfg.domain}";
         NETBIRD_MGMT_GRPC_API_ENDPOINT = "https://${cfg.domain}";
+        NETBIRD_AGENT_NETWORK_ENABLED = cfg.enableAgentNetwork;
+        NETBIRD_AGENT_NETWORK_ONLY = false;
       };
       toStringEnv = value:
         if builtins.isBool value
@@ -83,6 +85,8 @@
               "$AUTH_REDIRECT_URI"
               "$AUTH_SILENT_REDIRECT_URI"
               "$AUTH_SUPPORTED_SCOPES"
+              "$NETBIRD_AGENT_NETWORK_ENABLED"
+              "$NETBIRD_AGENT_NETWORK_ONLY"
               "$NETBIRD_DRAG_QUERY_PARAMS"
               "$NETBIRD_GOOGLE_ANALYTICS_ID"
               "$NETBIRD_GOOGLE_TAG_MANAGER_ID"
@@ -100,7 +104,7 @@
         find build -type d -exec chmod 755 {} \;
         OIDC_TRUSTED_DOMAINS="build/OidcTrustedDomains.js"
         envsubst "$ENV_STR" < "$OIDC_TRUSTED_DOMAINS.tmpl" > "$OIDC_TRUSTED_DOMAINS"
-        for f in $(grep -R -l AUTH_SUPPORTED_SCOPES build/); do
+        for f in $(grep -R -l -E 'AUTH_SUPPORTED_SCOPES|NETBIRD_AGENT_NETWORK' build/); do
           mv "$f" "$f.copy"
           envsubst "$ENV_STR" < "$f.copy" > "$f"
           rm "$f.copy"
@@ -172,6 +176,15 @@
         type = lib.types.bool;
         default = true;
         description = "Enable Traefik TLS passthrough for NetBird reverse proxy (HostSNI `*`).";
+      };
+
+      enableAgentNetwork = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Expose the Agent Network section in the dashboard nav (NETBIRD_AGENT_NETWORK_ENABLED).
+          Keeps the full NetBird UI; does not enable agent-network-only mode.
+        '';
       };
     };
 
