@@ -53,4 +53,10 @@
     enable = true;
     setupKeyFile = "/var/lib/netbird-client/setup.key";
   };
+  # Home Assistant: NetBird for mesh peers, Pangolin for public HTTPS.
+  home-assistant = {
+    enable = true;
+    externalUrl = "https://home-assistant.yorganci.dev";
+    internalUrl = "http://mercury.netbird.selfhosted:8123";
+  };
 }
