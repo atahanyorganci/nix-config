@@ -51,6 +51,31 @@
         license = lib.licenses.mit;
       };
     };
+    # Samsung Frame Art Mode + enhanced TV control (personal art upload without Art Store).
+    samsungtvSmart = pkgs.buildHomeAssistantComponent rec {
+      owner = "TheFab21";
+      domain = "samsungtv_smart";
+      version = "8.3.3";
+      src = pkgs.fetchFromGitHub {
+        owner = "TheFab21";
+        repo = "ha-samsungtv-smart";
+        tag = version;
+        hash = "sha256-FhSX5bIaM+RRSBu+z+0cvGf2Mc+EpexieDmaGOJS1ng=";
+      };
+      dependencies = with pkgs.home-assistant.python3Packages; [
+        aiofiles
+        casttube
+        pillow
+        pysmartthings
+        wakeonlan
+        websocket-client
+      ];
+      meta = {
+        description = "Samsung Smart TV control with Frame Art Mode support";
+        homepage = "https://github.com/TheFab21/ha-samsungtv-smart";
+        license = lib.licenses.lgpl21;
+      };
+    };
     # YAML HomeKit only — do not also add bridges via the UI (that spawns extra ports).
     # TVs / media players that act as Televisions must use accessory mode (one entity each).
     homekit = [
@@ -75,6 +100,10 @@
             "binary_sensor.dishwasher_no_water"
             "binary_sensor.dishwasher_check_the_filter"
             "binary_sensor.dishwasher_remote_control"
+            # Samsung Frame Art Mode (TV itself is a separate accessory)
+            "switch.samsung_frame_tv_55_art_mode"
+            "number.samsung_frame_tv_55_art_mode_brightness"
+            "number.samsung_frame_tv_55_art_mode_color_temperature"
           ];
         };
         entity_config = {
@@ -86,6 +115,15 @@
           "switch.dishwasher" = {
             name = "Dishwasher";
           };
+          "switch.samsung_frame_tv_55_art_mode" = {
+            name = "Frame Art Mode";
+          };
+          "number.samsung_frame_tv_55_art_mode_brightness" = {
+            name = "Frame Art Brightness";
+          };
+          "number.samsung_frame_tv_55_art_mode_color_temperature" = {
+            name = "Frame Art Color Temperature";
+          };
         };
       }
       {
@@ -93,9 +131,9 @@
         port = 21064;
         mode = "accessory";
         filter.include_entities = [
-          "media_player.living_room_samsung_frame_55"
+          "media_player.samsung_frame_tv_55"
         ];
-        entity_config."media_player.living_room_samsung_frame_55" = {
+        entity_config."media_player.samsung_frame_tv_55" = {
           name = "Samsung Frame";
           feature_list = [
             {feature = "on_off";}
@@ -195,6 +233,11 @@
             "apple_tv"
             "cast"
             "samsungtv"
+            # Soft deps / optional backends for samsungtv_smart (Frame Art + SmartThings).
+            "application_credentials"
+            "folder"
+            "local_file"
+            "smartthings"
             # Xiaomi/Miio air purifiers etc. (UI label: "Xiaomi Home").
             "xiaomi_miio"
             # Required by custom xiaomi_miot (media_player imports homekit → pyhap; camera needs ffmpeg).
@@ -209,6 +252,7 @@
         customComponents = [
           authHeader
           homewhiz
+          samsungtvSmart
           pkgs.home-assistant-custom-components.xiaomi_miot
         ];
         config = {
@@ -240,10 +284,37 @@
             default = "info";
             logs."custom_components.auth_header" = "debug";
             logs."custom_components.homewhiz" = "info";
+            logs."custom_components.samsungtv_smart" = "info";
             logs."homeassistant.components.homekit" = "info";
           };
           # HomeKit bridges allows Apple's Home app to control the devices.
           inherit homekit;
+          # Control Center TV remote: arrows/back/info only fire events — map them to Samsung keys.
+          # Keep the Jinja on one line; NixOS YAML folding breaks multiline templates.
+          automation = [
+            {
+              id = "samsung_frame_homekit_remote";
+              alias = "Samsung Frame HomeKit remote keys";
+              mode = "queued";
+              trigger = [
+                {
+                  platform = "event";
+                  event_type = "homekit_tv_remote_key_pressed";
+                  event_data.entity_id = "media_player.samsung_frame_tv_55";
+                }
+              ];
+              action = [
+                {
+                  action = "media_player.play_media";
+                  target.entity_id = "media_player.samsung_frame_tv_55";
+                  data = {
+                    media_content_type = "send_key";
+                    media_content_id = "{{ {'arrow_up':'KEY_UP','arrow_down':'KEY_DOWN','arrow_left':'KEY_LEFT','arrow_right':'KEY_RIGHT','select':'KEY_ENTER','back':'KEY_RETURN','information':'KEY_MENU','exit':'KEY_EXIT'}[trigger.event.data.key_name] }}";
+                  };
+                }
+              ];
+            }
+          ];
         };
       };
       # Expose the UI only to peers connected through NetBird.
