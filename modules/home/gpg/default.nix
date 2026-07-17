@@ -18,6 +18,29 @@
         trust = 5;
       })
       keyFileNames;
+
+    # Local extra socket forwarded to remotes (gpg-agent enableExtraSocket).
+    # Agent holders are Darwin today; GnuPG keeps sockets under ~/.gnupg there.
+    localExtraSocket = "${config.home.homeDirectory}/.gnupg/S.gpg-agent.extra";
+
+    remoteAgentSocket = target:
+      if target.ssh.isDarwin
+      then "/Users/${target.ssh.user}/.gnupg/S.gpg-agent"
+      else "/run/user/${toString target.ssh.uid}/gnupg/S.gpg-agent";
+
+    matchBlocksFromInventory =
+      lib.mapAttrs (_name: target: {
+        host = lib.concatStringsSep " " target.ssh.hostNames;
+        user = target.ssh.user;
+        forwardAgent = true;
+        remoteForwards = [
+          {
+            bind.address = remoteAgentSocket target;
+            host.address = localExtraSocket;
+          }
+        ];
+      })
+      config.gpg.managedTargets;
   in {
     options.gpg = {
       enable = lib.mkEnableOption "GPG";
@@ -25,6 +48,11 @@
         type = lib.types.bool;
         default = true;
         description = "Run a local gpg-agent (disable on remotes that use agent forwarding)";
+      };
+      managedTargets = lib.mkOption {
+        type = lib.types.attrsOf lib.types.raw;
+        default = {};
+        description = "Flake inventory managedTargets used to generate SSH Host blocks (agent holders only)";
       };
     };
     config = lib.mkIf config.gpg.enable {
@@ -41,6 +69,7 @@
         enable = true;
         enableDefaultConfig = false;
         inherit includes;
+        matchBlocks = lib.mkIf config.gpg.agent.enable matchBlocksFromInventory;
       };
       home.packages = with pkgs; [
         openssl

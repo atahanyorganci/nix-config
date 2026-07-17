@@ -4,6 +4,7 @@
   inputs,
   ...
 }: {
+  hostInventory.role = "managedTarget";
   # Hostname
   networking.hostName = "venus";
   # Disable `nix-darwin` documentation

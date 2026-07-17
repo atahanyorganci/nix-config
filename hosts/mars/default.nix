@@ -20,6 +20,7 @@ in {
         home-manager.users.${user.username}.imports = [
           homeManager.base
           homeManager.git
+          homeManager.gpg
           homeManager.shell
           homeManager.tools
           ./home.nix

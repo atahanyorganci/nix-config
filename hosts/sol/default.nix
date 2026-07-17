@@ -20,6 +20,7 @@ in {
             config.flake.modules.homeManager.default
             ./home.nix
           ];
+          gpg.managedTargets = config.flake.inventory.managedTargets;
         };
         home-manager.extraSpecialArgs = {
           inherit user inputs;
