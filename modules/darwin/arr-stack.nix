@@ -25,7 +25,6 @@
             - Prowlarr
             - Transmission
             - Jellyfin
-            - Cloudflare Tunnel
           '';
         };
       domain = mkOption {
@@ -59,19 +58,6 @@
             # Keep admin when signing in with NetBird email.
             canonicalUsername = user.email;
             canonicalUserId = "5A8A2446-9984-479D-BBBC-8D86EDFBA8D0";
-          };
-        };
-        cloudflared = {
-          enable = true;
-          tunnels = {
-            arr = {
-              tokenFile = "/Users/${user.username}/.local/share/cloudflared/arr.token";
-              logDir = "/Users/${user.username}/Library/Logs/cloudflared/arr";
-            };
-            media = {
-              tokenFile = "/Users/${user.username}/.local/share/cloudflared/media.token";
-              logDir = "/Users/${user.username}/Library/Logs/cloudflared/media";
-            };
           };
         };
       };
