@@ -104,6 +104,8 @@
             "switch.samsung_frame_tv_55_art_mode"
             "number.samsung_frame_tv_55_art_mode_brightness"
             "number.samsung_frame_tv_55_art_mode_color_temperature"
+            # Roborock Q Revo L (HomeKit exposes vacuum as a switch)
+            "vacuum.qrevo_l_pro"
           ];
         };
         entity_config = {
@@ -123,6 +125,9 @@
           };
           "number.samsung_frame_tv_55_art_mode_color_temperature" = {
             name = "Frame Art Color Temperature";
+          };
+          "vacuum.qrevo_l_pro" = {
+            name = "Robot Vacuum";
           };
         };
       }
@@ -246,6 +251,8 @@
             # HomeWhiz (Arçelik dishwasher): Bluetooth local and/or cloud (Wi-Fi).
             "bluetooth"
             "bluetooth_adapters"
+            # Roborock Q Revo L — local polling with cloud fallback (Roborock app required).
+            "roborock"
           ]
           ++ cfg.extraComponents;
         # xiaomi_miot: Air Purifier 4 Compact (xiaomi.airp.cpa4) — unsupported by stock xiaomi_miio.
@@ -286,6 +293,7 @@
             logs."custom_components.homewhiz" = "info";
             logs."custom_components.samsungtv_smart" = "info";
             logs."homeassistant.components.homekit" = "info";
+            logs."homeassistant.components.roborock" = "debug";
           };
           # HomeKit bridges allows Apple's Home app to control the devices.
           inherit homekit;
