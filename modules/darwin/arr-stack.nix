@@ -46,7 +46,21 @@
             rpc-host-whitelist = "download.${cfg.domain}";
           };
         };
-        jellyfin.enable = true;
+        jellyfin = {
+          enable = true;
+          knownProxies = ["100.64.0.0/10"];
+          oidc = {
+            enable = true;
+            secretFile = "/var/lib/jellyfin-oidc/client-secret";
+            providerName = "netbird";
+            endpoint = "https://netbird.${cfg.domain}/oauth2";
+            clientId = "jellyfin";
+            usernameClaim = "email";
+            # Keep admin when signing in with NetBird email.
+            canonicalUsername = user.email;
+            canonicalUserId = "5A8A2446-9984-479D-BBBC-8D86EDFBA8D0";
+          };
+        };
         cloudflared = {
           enable = true;
           tunnels = {
