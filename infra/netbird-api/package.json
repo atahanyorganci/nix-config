@@ -1,0 +1,33 @@
+{
+	"name": "@yorganci/netbird-api",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./spec": "./spec/netbird.api.json"
+	},
+	"scripts": {
+		"format": "oxfmt --check .",
+		"format:fix": "oxfmt --write .",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix ."
+	},
+	"dependencies": {
+		"effect": "catalog:"
+	},
+	"devDependencies": {
+		"@effect/language-service": "catalog:",
+		"@effect/platform-bun": "catalog:",
+		"@yorganci/config": "workspace:*",
+		"oxfmt": "catalog:",
+		"oxlint": "catalog:",
+		"oxlint-tsgolint": "catalog:",
+		"typescript": "catalog:",
+		"yaml": "^2.9.0"
+	},
+	"spec": {
+		"ref": "v0.74.6",
+		"path": "shared/management/http/api/openapi.yml",
+		"sha256": "05f0b48e36de7c37eef9cf1d8f533922a2f4115495a5decf17784b3a7859b189"
+	}
+}

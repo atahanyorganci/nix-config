@@ -22,6 +22,21 @@
         "typescript": "catalog:",
       },
     },
+    "infra/netbird-api": {
+      "name": "@yorganci/netbird-api",
+      "version": "0.0.0",
+      "dependencies": {
+        "@effect/platform-bun": "catalog:",
+        "effect": "catalog:",
+        "yaml": "^2.9.0",
+      },
+      "devDependencies": {
+        "@yorganci/config": "workspace:*",
+        "oxfmt": "catalog:",
+        "oxlint": "catalog:",
+        "oxlint-tsgolint": "catalog:",
+      },
+    },
     "infra/stack": {
       "name": "@yorganci/stack",
       "version": "0.0.0",
@@ -459,6 +474,8 @@
     "@vitest/utils": ["@vitest/utils@4.1.10", "", { "dependencies": { "@vitest/pretty-format": "4.1.10", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA=="],
 
     "@yorganci/config": ["@yorganci/config@workspace:infra/config"],
+
+    "@yorganci/netbird-api": ["@yorganci/netbird-api@workspace:infra/netbird-api"],
 
     "@yorganci/stack": ["@yorganci/stack@workspace:infra/stack"],
 
