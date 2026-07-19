@@ -1,0 +1,30 @@
+{
+	"name": "@yorganci/stack",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"check": "tsc --noEmit",
+		"deploy": "alchemy deploy",
+		"destroy": "alchemy destroy",
+		"dev": "alchemy dev",
+		"format": "oxfmt --check .",
+		"format:fix": "oxfmt --write .",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix ."
+	},
+	"dependencies": {
+		"@effect/platform-bun": "catalog:",
+		"@effect/platform-node": "catalog:",
+		"alchemy": "catalog:",
+		"effect": "catalog:"
+	},
+	"devDependencies": {
+		"@effect/language-service": "catalog:",
+		"@yorganci/config": "workspace:*",
+		"oxfmt": "catalog:",
+		"oxlint": "catalog:",
+		"oxlint-tsgolint": "catalog:",
+		"typescript": "catalog:"
+	}
+}

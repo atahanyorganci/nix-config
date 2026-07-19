@@ -1,0 +1,27 @@
+{
+	"name": "@yorganci/config",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./oxfmt": "./oxfmt.config.ts",
+		"./oxlint": "./oxlint.config.ts"
+	},
+	"scripts": {
+		"check": "tsc --noEmit",
+		"format": "oxfmt --check .",
+		"format:fix": "oxfmt --write .",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix ."
+	},
+	"dependencies": {
+		"effect": "catalog:"
+	},
+	"devDependencies": {
+		"@effect/language-service": "catalog:",
+		"oxfmt": "catalog:",
+		"oxlint": "catalog:",
+		"oxlint-tsgolint": "catalog:",
+		"typescript": "catalog:"
+	}
+}
