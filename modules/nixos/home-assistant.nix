@@ -104,8 +104,14 @@
             "switch.samsung_frame_tv_55_art_mode"
             "number.samsung_frame_tv_55_art_mode_brightness"
             "number.samsung_frame_tv_55_art_mode_color_temperature"
-            # Roborock Q Revo L (HomeKit exposes vacuum as a switch)
+            # Roborock Q Revo L: on/off + one-shot clean modes (scripts → HomeKit switches)
             "vacuum.qrevo_l_pro"
+            "script.roborock_vacuum"
+            "script.roborock_vacuum_and_mop"
+            # Remote status: on while actively cleaning (HomeKit binary sensor)
+            "binary_sensor.qrevo_l_pro_cleaning"
+            "sensor.qrevo_l_pro_status"
+            "sensor.qrevo_l_pro_battery"
           ];
         };
         entity_config = {
@@ -128,6 +134,21 @@
           };
           "vacuum.qrevo_l_pro" = {
             name = "Robot Vacuum";
+          };
+          "script.roborock_vacuum" = {
+            name = "Vacuum";
+          };
+          "script.roborock_vacuum_and_mop" = {
+            name = "Vacuum and Mop";
+          };
+          "binary_sensor.qrevo_l_pro_cleaning" = {
+            name = "Robot Cleaning";
+          };
+          "sensor.qrevo_l_pro_status" = {
+            name = "Robot Status";
+          };
+          "sensor.qrevo_l_pro_battery" = {
+            name = "Robot Battery";
           };
         };
       }
@@ -297,6 +318,46 @@
           };
           # HomeKit bridges allows Apple's Home app to control the devices.
           inherit homekit;
+          # One-shot clean modes for HomeKit / Siri (mop intensity off = vacuum only).
+          script = {
+            roborock_vacuum = {
+              alias = "Vacuum";
+              icon = "mdi:robot-vacuum";
+              mode = "single";
+              sequence = [
+                {
+                  action = "select.select_option";
+                  target.entity_id = "select.qrevo_l_pro_mop_intensity";
+                  data.option = "off";
+                }
+                {
+                  action = "vacuum.start";
+                  target.entity_id = "vacuum.qrevo_l_pro";
+                }
+              ];
+            };
+            roborock_vacuum_and_mop = {
+              alias = "Vacuum and Mop";
+              icon = "mdi:robot-vacuum";
+              mode = "single";
+              sequence = [
+                {
+                  action = "select.select_option";
+                  target.entity_id = "select.qrevo_l_pro_mop_intensity";
+                  data.option = "medium";
+                }
+                {
+                  action = "select.select_option";
+                  target.entity_id = "select.qrevo_l_pro_mop_mode";
+                  data.option = "standard";
+                }
+                {
+                  action = "vacuum.start";
+                  target.entity_id = "vacuum.qrevo_l_pro";
+                }
+              ];
+            };
+          };
           # Control Center TV remote: arrows/back/info only fire events — map them to Samsung keys.
           # Keep the Jinja on one line; NixOS YAML folding breaks multiline templates.
           automation = [
