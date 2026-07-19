@@ -4,7 +4,15 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		"./spec": "./spec/netbird.api.json"
+		"./spec": "./spec/netbird.api.json",
+		"./Credentials": "./src/credentials.ts",
+		"./Client": "./src/client.ts",
+		"./Errors": "./src/errors.ts",
+		"./Traits": "./src/traits.ts",
+		"./Retry": "./src/retry.ts",
+		"./Category": "./src/category.ts",
+		"./Sensitive": "./src/sensitive.ts",
+		"./*": "./src/operations/*.ts"
 	},
 	"scripts": {
 		"format": "oxfmt --check .",
@@ -13,6 +21,7 @@
 		"lint:fix": "oxlint --fix ."
 	},
 	"dependencies": {
+		"@distilled.cloud/core": "catalog:",
 		"effect": "catalog:"
 	},
 	"devDependencies": {

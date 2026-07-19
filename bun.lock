@@ -26,15 +26,18 @@
       "name": "@yorganci/netbird-api",
       "version": "0.0.0",
       "dependencies": {
-        "@effect/platform-bun": "catalog:",
+        "@distilled.cloud/core": "catalog:",
         "effect": "catalog:",
-        "yaml": "^2.9.0",
       },
       "devDependencies": {
+        "@effect/language-service": "catalog:",
+        "@effect/platform-bun": "catalog:",
         "@yorganci/config": "workspace:*",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
         "oxlint-tsgolint": "catalog:",
+        "typescript": "catalog:",
+        "yaml": "^2.9.0",
       },
     },
     "infra/stack": {
@@ -57,6 +60,7 @@
     },
   },
   "catalog": {
+    "@distilled.cloud/core": "0.29.1",
     "@effect/language-service": "^0.86.2",
     "@effect/platform-bun": "4.0.0-beta.99",
     "@effect/platform-node": "4.0.0-beta.99",
