@@ -1,0 +1,5 @@
+{
+  "name": "@yorganci/nix-config",
+  "type": "module",
+  "private": true
+}
