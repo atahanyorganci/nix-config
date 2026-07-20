@@ -9,6 +9,10 @@
 		"lint": {},
 		"lint:fix": {
 			"cache": false
+		},
+		"test": {
+			"dependsOn": ["check"],
+			"cache": false
 		}
 	}
 }

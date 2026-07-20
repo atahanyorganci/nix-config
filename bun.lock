@@ -22,6 +22,26 @@
         "typescript": "catalog:",
       },
     },
+    "infra/hetzner-alchemy": {
+      "name": "@yorganci/hetzner-alchemy",
+      "version": "0.0.0",
+      "dependencies": {
+        "@yorganci/hetzner-api": "workspace:*",
+        "alchemy": "catalog:",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/language-service": "catalog:",
+        "@effect/platform-bun": "catalog:",
+        "@effect/vitest": "catalog:",
+        "@yorganci/config": "workspace:*",
+        "oxfmt": "catalog:",
+        "oxlint": "catalog:",
+        "oxlint-tsgolint": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "infra/hetzner-api": {
       "name": "@yorganci/hetzner-api",
       "version": "0.0.0",
@@ -518,6 +538,8 @@
     "@vitest/utils": ["@vitest/utils@4.1.10", "", { "dependencies": { "@vitest/pretty-format": "4.1.10", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA=="],
 
     "@yorganci/config": ["@yorganci/config@workspace:infra/config"],
+
+    "@yorganci/hetzner-alchemy": ["@yorganci/hetzner-alchemy@workspace:infra/hetzner-alchemy"],
 
     "@yorganci/hetzner-api": ["@yorganci/hetzner-api@workspace:infra/hetzner-api"],
 
