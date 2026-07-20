@@ -1,7 +1,9 @@
+import * as NetBird from "@yorganci/netbird-alchemy";
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 const DOMAIN = "yorganci.dev";
 const NETBIRD_IP = "91.99.103.93";
@@ -9,7 +11,7 @@ const NETBIRD_IP = "91.99.103.93";
 export default Alchemy.Stack(
 	"Infra",
 	{
-		providers: Cloudflare.providers(),
+		providers: Layer.mergeAll(Cloudflare.providers(), NetBird.providers()),
 		state: Cloudflare.state(),
 	},
 	Effect.gen(function* () {
@@ -32,9 +34,16 @@ export default Alchemy.Stack(
 			proxied: false,
 			ttl: "1",
 		});
+
+		// Requires NETBIRD_API_TOKEN (and optional NETBIRD_API_BASE_URL).
+		const infraPeers = yield* NetBird.Group("InfraPeers", {
+			name: "infra-peers",
+		});
+
 		return {
 			zoneId: zone.zoneId,
 			netbirdUrl: Output.interpolate`https://${netbirdRecord.content}`,
+			infraPeersGroupId: infraPeers.groupId,
 		};
 	}),
 );

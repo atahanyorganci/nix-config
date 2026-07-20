@@ -16,6 +16,7 @@
 	"dependencies": {
 		"@effect/platform-bun": "catalog:",
 		"@effect/platform-node": "catalog:",
+		"@yorganci/netbird-alchemy": "workspace:*",
 		"alchemy": "catalog:",
 		"effect": "catalog:"
 	},
