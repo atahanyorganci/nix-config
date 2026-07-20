@@ -45,6 +45,7 @@
   # Calibre
   calibre-web = {
     enable = true;
+    listen.ip = "0.0.0.0";
     options.enableBookUploading = true;
   };
   # SSH

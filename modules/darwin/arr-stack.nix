@@ -32,15 +32,35 @@
         description = "The domain name for the Arr Stack.";
         example = "yorganci.dev";
       };
+      listenAddress = mkOption {
+        type = types.str;
+        default = "*";
+        description = "Bind address for Sonarr/Radarr/Prowlarr (and Transmission RPC).";
+      };
     };
     config = mkIf cfg.enable {
       services = {
-        sonarr.enable = true;
-        radarr.enable = true;
-        prowlarr.enable = true;
+        sonarr = {
+          enable = true;
+          settings.bind-address = cfg.listenAddress;
+        };
+        radarr = {
+          enable = true;
+          settings.bind-address = cfg.listenAddress;
+        };
+        prowlarr = {
+          enable = true;
+          settings.bind-address = cfg.listenAddress;
+        };
         transmission = {
           enable = true;
           settings = {
+            rpc-bind-address =
+              if cfg.listenAddress == "*"
+              then "0.0.0.0"
+              else cfg.listenAddress;
+            rpc-whitelist-enabled = true;
+            rpc-whitelist = "127.0.0.1,100.*.*.*";
             rpc-host-whitelist-enabled = true;
             rpc-host-whitelist = "download.${cfg.domain}";
           };
