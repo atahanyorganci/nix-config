@@ -4,13 +4,14 @@ import { CredentialsFromEnv } from "./Credentials.ts";
 import { GroupProvider } from "./Group/Group.ts";
 import { NetworkProvider } from "./Network/Network.ts";
 import { PeerProvider } from "./Peer/Peer.ts";
+import { ReverseProxyDomainProvider } from "./ReverseProxyDomain/ReverseProxyDomain.ts";
 import { SetupKeyProvider } from "./SetupKey/SetupKey.ts";
 import { UserProvider } from "./User/User.ts";
 
 export type ProviderRequirements = Layer.Services<ReturnType<typeof providers>>;
 
 /**
- * NetBird resource providers (Group, Network, Peer, SetupKey, User).
+ * NetBird resource providers (Group, Network, Peer, SetupKey, User, reverse-proxy domain).
  * Pair with {@link CredentialsFromEnv} or `CredentialsFromConfig` as needed.
  */
 export const resourceProviders = () =>
@@ -20,6 +21,7 @@ export const resourceProviders = () =>
 		PeerProvider(),
 		SetupKeyProvider(),
 		UserProvider(),
+		ReverseProxyDomainProvider(),
 	);
 
 /**
