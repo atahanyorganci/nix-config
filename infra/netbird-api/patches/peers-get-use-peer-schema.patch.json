@@ -1,0 +1,10 @@
+{
+	"description": "Distilled drops $ref members inside allOf (PeerBatch kept only accessible_peers_count). Point GET /api/peers items at Peer so list responses include id/hostname/dns_label.",
+	"patches": [
+		{
+			"op": "replace",
+			"path": "/paths/~1api~1peers/get/responses/200/content/application~1json/schema/items/$ref",
+			"value": "#/components/schemas/Peer"
+		}
+	]
+}
