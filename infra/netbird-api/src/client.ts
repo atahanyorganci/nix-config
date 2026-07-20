@@ -10,7 +10,8 @@ import { Retry } from "./retry.ts";
 export { UnknownNetbirdError } from "./errors.ts";
 
 const ApiErrorResponse = Schema.Struct({
-	code: Schema.optional(Schema.String),
+	// Self-hosted NetBird returns numeric `code` (e.g. 404); cloud may use strings.
+	code: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
 	message: Schema.String,
 });
 
@@ -31,9 +32,17 @@ const matchError = (
 				}),
 			);
 		}
+		let code: string | undefined;
+		if (parsed.code === undefined) {
+			code = undefined;
+		} else if (typeof parsed.code === "string") {
+			code = parsed.code;
+		} else {
+			code = String(parsed.code);
+		}
 		return Effect.fail(
 			new UnknownNetbirdError({
-				code: parsed.code,
+				code,
 				message: parsed.message,
 				body: errorBody,
 			}),
