@@ -1,0 +1,34 @@
+{
+	"name": "@yorganci/netbird-alchemy",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./*": "./src/*.ts"
+	},
+	"scripts": {
+		"check": "tsc --noEmit",
+		"format": "oxfmt --check .",
+		"format:fix": "oxfmt --write .",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix .",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@yorganci/netbird-api": "workspace:*",
+		"alchemy": "catalog:",
+		"effect": "catalog:"
+	},
+	"devDependencies": {
+		"@effect/language-service": "catalog:",
+		"@effect/platform-bun": "catalog:",
+		"@effect/vitest": "catalog:",
+		"@yorganci/config": "workspace:*",
+		"oxfmt": "catalog:",
+		"oxlint": "catalog:",
+		"oxlint-tsgolint": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}
