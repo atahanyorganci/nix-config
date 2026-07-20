@@ -23,8 +23,8 @@ export interface IntegrationsEdrHuntressGetOutput {
 		peers_count: number;
 		resources_count: number;
 		issued?: "api" | "integration" | "jwt";
-		peers: ReadonlyArray<{ id: string; name: string }>;
-		resources: ReadonlyArray<{ id: string; type: {} }>;
+		peers: ReadonlyArray<{ id: string; name: string }> | null;
+		resources: ReadonlyArray<{ id: string; type: {} }> | null;
 	}>;
 	last_synced_interval: number;
 	enabled: boolean;
@@ -49,17 +49,21 @@ export const IntegrationsEdrHuntressGetOutput = /*@__PURE__*/ Schema.Struct({
 			peers_count: Schema.Number,
 			resources_count: Schema.Number,
 			issued: Schema.optional(Schema.Literals(["api", "integration", "jwt"])),
-			peers: Schema.Array(
-				Schema.Struct({
-					id: Schema.String,
-					name: Schema.String,
-				}),
+			peers: Schema.NullOr(
+				Schema.Array(
+					Schema.Struct({
+						id: Schema.String,
+						name: Schema.String,
+					}),
+				),
 			),
-			resources: Schema.Array(
-				Schema.Struct({
-					id: Schema.String,
-					type: Schema.Struct({}),
-				}),
+			resources: Schema.NullOr(
+				Schema.Array(
+					Schema.Struct({
+						id: Schema.String,
+						type: Schema.Struct({}),
+					}),
+				),
 			),
 		}),
 	),

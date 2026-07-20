@@ -16,18 +16,18 @@ export const NetworksPostInput = /*@__PURE__*/ Schema.Struct({
 // Output Schema
 export interface NetworksPostOutput {
 	id: string;
-	routers: ReadonlyArray<string>;
+	routers: ReadonlyArray<string> | null;
 	routing_peers_count: number;
-	resources: ReadonlyArray<string>;
+	resources: ReadonlyArray<string> | null;
 	policies: ReadonlyArray<string>;
 	name: string;
 	description?: string;
 }
 export const NetworksPostOutput = /*@__PURE__*/ Schema.Struct({
 	id: Schema.String,
-	routers: Schema.Array(Schema.String),
+	routers: Schema.NullOr(Schema.Array(Schema.String)),
 	routing_peers_count: Schema.Number,
-	resources: Schema.Array(Schema.String),
+	resources: Schema.NullOr(Schema.Array(Schema.String)),
 	policies: Schema.Array(Schema.String),
 	name: Schema.String,
 	description: Schema.optional(Schema.String),

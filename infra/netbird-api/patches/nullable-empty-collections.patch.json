@@ -1,0 +1,25 @@
+{
+	"description": "Self-hosted NetBird management returns null for empty Group peers/resources and Network routers/resources arrays.",
+	"patches": [
+		{
+			"op": "add",
+			"path": "/components/schemas/Group/allOf/1/properties/peers/nullable",
+			"value": true
+		},
+		{
+			"op": "add",
+			"path": "/components/schemas/Group/allOf/1/properties/resources/nullable",
+			"value": true
+		},
+		{
+			"op": "add",
+			"path": "/components/schemas/Network/allOf/0/properties/routers/nullable",
+			"value": true
+		},
+		{
+			"op": "add",
+			"path": "/components/schemas/Network/allOf/0/properties/resources/nullable",
+			"value": true
+		}
+	]
+}
