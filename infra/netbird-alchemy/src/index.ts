@@ -6,5 +6,6 @@ export * from "./Peer/index.ts";
 export * from "./Providers.ts";
 export * from "./ReverseProxyDomain/index.ts";
 export * from "./ReverseProxyService/index.ts";
+export * from "./Setup/index.ts";
 export * from "./SetupKey/index.ts";
 export * from "./User/index.ts";

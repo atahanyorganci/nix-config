@@ -4,6 +4,7 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 
 ## Resources
 
+- `NetBird.Setup` — first-admin bootstrap via `POST /api/setup` (`password` + PAT are `Redacted`)
 - `NetBird.Group` — peer groups
 - `NetBird.Network` — networks
 - `NetBird.Peer` — adopt existing mesh peers by stable ID (not created by Alchemy)
@@ -16,11 +17,13 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 
 Stack deploys resolve credentials via Effect `Config` (default provider: environment):
 
-| Config key             | Purpose                                            |
-| ---------------------- | -------------------------------------------------- |
-| `NETBIRD_API_TOKEN`    | Management API token (required for stack deploy)   |
-| `NETBIRD_API_BASE_URL` | Optional; defaults to `https://api.netbird.io`     |
-| `DEBUG`                | Optional boolean; enables Debug log level in tests |
+| Config key             | Purpose                                                    |
+| ---------------------- | ---------------------------------------------------------- |
+| `NETBIRD_API_TOKEN`    | Management API token (optional until hydrated after Setup) |
+| `NETBIRD_API_BASE_URL` | Optional; defaults to `https://api.netbird.io`             |
+| `DEBUG`                | Optional boolean; enables Debug log level in tests         |
+
+`NetBird.Setup` does not use `Credentials` (setup is unauthenticated). After Setup, the infra stack hydrates `NETBIRD_API_TOKEN` into the process env / `.env.local` for Group, SetupKey, and other API resources.
 
 Tests use a fixture Layer backed by a bootstrapped PAT (same `Credentials` service as `CredentialsFromConfig`) — no cloud token required.
 
