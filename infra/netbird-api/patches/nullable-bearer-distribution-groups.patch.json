@@ -1,0 +1,10 @@
+{
+	"description": "Self-hosted NetBird returns null for empty reverse-proxy BearerAuthConfig.distribution_groups.",
+	"patches": [
+		{
+			"op": "add",
+			"path": "/components/schemas/BearerAuthConfig/properties/distribution_groups/nullable",
+			"value": true
+		}
+	]
+}

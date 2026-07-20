@@ -35,7 +35,7 @@ export interface ReverseProxiesServicesPostInput {
 	auth?: {
 		password_auth?: { enabled: boolean; password: string | Redacted.Redacted<string> };
 		pin_auth?: { enabled: boolean; pin: string };
-		bearer_auth?: { enabled: boolean; distribution_groups?: ReadonlyArray<string> };
+		bearer_auth?: { enabled: boolean; distribution_groups?: ReadonlyArray<string> | null };
 		link_auth?: { enabled: boolean };
 		header_auths?: ReadonlyArray<{ enabled: boolean; header: string; value: string }>;
 	};
@@ -98,7 +98,7 @@ export const ReverseProxiesServicesPostInput = /*@__PURE__*/ Schema.Struct({
 			bearer_auth: Schema.optional(
 				Schema.Struct({
 					enabled: Schema.Boolean,
-					distribution_groups: Schema.optional(Schema.Array(Schema.String)),
+					distribution_groups: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 				}),
 			),
 			link_auth: Schema.optional(
@@ -166,7 +166,7 @@ export interface ReverseProxiesServicesPostOutput {
 	auth: {
 		password_auth?: { enabled: boolean; password: Redacted.Redacted<string> };
 		pin_auth?: { enabled: boolean; pin: string };
-		bearer_auth?: { enabled: boolean; distribution_groups?: ReadonlyArray<string> };
+		bearer_auth?: { enabled: boolean; distribution_groups?: ReadonlyArray<string> | null };
 		link_auth?: { enabled: boolean };
 		header_auths?: ReadonlyArray<{ enabled: boolean; header: string; value: string }>;
 	};
@@ -235,7 +235,7 @@ export const ReverseProxiesServicesPostOutput = /*@__PURE__*/ Schema.Struct({
 		bearer_auth: Schema.optional(
 			Schema.Struct({
 				enabled: Schema.Boolean,
-				distribution_groups: Schema.optional(Schema.Array(Schema.String)),
+				distribution_groups: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 			}),
 		),
 		link_auth: Schema.optional(
