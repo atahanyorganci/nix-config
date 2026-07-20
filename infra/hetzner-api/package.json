@@ -1,0 +1,40 @@
+{
+	"name": "@yorganci/hetzner-api",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./spec": "./spec/hetzner.cloud.api.json",
+		"./Credentials": "./src/credentials.ts",
+		"./Client": "./src/client.ts",
+		"./Errors": "./src/errors.ts",
+		"./Traits": "./src/traits.ts",
+		"./Retry": "./src/retry.ts",
+		"./Category": "./src/category.ts",
+		"./Sensitive": "./src/sensitive.ts",
+		"./*": "./src/operations/*.ts"
+	},
+	"scripts": {
+		"format": "oxfmt --check .",
+		"format:fix": "oxfmt --write .",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix ."
+	},
+	"dependencies": {
+		"@distilled.cloud/core": "catalog:",
+		"effect": "catalog:"
+	},
+	"devDependencies": {
+		"@effect/language-service": "catalog:",
+		"@effect/platform-bun": "catalog:",
+		"@yorganci/config": "workspace:*",
+		"oxfmt": "catalog:",
+		"oxlint": "catalog:",
+		"oxlint-tsgolint": "catalog:",
+		"typescript": "catalog:"
+	},
+	"spec": {
+		"url": "https://docs.hetzner.cloud/cloud.spec.json",
+		"sha256": "9ca6b542a057b002804b9f4f45ccfdb8b9a28c92b7e5bf5ae1b7f46b54fe0093"
+	}
+}
