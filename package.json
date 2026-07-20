@@ -9,13 +9,15 @@
 		"@effect/language-service": "^0.86.2",
 		"@effect/platform-bun": "4.0.0-beta.99",
 		"@effect/platform-node": "4.0.0-beta.99",
+		"@effect/vitest": "4.0.0-beta.99",
 		"alchemy": "next",
 		"effect": "4.0.0-beta.99",
 		"oxfmt": "^0.51.0",
 		"oxlint": "^1.66.0",
 		"oxlint-tsgolint": "^0.23.0",
 		"turbo": "^2.10.5",
-		"typescript": "^7.0.2"
+		"typescript": "^7.0.2",
+		"vitest": "^4.1.8"
 	},
 	"scripts": {
 		"check": "turbo run check",
