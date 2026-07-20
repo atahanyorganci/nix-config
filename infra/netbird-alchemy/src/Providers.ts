@@ -5,19 +5,26 @@ import { GroupProvider } from "./Group/Group.ts";
 import { NetworkProvider } from "./Network/Network.ts";
 import { PeerProvider } from "./Peer/Peer.ts";
 import { SetupKeyProvider } from "./SetupKey/SetupKey.ts";
+import { UserProvider } from "./User/User.ts";
 
 export type ProviderRequirements = Layer.Services<ReturnType<typeof providers>>;
 
 /**
- * NetBird resource providers (Group, Network, Peer, SetupKey).
+ * NetBird resource providers (Group, Network, Peer, SetupKey, User).
  * Pair with {@link CredentialsFromEnv} or `CredentialsFromConfig` as needed.
  */
 export const resourceProviders = () =>
-	Layer.mergeAll(GroupProvider(), NetworkProvider(), PeerProvider(), SetupKeyProvider());
+	Layer.mergeAll(
+		GroupProvider(),
+		NetworkProvider(),
+		PeerProvider(),
+		SetupKeyProvider(),
+		UserProvider(),
+	);
 
 /**
  * Build the complete NetBird providers Layer for stack deploys.
- * Includes credentials from the environment and a Fetch HTTP client.
+ * Resolves credentials from Effect `Config` (`NETBIRD_API_TOKEN`).
  */
 export const providers = () =>
-	Layer.mergeAll(resourceProviders(), CredentialsFromEnv, FetchHttpClient.layer);
+	resourceProviders().pipe(Layer.provideMerge(CredentialsFromEnv), Layer.provideMerge(FetchHttpClient.layer));
