@@ -318,6 +318,9 @@
         wants = ["network-online.target"];
         wantedBy = ["multi-user.target"];
 
+        # Allow Alchemy /api/setup to mint an initial admin PAT (create_pat: true).
+        environment.NB_SETUP_PAT_ENABLED = "true";
+
         serviceConfig = {
           Type = "simple";
           User = "netbird";
