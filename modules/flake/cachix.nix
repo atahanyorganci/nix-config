@@ -2,6 +2,8 @@
   cacheName = "atahanyorganci";
   cachePublicKey = "atahanyorganci.cachix.org-1:r9ZNvFHFKPxydR+do9PhRGHk2x/MuxG5U8ilm7t9mWs=";
   cacheUrl = "https://${cacheName}.cachix.org";
+  nixosCacheUrl = "https://cache.nixos.org/";
+  nixosCachePublicKey = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
 
   netbirdPackagesBySystem = {
     x86_64-linux = ["netbird" "netbird-server" "netbird-proxy"];
@@ -43,8 +45,15 @@ in {
 
     flake.modules.nixos.cachix = {
       nix.settings = {
-        extra-substituters = [cacheUrl];
-        extra-trusted-public-keys = [cachePublicKey];
+        substituters = [cacheUrl];
+        trusted-public-keys = [cachePublicKey];
+      };
+    };
+
+    flake.modules.darwin.cachix = {
+      nix.settings = {
+        substituters = [nixosCacheUrl cacheUrl];
+        trusted-public-keys = [nixosCachePublicKey cachePublicKey];
       };
     };
 
