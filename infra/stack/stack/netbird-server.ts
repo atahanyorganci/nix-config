@@ -28,7 +28,6 @@ const FlakeMe = Schema.Struct({
  * Nix eval uses the repository root as `cwd` so memo can hash every Nix source.
  */
 const REPO_ROOT = "../..";
-const DEPLOY_SCRIPT = "infra/stack/scripts/deploy-mars-nixos.sh";
 
 const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({});
 
@@ -83,8 +82,8 @@ export default NetbirdServerStack.make(
 			publicKey: deployKey,
 		});
 		const {
-			ipv4: { ip: marsIp },
-			server: marsServer,
+			ipv4: { ip: serverIp },
+			server,
 		} = yield* NetbirdServer.stack({
 			name: "mars",
 			location: "nbg1",
@@ -100,7 +99,7 @@ export default NetbirdServerStack.make(
 			zoneId: zone.zoneId,
 			name: `netbird.${DOMAIN}`,
 			type: "A",
-			content: marsIp,
+			content: serverIp,
 			proxied: false,
 			ttl: "1",
 		});
@@ -109,16 +108,21 @@ export default NetbirdServerStack.make(
 			zoneId: zone.zoneId,
 			name: `*.${DOMAIN}`,
 			type: "A",
-			content: marsIp,
+			content: serverIp,
 			proxied: false,
 			ttl: "1",
 		});
 
-		const marsNixos = yield* Command.Exec("MarsNixos", {
-			command: Output.interpolate`${DEPLOY_SCRIPT} ${marsIp} ${marsServer.serverId} ${NETBIRD_HOST}`,
+		const serverNixos = yield* Command.Exec("ServerNixos", {
+			command: Output.interpolate`nix run .#deploy-nixos -- ${serverIp} ${server.serverId} . mars ${NETBIRD_HOST}`,
 			cwd: REPO_ROOT,
 			memo: {
-				include: ["**/*.nix", "flake.lock", "infra/stack/scripts/deploy-mars-nixos.sh"],
+				include: [
+					"**/*.nix",
+					"flake.lock",
+					"modules/pkgs/deploy-nixos/default.nix",
+					"modules/pkgs/deploy-nixos/deploy-nixos.sh",
+				],
 			},
 		});
 
@@ -133,7 +137,7 @@ export default NetbirdServerStack.make(
 			password: adminPassword.text,
 			patExpireIn: 365,
 			// Wait for NixOS install/rebuild before hitting the management API.
-			ready: Output.map(marsNixos.hash, hash => hash.input ?? "pending"),
+			ready: Output.map(serverNixos.hash, hash => hash.input ?? "pending"),
 		});
 
 		const credentials = yield* UpdateNetBirdCredentialsRef({
@@ -141,10 +145,10 @@ export default NetbirdServerStack.make(
 			apiToken: setup.personalAccessToken,
 		});
 
+		const managementApiReady = Output.all(credentials, serverNixos.hash);
 		const infraPeers = yield* NetBird.Group("InfraPeers", {
 			name: "infra-peers",
-			// Depend on credential hydration so API calls see NETBIRD_API_TOKEN.
-			peers: Output.map(credentials, () => [] as string[]),
+			peers: Output.map(managementApiReady, () => [] as string[]),
 		});
 
 		yield* NetBird.SetupKey("InfraSetupKey", {
@@ -157,7 +161,7 @@ export default NetbirdServerStack.make(
 
 		return {
 			zone: zone.name,
-			marsIp,
+			serverIp,
 			apiBaseUrl: netbirdApiBaseUrl,
 			admin: {
 				email: setup.email,
