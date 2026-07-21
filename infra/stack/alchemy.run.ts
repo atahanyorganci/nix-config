@@ -12,6 +12,7 @@ import * as Schema from "effect/Schema";
 import { NetbirdServer, NixExpr } from "./src/index.ts";
 
 const DOMAIN = "yorganci.dev";
+const NETBIRD_HOST = `netbird.${DOMAIN}`;
 
 const FlakeMe = Schema.Struct({
 	name: Schema.String,
@@ -104,7 +105,7 @@ export default Alchemy.Stack(
 			proxied: false,
 			ttl: "1",
 		});
-		const netbirdApiBaseUrl = Output.interpolate`https://${netbirdRecord.content}`;
+		const netbirdApiBaseUrl = Output.map(netbirdRecord.content, () => `https://${NETBIRD_HOST}`);
 		yield* Cloudflare.DNS.Record("ProxyWildcardDnsRecord", {
 			zoneId: zone.zoneId,
 			name: `*.${DOMAIN}`,
@@ -115,7 +116,7 @@ export default Alchemy.Stack(
 		});
 
 		const marsNixos = yield* Command.Exec("MarsNixos", {
-			command: Output.interpolate`${DEPLOY_SCRIPT} ${marsIp} ${marsServer.serverId} ${netbirdRecord.content}`,
+			command: Output.interpolate`${DEPLOY_SCRIPT} ${marsIp} ${marsServer.serverId} ${NETBIRD_HOST}`,
 			cwd: REPO_ROOT,
 			memo: {
 				include: ["**/*.nix", "flake.lock", "infra/stack/scripts/deploy-mars-nixos.sh"],
