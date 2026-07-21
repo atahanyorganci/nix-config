@@ -29,7 +29,11 @@ const FlakeMe = Schema.Struct({
  */
 const REPO_ROOT = "../..";
 
-const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({});
+// Actions hydrate the PAT during the first deploy. Subsequent deploys and
+// destroys still need the current management endpoint before that action runs.
+const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({
+	NETBIRD_API_BASE_URL: `https://${NETBIRD_HOST}`,
+});
 
 const UpdateNetBirdCredentialsRef = Alchemy.Action(
 	"UpdateNetBirdCredentialsRef",
@@ -97,7 +101,7 @@ export default NetbirdServerStack.make(
 		});
 		const netbirdRecord = yield* Cloudflare.DNS.Record("NetbirdDnsRecord", {
 			zoneId: zone.zoneId,
-			name: `netbird.${DOMAIN}`,
+			name: NETBIRD_HOST,
 			type: "A",
 			content: serverIp,
 			proxied: false,
@@ -149,7 +153,7 @@ export default NetbirdServerStack.make(
 		const infraPeers = yield* NetBird.Group("InfraPeers", {
 			name: "infra-peers",
 			peers: Output.map(managementApiReady, () => [] as string[]),
-		});
+		}).pipe(Alchemy.RemovalPolicy.retain());
 
 		yield* NetBird.SetupKey("InfraSetupKey", {
 			name: "infra-peers-bootstrap",
@@ -157,7 +161,7 @@ export default NetbirdServerStack.make(
 			expiresIn: 31_536_000,
 			usageLimit: 0,
 			autoGroups: [infraPeers.groupId],
-		});
+		}).pipe(Alchemy.RemovalPolicy.retain());
 
 		return {
 			zone: zone.name,
