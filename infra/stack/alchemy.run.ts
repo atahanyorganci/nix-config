@@ -8,18 +8,23 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
-import { NetbirdServer } from "./src/index.ts";
+import * as Schema from "effect/Schema";
+import { NetbirdServer, NixExpr } from "./src/index.ts";
 
 const DOMAIN = "yorganci.dev";
-const ADMIN_EMAIL = "atahanyorganci@hotmail.com";
-const ADMIN_NAME = "Atahan";
 
-/** Deploy key also present in flake.me.authorizedKeys / Hetzner as "Atahan". */
-const DEPLOY_SSH_PUBLIC_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQEQWwP1aWkv4t/nzin3rRn7ueC7HWR+g9Tec1nwuS";
+const FlakeMe = Schema.Struct({
+	name: Schema.String,
+	email: Schema.String,
+	username: Schema.String,
+	shell: Schema.String,
+	key: Schema.String,
+	authorizedKeys: Schema.Array(Schema.String),
+});
 
 /**
  * Paths assume Alchemy is launched from `infra/stack` (package scripts).
- * Exec uses the repository root as `cwd` so memo can hash every Nix source.
+ * Nix eval uses the repository root as `cwd` so memo can hash every Nix source.
  */
 const REPO_ROOT = "../..";
 const DEPLOY_SCRIPT = "infra/stack/scripts/deploy-mars-nixos.sh";
@@ -55,13 +60,27 @@ export default Alchemy.Stack(
 			Cloudflare.providers(),
 			Hetzner.providers(),
 			NetBird.providers(NetBird.CredentialsFromRef(netbirdCredentials)),
+			NixExpr.NixExprProvider(),
 		),
 		state: Cloudflare.state(),
 	},
 	Effect.gen(function* () {
+		const me = yield* NixExpr.make({
+			name: "FlakeMe",
+			cwd: REPO_ROOT,
+			include: ["**/*.nix", "flake.lock"],
+			expression: ".#me",
+			schema: FlakeMe,
+		});
+
+		const deployKey = me.value.authorizedKeys[0];
+		if (!deployKey) {
+			return yield* Effect.die("flake.me.authorizedKeys is empty");
+		}
+
 		const sshKey = yield* Hetzner.SshKey("DeployKey", {
-			name: "Atahan",
-			publicKey: DEPLOY_SSH_PUBLIC_KEY,
+			name: me.value.username,
+			publicKey: deployKey,
 		});
 		const {
 			ipv4: { ip: marsIp },
@@ -109,8 +128,8 @@ export default Alchemy.Stack(
 
 		const setup = yield* NetBird.Setup("Admin", {
 			apiBaseUrl: netbirdApiBaseUrl,
-			email: ADMIN_EMAIL,
-			name: ADMIN_NAME,
+			email: me.value.email,
+			name: me.value.name,
 			password: adminPassword.text,
 			patExpireIn: 365,
 			// Wait for NixOS install/rebuild before hitting the management API.
