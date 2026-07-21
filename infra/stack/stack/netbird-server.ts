@@ -12,7 +12,7 @@ import * as Schema from "effect/Schema";
 import { NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
 
 const DOMAIN = "yorganci.dev";
-const NETBIRD_HOST = `netbird.${DOMAIN}`;
+const NETBIRD_HOST = `netbird-4.${DOMAIN}`;
 
 const FlakeMe = Schema.Struct({
 	name: Schema.String,
@@ -25,7 +25,7 @@ const FlakeMe = Schema.Struct({
 
 /**
  * Paths assume Alchemy is launched from `infra/stack` (package scripts).
- * Nix eval uses the repository root as `cwd` so memo can hash every Nix source.
+ * Nix eval uses the repository root as `cwd`.
  */
 const REPO_ROOT = "../..";
 
@@ -73,21 +73,19 @@ export default NetbirdServerStack.make(
 		state: Cloudflare.state(),
 	},
 	Effect.gen(function* () {
-		const me = yield* NixExpr.make({
-			name: "FlakeMe",
+		const meExpr = yield* NixExpr.NixExpr("FlakeMe", {
 			cwd: REPO_ROOT,
-			include: ["**/*.nix", "flake.lock"],
 			expression: ".#me",
-			schema: FlakeMe,
 		});
+		const me = yield* NixExpr.decode(meExpr, FlakeMe);
 
-		const deployKey = me.value.authorizedKeys[0];
+		const deployKey = me.authorizedKeys[0];
 		if (!deployKey) {
 			return yield* Effect.die("flake.me.authorizedKeys is empty");
 		}
 
 		const sshKey = yield* Hetzner.SshKey("DeployKey", {
-			name: me.value.username,
+			name: me.username,
 			publicKey: deployKey,
 		});
 		const {
@@ -141,8 +139,8 @@ export default NetbirdServerStack.make(
 
 		const setup = yield* NetBird.Setup("Admin", {
 			apiBaseUrl: netbirdApiBaseUrl,
-			email: me.value.email,
-			name: me.value.name,
+			email: me.email,
+			name: me.name,
 			password: adminPassword.text,
 			patExpireIn: 365,
 			// Wait for NixOS install/rebuild before hitting the management API.
