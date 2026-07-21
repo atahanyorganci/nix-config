@@ -1,4 +1,5 @@
 import { firewallsGet } from "@yorganci/hetzner-api/firewallsGet";
+import { firewallsIdActionsRemoveFromResourcesPost } from "@yorganci/hetzner-api/firewallsIdActionsRemoveFromResourcesPost";
 import { firewallsIdActionsSetRulesPost } from "@yorganci/hetzner-api/firewallsIdActionsSetRulesPost";
 import { firewallsIdDelete } from "@yorganci/hetzner-api/firewallsIdDelete";
 import { firewallsIdGet } from "@yorganci/hetzner-api/firewallsIdGet";
@@ -162,9 +163,37 @@ export const FirewallProvider = () =>
 			return toAttributes(observed);
 		}),
 		delete: Effect.fn(function* ({ output }) {
+			const live = yield* catchNotFound(firewallsIdGet({ id: output.firewallId }));
+			const removeFrom = live?.firewall ? appliedServers(live.firewall.applied_to) : [];
+			if (removeFrom.length > 0) {
+				const result = yield* firewallsIdActionsRemoveFromResourcesPost({
+					id: output.firewallId,
+					remove_from: removeFrom,
+				});
+				yield* waitForActions(result.actions);
+			}
 			yield* catchNotFound(firewallsIdDelete({ id: output.firewallId }));
 		}),
 	});
+
+type FirewallAppliedTo = FirewallApi["applied_to"][number];
+
+const appliedServers = (
+	appliedTo: ReadonlyArray<FirewallAppliedTo>,
+): ReadonlyArray<{ type: "server"; server: { id: number } }> => {
+	const ids = new Set<number>();
+	for (const entry of appliedTo) {
+		if (entry.type === "server" && entry.server?.id != null) {
+			ids.add(entry.server.id);
+		}
+		for (const resource of entry.applied_to_resources ?? []) {
+			if (resource.server?.id != null) {
+				ids.add(resource.server.id);
+			}
+		}
+	}
+	return [...ids].map(id => ({ type: "server" as const, server: { id } }));
+};
 
 type FirewallApiRule = {
 	description?: string | null;
@@ -180,6 +209,12 @@ type FirewallApi = {
 	name: string;
 	labels?: Record<string, string>;
 	rules: ReadonlyArray<FirewallApiRule>;
+	applied_to: ReadonlyArray<{
+		type: "server" | "label_selector";
+		server?: { id: number };
+		label_selector?: { selector: string };
+		applied_to_resources?: ReadonlyArray<{ type?: "server"; server?: { id: number } }>;
+	}>;
 };
 
 const resolveName = (id: string, name: string | undefined) =>
