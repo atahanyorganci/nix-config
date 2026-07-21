@@ -13,5 +13,6 @@
       };
       overlays = lib.attrValues config.flake.overlays;
     };
+    packages.nixos-anywhere = inputs.nixos-anywhere.packages.${system}.default;
   };
 }
