@@ -1,45 +1,131 @@
+import * as Hetzner from "@yorganci/hetzner-alchemy";
 import * as NetBird from "@yorganci/netbird-alchemy";
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
+import * as Command from "alchemy/Command";
 import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import * as Ref from "effect/Ref";
 
 const DOMAIN = "yorganci.dev";
-const NETBIRD_IP = "91.99.103.93";
+const LOCATION = "nbg1";
+const SERVER_TYPE = "cx23";
+const IMAGE = "ubuntu-24.04";
+const NETBIRD_URL = `https://netbird.${DOMAIN}`;
+const ADMIN_EMAIL = "atahanyorganci@hotmail.com";
+const ADMIN_NAME = "Atahan";
 
-/** Stable NetBird peer IDs (management store). */
-const PEER_MERCURY = "d9bc4hn0vp6n2qgqba4g";
-const PEER_VENUS = "d99ve6f0vp6kefutb2v0";
-const PEER_MARS = "d9aba6f0vp6m1cjc8gg0";
+/** Deploy key also present in flake.me.authorizedKeys / Hetzner as "Atahan". */
+const DEPLOY_SSH_PUBLIC_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQEQWwP1aWkv4t/nzin3rRn7ueC7HWR+g9Tec1nwuS";
 
-/** Built-in "All" group ID. */
-const GROUP_ALL = "d99tk9n0vp6k4geo50pg";
+/**
+ * Paths assume Alchemy is launched from `infra/stack` (package scripts).
+ * Exec uses the repository root as `cwd` so memo can hash every Nix source.
+ */
+const REPO_ROOT = "../..";
+const DEPLOY_SCRIPT = "infra/stack/scripts/deploy-mars-nixos.sh";
 
-/** Reverse-proxy cluster address (`NB_PROXY_DOMAIN`). */
-const PROXY_CLUSTER = "yorganci.dev";
+const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({});
 
-const oidcAuth = {
-	bearerAuth: { enabled: true },
-} as const;
+const UpdateNetBirdCredentialsRef = Alchemy.Action(
+	"UpdateNetBirdCredentialsRef",
+	Effect.succeed(
+		Effect.fn(function* (input: NetBird.CredentialsConfig) {
+			const apiToken = Redacted.value(input.apiToken);
+			if (!apiToken) {
+				return yield* Effect.die("NetBird PAT is empty after Setup");
+			}
 
-const peerHttpTarget = (peerId: string, port: number) => [
-	{
-		targetId: peerId,
-		targetType: "peer" as const,
-		protocol: "http" as const,
-		port,
-		enabled: true,
-	},
-];
+			yield* Ref.set(netbirdCredentials, {
+				NETBIRD_API_TOKEN: apiToken,
+				NETBIRD_API_BASE_URL: input.apiBaseUrl,
+			});
+
+			return {
+				apiToken,
+				apiBaseUrl: input.apiBaseUrl,
+			};
+		}),
+	),
+);
 
 export default Alchemy.Stack(
 	"Infra",
 	{
-		providers: Layer.mergeAll(Cloudflare.providers(), NetBird.providers()),
+		providers: Layer.mergeAll(
+			Cloudflare.providers(),
+			Hetzner.providers(),
+			NetBird.providers(NetBird.CredentialsFromRef(netbirdCredentials)),
+		),
 		state: Cloudflare.state(),
 	},
 	Effect.gen(function* () {
+		const sshKey = yield* Hetzner.SshKey("DeployKey", {
+			name: "Atahan",
+			publicKey: DEPLOY_SSH_PUBLIC_KEY,
+		});
+
+		const firewall = yield* Hetzner.Firewall("MarsFirewall", {
+			name: "mars",
+			rules: [
+				{
+					direction: "in",
+					protocol: "tcp",
+					port: "22",
+					sourceIps: ["0.0.0.0/0", "::/0"],
+					description: "SSH",
+				},
+				{
+					direction: "in",
+					protocol: "tcp",
+					port: "80",
+					sourceIps: ["0.0.0.0/0", "::/0"],
+					description: "HTTP ACME",
+				},
+				{
+					direction: "in",
+					protocol: "tcp",
+					port: "443",
+					sourceIps: ["0.0.0.0/0", "::/0"],
+					description: "HTTPS",
+				},
+				{
+					direction: "in",
+					protocol: "udp",
+					port: "3478",
+					sourceIps: ["0.0.0.0/0", "::/0"],
+					description: "NetBird STUN",
+				},
+				{
+					direction: "in",
+					protocol: "udp",
+					port: "51820",
+					sourceIps: ["0.0.0.0/0", "::/0"],
+					description: "WireGuard",
+				},
+			],
+		});
+
+		const marsIp = yield* Hetzner.PrimaryIp("MarsIpv4", {
+			name: "mars-ipv4",
+			type: "ipv4",
+			location: LOCATION,
+			autoDelete: false,
+		});
+
+		const marsServer = yield* Hetzner.Server("Mars", {
+			name: "mars",
+			serverType: SERVER_TYPE,
+			image: IMAGE,
+			location: LOCATION,
+			sshKeys: [sshKey.name],
+			firewalls: [firewall.firewallId],
+			primaryIpv4Id: marsIp.primaryIpId,
+			enableIpv6: false,
+		});
+
 		const zone = yield* Cloudflare.Zone.Zone("Domain", {
 			name: DOMAIN,
 		});
@@ -47,7 +133,7 @@ export default Alchemy.Stack(
 			zoneId: zone.zoneId,
 			name: `netbird.${DOMAIN}`,
 			type: "A",
-			content: NETBIRD_IP,
+			content: marsIp.ip,
 			proxied: false,
 			ttl: "1",
 		});
@@ -55,121 +141,66 @@ export default Alchemy.Stack(
 			zoneId: zone.zoneId,
 			name: `*.${DOMAIN}`,
 			type: "A",
-			content: NETBIRD_IP,
+			content: marsIp.ip,
 			proxied: false,
 			ttl: "1",
 		});
 
+		const marsNixos = yield* Command.Exec("MarsNixos", {
+			command: Output.interpolate`${DEPLOY_SCRIPT} ${marsIp.ip} ${marsServer.serverId} ${netbirdRecord.content}`,
+			cwd: REPO_ROOT,
+			memo: {
+				include: ["**/*.nix", "flake.lock", "infra/stack/scripts/deploy-mars-nixos.sh"],
+			},
+		});
+
+		const adminPassword = yield* Alchemy.Random("NetBirdAdminPassword", {
+			bytes: 24,
+		});
+
+		const setup = yield* NetBird.Setup("Admin", {
+			apiBaseUrl: NETBIRD_URL,
+			email: ADMIN_EMAIL,
+			name: ADMIN_NAME,
+			password: adminPassword.text,
+			patExpireIn: 365,
+			// Wait for NixOS install/rebuild before hitting the management API.
+			ready: Output.map(marsNixos.hash, hash => hash.input ?? "pending"),
+		});
+
+		const credentials = yield* UpdateNetBirdCredentialsRef({
+			apiBaseUrl: setup.apiBaseUrl,
+			apiToken: setup.personalAccessToken,
+		});
+
 		const infraPeers = yield* NetBird.Group("InfraPeers", {
 			name: "infra-peers",
+			// Depend on credential hydration so API calls see NETBIRD_API_TOKEN.
+			peers: Output.map(credentials, () => [] as string[]),
 		});
 
-		const mercury = yield* NetBird.Peer("Mercury", { peerId: PEER_MERCURY });
-		const venus = yield* NetBird.Peer("Venus", { peerId: PEER_VENUS });
-		const mars = yield* NetBird.Peer("Mars", { peerId: PEER_MARS });
-
-		const proxyDomain = yield* NetBird.ReverseProxyDomain("ProxyApex", {
-			domain: DOMAIN,
-			targetCluster: PROXY_CLUSTER,
-		});
-
-		// Jellyfin — public, app-native NetBird OIDC (no proxy auth)
-		const watch = yield* NetBird.ReverseProxyService("Watch", {
-			name: "watch",
-			domain: `watch.${DOMAIN}`,
-			enabled: true,
-			private: false,
-			targets: peerHttpTarget(PEER_VENUS, 8096),
-		});
-
-		// Calibre — public + NetBird OIDC at the proxy
-		const library = yield* NetBird.ReverseProxyService("Library", {
-			name: "library",
-			domain: `library.${DOMAIN}`,
-			enabled: true,
-			private: false,
-			auth: oidcAuth,
-			targets: peerHttpTarget(PEER_VENUS, 8083),
-		});
-
-		// Arr / Transmission / HA / Pi-hole / oMLX — mesh-private
-		const film = yield* NetBird.ReverseProxyService("Film", {
-			name: "film",
-			domain: `film.${DOMAIN}`,
-			enabled: true,
-			private: true,
-			accessGroups: [GROUP_ALL],
-			targets: peerHttpTarget(PEER_VENUS, 7878),
-		});
-		const tv = yield* NetBird.ReverseProxyService("Tv", {
-			name: "tv",
-			domain: `tv.${DOMAIN}`,
-			enabled: true,
-			private: true,
-			accessGroups: [GROUP_ALL],
-			targets: peerHttpTarget(PEER_VENUS, 8989),
-		});
-		const indexer = yield* NetBird.ReverseProxyService("Indexer", {
-			name: "indexer",
-			domain: `indexer.${DOMAIN}`,
-			enabled: true,
-			private: true,
-			accessGroups: [GROUP_ALL],
-			targets: peerHttpTarget(PEER_VENUS, 9696),
-		});
-		const download = yield* NetBird.ReverseProxyService("Download", {
-			name: "download",
-			domain: `download.${DOMAIN}`,
-			enabled: true,
-			private: true,
-			accessGroups: [GROUP_ALL],
-			targets: peerHttpTarget(PEER_VENUS, 9091),
-		});
-		const homeAssistant = yield* NetBird.ReverseProxyService("HomeAssistant", {
-			name: "home-assistant",
-			domain: `home-assistant.${DOMAIN}`,
-			enabled: true,
-			private: true,
-			accessGroups: [GROUP_ALL],
-			targets: peerHttpTarget(PEER_MERCURY, 8123),
-		});
-		const pihole = yield* NetBird.ReverseProxyService("Pihole", {
-			name: "pihole",
-			domain: `pihole.${DOMAIN}`,
-			enabled: true,
-			private: true,
-			accessGroups: [GROUP_ALL],
-			targets: peerHttpTarget(PEER_MARS, 8053),
-		});
-		const omlx = yield* NetBird.ReverseProxyService("Omlx", {
-			name: "omlx",
-			domain: `omlx.${DOMAIN}`,
-			enabled: true,
-			private: true,
-			accessGroups: [GROUP_ALL],
-			targets: peerHttpTarget(PEER_VENUS, 8000),
+		const infraSetupKey = yield* NetBird.SetupKey("InfraSetupKey", {
+			name: "infra-peers-bootstrap",
+			type: "reusable",
+			expiresIn: 31_536_000,
+			usageLimit: 0,
+			autoGroups: [infraPeers.groupId],
 		});
 
 		return {
 			zoneId: zone.zoneId,
-			netbirdUrl: Output.interpolate`https://${netbirdRecord.content}`,
-			infraPeersGroupId: infraPeers.groupId,
-			proxyDomainId: proxyDomain.domainId,
-			peers: {
-				mercury: mercury.peerId,
-				venus: venus.peerId,
-				mars: mars.peerId,
+			mars: {
+				serverId: marsServer.serverId,
+				ipv4: marsIp.ip,
+				primaryIpId: marsIp.primaryIpId,
+				firewallId: firewall.firewallId,
 			},
-			services: {
-				download: download.serviceId,
-				watch: watch.serviceId,
-				library: library.serviceId,
-				film: film.serviceId,
-				tv: tv.serviceId,
-				indexer: indexer.serviceId,
-				homeAssistant: homeAssistant.serviceId,
-				pihole: pihole.serviceId,
-				omlx: omlx.serviceId,
+			netbirdUrl: Output.interpolate`${NETBIRD_URL}`,
+			adminEmail: ADMIN_EMAIL,
+			infraPeersGroupId: infraPeers.groupId,
+			infraSetupKeyId: infraSetupKey.keyId,
+			dns: {
+				netbird: netbirdRecord.content,
 			},
 		};
 	}),

@@ -103,6 +103,7 @@
       "dependencies": {
         "@effect/platform-bun": "catalog:",
         "@effect/platform-node": "catalog:",
+        "@yorganci/hetzner-alchemy": "workspace:*",
         "@yorganci/netbird-alchemy": "workspace:*",
         "alchemy": "catalog:",
         "effect": "catalog:",
