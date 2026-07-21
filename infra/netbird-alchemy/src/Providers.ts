@@ -1,5 +1,6 @@
 import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import { ApiKeyProvider } from "./ApiKey/ApiKey.ts";
 import { CredentialsFromEnv, type Credentials } from "./Credentials.ts";
 import { GroupProvider } from "./Group/Group.ts";
 import { NetworkProvider } from "./Network/Network.ts";
@@ -13,7 +14,7 @@ import { UserProvider } from "./User/User.ts";
 export type ProviderRequirements = Layer.Services<ReturnType<typeof providers>>;
 
 /**
- * NetBird resource providers (Setup, Group, Network, Peer, SetupKey, User, reverse proxy).
+ * NetBird resource providers (Setup, Group, Network, Peer, SetupKey, ApiKey, User, reverse proxy).
  * Pair with {@link CredentialsFromEnv} or `CredentialsFromConfig` as needed.
  */
 export const resourceProviders = () =>
@@ -23,6 +24,7 @@ export const resourceProviders = () =>
 		NetworkProvider(),
 		PeerProvider(),
 		SetupKeyProvider(),
+		ApiKeyProvider(),
 		UserProvider(),
 		ReverseProxyDomainProvider(),
 		ReverseProxyServiceProvider(),

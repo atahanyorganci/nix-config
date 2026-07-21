@@ -5,9 +5,19 @@ import type { NotFound } from "@yorganci/netbird-api/Errors";
 export const isNotFound = (error: unknown): error is InstanceType<typeof NotFound> =>
 	Predicate.hasProperty(error, "_tag") && error._tag === "NotFound";
 
-const isTransportError = (error: unknown) =>
+export const isTransportError = (error: unknown) =>
 	(Predicate.hasProperty(error, "_tag") && error._tag === "HttpClientError") ||
 	(error instanceof Error && error.name === "HttpClientError" && error.message.startsWith("Transport error"));
+
+/** Swallow transport failures when the control plane is unreachable (e.g. during destroy). */
+export const catchUnavailable = <A, E, R>(
+	effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A | undefined, Exclude<E, never>, R> =>
+	effect.pipe(Effect.catchIf(isTransportError, () => Effect.succeed(undefined))) as Effect.Effect<
+		A | undefined,
+		Exclude<E, never>,
+		R
+	>;
 
 /** Swallow NetBird 404s when the typed op union omits `NotFound`. */
 export const catchNotFound = <A, E, R>(

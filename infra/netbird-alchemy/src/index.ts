@@ -7,6 +7,7 @@ export {
 	DEFAULT_API_BASE_URL,
 } from "./Credentials.ts";
 export type { CredentialsRef } from "./Credentials.ts";
+export * from "./ApiKey/index.ts";
 export * from "./Group/index.ts";
 export * from "./Network/index.ts";
 export * from "./Peer/index.ts";

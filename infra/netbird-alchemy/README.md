@@ -9,6 +9,7 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 - `NetBird.Network` — networks
 - `NetBird.Peer` — adopt existing mesh peers by stable ID (not created by Alchemy)
 - `NetBird.SetupKey` — setup keys (secret `key` is `Redacted`)
+- `NetBird.ApiKey` — personal access tokens for management users (secret `token` is `Redacted`)
 - `NetBird.User` — management / service users (optional `password` is `Redacted`)
 - `NetBird.ReverseProxyDomain` — reverse-proxy domains
 - `NetBird.ReverseProxyService` — reverse-proxy services (auth secrets are `Redacted`)
@@ -38,6 +39,14 @@ const bot =
 		name: "ci-bot",
 		role: "admin",
 		isServiceUser: true,
+	});
+
+const apiKey =
+	yield *
+	NetBird.ApiKey("CiBotKey", {
+		userId: bot.userId,
+		name: "ci-bot-key",
+		expiresIn: 365,
 	});
 
 const domain =
