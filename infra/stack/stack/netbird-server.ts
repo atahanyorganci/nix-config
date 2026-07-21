@@ -57,6 +57,11 @@ const UpdateNetBirdCredentialsRef = Alchemy.Action(
 	),
 );
 
+const preferProvisionedApiToken = (
+	provisioned: Redacted.Redacted<string>,
+	fallback: Redacted.Redacted<string>,
+): Redacted.Redacted<string> => (Redacted.value(provisioned).length > 0 ? provisioned : fallback);
+
 export default NetbirdServerStack.make(
 	{
 		providers: Layer.mergeAll(
@@ -144,24 +149,24 @@ export default NetbirdServerStack.make(
 			ready: Output.map(serverNixos.hash, hash => hash.input ?? "pending"),
 		});
 
-		const credentials = yield* UpdateNetBirdCredentialsRef({
+		// Bootstrap credentials so NetBird API resources can authenticate.
+		yield* UpdateNetBirdCredentialsRef({
 			apiBaseUrl: setup.apiBaseUrl,
 			apiToken: setup.personalAccessToken,
 		});
 
-		const managementApiReady = Output.all(credentials, serverNixos.hash);
-		const infraPeers = yield* NetBird.Group("InfraPeers", {
-			name: "infra-peers",
-			peers: Output.map(managementApiReady, () => [] as string[]),
+		const adminApiKey = yield* NetBird.ApiKey("AdminApiKey", {
+			userId: setup.userId,
+			name: "admin-full-access",
+			expiresIn: 365,
 		}).pipe(Alchemy.RemovalPolicy.retain());
 
-		yield* NetBird.SetupKey("InfraSetupKey", {
-			name: "infra-peers-bootstrap",
-			type: "reusable",
-			expiresIn: 31_536_000,
-			usageLimit: 0,
-			autoGroups: [infraPeers.groupId],
-		}).pipe(Alchemy.RemovalPolicy.retain());
+		yield* UpdateNetBirdCredentialsRef({
+			apiBaseUrl: setup.apiBaseUrl,
+			apiToken: Output.map(Output.all(adminApiKey.token, setup.personalAccessToken), ([provisioned, fallback]) =>
+				preferProvisionedApiToken(provisioned, fallback),
+			),
+		});
 
 		return {
 			zone: zone.name,
