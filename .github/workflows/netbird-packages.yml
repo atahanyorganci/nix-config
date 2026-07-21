@@ -1,0 +1,86 @@
+name: NetBird Packages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: netbird-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            system: x86_64-linux
+            packages: netbird netbird-server netbird-proxy
+          - runner: ubuntu-24.04-arm
+            system: aarch64-linux
+            packages: netbird
+          - runner: macos-latest
+            system: aarch64-darwin
+            packages: netbird netbird-app
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            keep-env-derivations = true
+            keep-outputs = true
+
+      - name: Compute NetBird cache key
+        id: netbird-cache-key
+        run: |
+          set -euo pipefail
+          hash="$(nix build --no-link --print-out-paths --accept-flake-config \
+            ".#checks.${{ matrix.system }}.netbird-cache-key" | xargs cat)"
+          echo "hash=${hash}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: netbird-${{ matrix.system }}-${{ steps.netbird-cache-key.outputs.hash }}
+          restore-prefixes-first-match: netbird-${{ matrix.system }}-
+          gc-max-store-size-linux: 2G
+          purge: true
+          purge-prefixes: netbird-${{ matrix.system }}-
+          purge-last-accessed: P7D
+          purge-primary-key: never
+
+      - uses: cachix/cachix-action@v16
+        with:
+          name: atahanyorganci
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true
+
+      - name: Build NetBird packages (${{ matrix.system }})
+        run: |
+          set -euo pipefail
+          args=()
+          for pkg in ${{ matrix.packages }}; do
+            args+=(".#packages.${{ matrix.system }}.$pkg")
+          done
+          nix build -L --accept-flake-config "${args[@]}"
+
+      - name: Push NetBird packages to Cachix
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          set -euo pipefail
+          args=()
+          for pkg in ${{ matrix.packages }}; do
+            args+=(".#packages.${{ matrix.system }}.$pkg")
+          done
+          nix build --no-link --print-out-paths --accept-flake-config "${args[@]}" \
+            | cachix push atahanyorganci

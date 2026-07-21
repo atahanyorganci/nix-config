@@ -13,6 +13,11 @@
 
       vendorHash = "sha256-z/2+LUBocWQ06EfdJ4nujr4vb1e2zjmlufsGgGWN0ak=";
 
+      # Share the go-modules derivation name across NetBird components.
+      overrideModAttrs = _final: _prev: {
+        name = "netbird-${version}-go-modules";
+      };
+
       subPackages = ["combined"];
 
       ldflags = [
