@@ -11,7 +11,8 @@
 					"deterministicKeys": "error"
 				}
 			}
-		]
+		],
+		"types": ["bun"]
 	},
 	"include": ["./alchemy.run.ts", "./src/**/*.ts", "./oxfmt.config.ts", "./oxlint.config.ts"]
 }

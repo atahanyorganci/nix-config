@@ -23,6 +23,7 @@
 	},
 	"devDependencies": {
 		"@effect/language-service": "catalog:",
+		"@types/bun": "^1.3.14",
 		"@yorganci/config": "workspace:*",
 		"oxfmt": "catalog:",
 		"oxlint": "catalog:",
