@@ -7,7 +7,7 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 - `NetBird.Setup` — first-admin bootstrap via `POST /api/setup` (`password` + PAT are `Redacted`)
 - `NetBird.Group` — peer groups
 - `NetBird.Network` — networks
-- `NetBird.Peer` — adopt existing mesh peers by stable ID (not created by Alchemy)
+- `NetBird.Peer` — adopt existing mesh peers by `host` identity or stable `peerId` (not created by Alchemy)
 - `NetBird.SetupKey` — setup keys (secret `key` is `Redacted`)
 - `NetBird.ApiKey` — personal access tokens for management users (secret `token` is `Redacted`)
 - `NetBird.User` — management / service users (optional `password` is `Redacted`)
@@ -49,6 +49,12 @@ const apiKey =
 		expiresIn: 365,
 	});
 
+const venus =
+	yield *
+	NetBird.Peer("Venus", {
+		host: "venus",
+	});
+
 const domain =
 	yield *
 	NetBird.ReverseProxyDomain("AppDomain", {
@@ -62,6 +68,15 @@ const svc =
 		name: "web",
 		domain: domain.domain,
 		enabled: true,
+		targets: [
+			{
+				targetId: venus.peerId,
+				targetType: "peer",
+				protocol: "http",
+				port: 8080,
+				enabled: true,
+			},
+		],
 	});
 ```
 
