@@ -38,7 +38,31 @@
         description = "Bind address for Sonarr/Radarr/Prowlarr (and Transmission RPC).";
       };
     };
-    config = mkIf cfg.enable {
+    config = mkIf cfg.enable (let
+      privateHttpService = port: {
+        inherit port;
+        expose = {
+          enable = true;
+          private = true;
+        };
+        auth = {type = "none";};
+      };
+      publicHttpService = port: {
+        inherit port;
+        expose = {
+          enable = true;
+          private = false;
+        };
+        auth = {type = "none";};
+      };
+    in {
+      httpServices = {
+        tv = privateHttpService config.services.sonarr.settings.port;
+        film = privateHttpService config.services.radarr.settings.port;
+        indexer = privateHttpService config.services.prowlarr.settings.port;
+        watch = publicHttpService 8096;
+        download = privateHttpService config.services.transmission.settings."rpc-port";
+      };
       services = {
         sonarr = {
           enable = true;
@@ -81,6 +105,6 @@
           };
         };
       };
-    };
+    });
   };
 }

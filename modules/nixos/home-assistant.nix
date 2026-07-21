@@ -386,6 +386,14 @@
           ];
         };
       };
+      httpServices.home-assistant = {
+        port = cfg.port;
+        expose = {
+          enable = true;
+          private = true;
+        };
+        auth = {type = "none";};
+      };
       # Expose the UI only to peers connected through NetBird.
       networking.firewall.interfaces."nb-wt0".allowedTCPPorts = [cfg.port];
       # HomeKit HAP ports (derived from homekit bridge/accessory entries). mDNS UDP 5353 via mdns.

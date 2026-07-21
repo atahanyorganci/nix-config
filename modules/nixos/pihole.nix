@@ -59,6 +59,15 @@
         ports = [8053];
       };
 
+      httpServices.pihole = {
+        port = 8053;
+        expose = {
+          enable = true;
+          private = true;
+        };
+        auth = {type = "none";};
+      };
+
       # DNS + admin UI only on the NetBird interface (not the public NIC).
       networking.firewall.interfaces.${netbirdInterface} = {
         allowedUDPPorts = [53];
@@ -66,6 +75,11 @@
           53
           8053
         ];
+      };
+
+      # pihole-ftl-setup exits 1 when blocklists are already present; treat as success.
+      systemd.services.pihole-ftl-setup = {
+        serviceConfig.SuccessExitStatus = "0 1";
       };
 
       # Skip start until the NetBird iface exists (avoids hanging nixos-rebuild).
