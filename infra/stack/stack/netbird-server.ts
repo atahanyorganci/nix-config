@@ -9,7 +9,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
-import { NetbirdServer, NixExpr } from "./src/index.ts";
+import { NetbirdServer, NixExpr } from "../src/index.ts";
 
 const DOMAIN = "yorganci.dev";
 const NETBIRD_HOST = `netbird.${DOMAIN}`;
@@ -55,7 +55,7 @@ const UpdateNetBirdCredentialsRef = Alchemy.Action(
 );
 
 export default Alchemy.Stack(
-	"Infra",
+	"NetbirdServer",
 	{
 		providers: Layer.mergeAll(
 			Cloudflare.providers(),
