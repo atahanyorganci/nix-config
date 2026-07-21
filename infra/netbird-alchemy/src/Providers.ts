@@ -1,6 +1,6 @@
 import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import { CredentialsFromEnv } from "./Credentials.ts";
+import { CredentialsFromEnv, type Credentials } from "./Credentials.ts";
 import { GroupProvider } from "./Group/Group.ts";
 import { NetworkProvider } from "./Network/Network.ts";
 import { PeerProvider } from "./Peer/Peer.ts";
@@ -32,5 +32,10 @@ export const resourceProviders = () =>
  * Build the complete NetBird providers Layer for stack deploys.
  * Resolves credentials from Effect `Config` (`NETBIRD_API_TOKEN`).
  */
-export const providers = () =>
-	resourceProviders().pipe(Layer.provideMerge(CredentialsFromEnv), Layer.provideMerge(FetchHttpClient.layer));
+export const providers = (credentials: Layer.Layer<Credentials, never, never> = CredentialsFromEnv) =>
+	resourceProviders().pipe(
+		// `credentials` is the output layer and therefore wins when it supplies
+		// Credentials; CredentialsFromEnv remains the fallback.
+		Layer.provideMerge(credentials.pipe(Layer.provideMerge(CredentialsFromEnv))),
+		Layer.provideMerge(FetchHttpClient.layer),
+	);
