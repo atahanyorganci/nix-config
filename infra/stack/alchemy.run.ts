@@ -8,12 +8,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
+import { NetbirdServer } from "./src/index.ts";
 
 const DOMAIN = "yorganci.dev";
-const LOCATION = "nbg1";
-const SERVER_TYPE = "cx23";
-const IMAGE = "ubuntu-24.04";
-const NETBIRD_URL = `https://netbird.${DOMAIN}`;
 const ADMIN_EMAIL = "atahanyorganci@hotmail.com";
 const ADMIN_NAME = "Atahan";
 
@@ -66,64 +63,15 @@ export default Alchemy.Stack(
 			name: "Atahan",
 			publicKey: DEPLOY_SSH_PUBLIC_KEY,
 		});
-
-		const firewall = yield* Hetzner.Firewall("MarsFirewall", {
+		const {
+			ipv4: { ip: marsIp },
+			server: marsServer,
+		} = yield* NetbirdServer.stack({
 			name: "mars",
-			rules: [
-				{
-					direction: "in",
-					protocol: "tcp",
-					port: "22",
-					sourceIps: ["0.0.0.0/0", "::/0"],
-					description: "SSH",
-				},
-				{
-					direction: "in",
-					protocol: "tcp",
-					port: "80",
-					sourceIps: ["0.0.0.0/0", "::/0"],
-					description: "HTTP ACME",
-				},
-				{
-					direction: "in",
-					protocol: "tcp",
-					port: "443",
-					sourceIps: ["0.0.0.0/0", "::/0"],
-					description: "HTTPS",
-				},
-				{
-					direction: "in",
-					protocol: "udp",
-					port: "3478",
-					sourceIps: ["0.0.0.0/0", "::/0"],
-					description: "NetBird STUN",
-				},
-				{
-					direction: "in",
-					protocol: "udp",
-					port: "51820",
-					sourceIps: ["0.0.0.0/0", "::/0"],
-					description: "WireGuard",
-				},
-			],
-		});
-
-		const marsIp = yield* Hetzner.PrimaryIp("MarsIpv4", {
-			name: "mars-ipv4",
-			type: "ipv4",
-			location: LOCATION,
-			autoDelete: false,
-		});
-
-		const marsServer = yield* Hetzner.Server("Mars", {
-			name: "mars",
-			serverType: SERVER_TYPE,
-			image: IMAGE,
-			location: LOCATION,
-			sshKeys: [sshKey.name],
-			firewalls: [firewall.firewallId],
-			primaryIpv4Id: marsIp.primaryIpId,
-			enableIpv6: false,
+			location: "nbg1",
+			image: "ubuntu-24.04",
+			serverType: "cx23",
+			sshKey: sshKey.name,
 		});
 
 		const zone = yield* Cloudflare.Zone.Zone("Domain", {
@@ -133,21 +81,22 @@ export default Alchemy.Stack(
 			zoneId: zone.zoneId,
 			name: `netbird.${DOMAIN}`,
 			type: "A",
-			content: marsIp.ip,
+			content: marsIp,
 			proxied: false,
 			ttl: "1",
 		});
+		const netbirdApiBaseUrl = Output.interpolate`https://${netbirdRecord.content}`;
 		yield* Cloudflare.DNS.Record("ProxyWildcardDnsRecord", {
 			zoneId: zone.zoneId,
 			name: `*.${DOMAIN}`,
 			type: "A",
-			content: marsIp.ip,
+			content: marsIp,
 			proxied: false,
 			ttl: "1",
 		});
 
 		const marsNixos = yield* Command.Exec("MarsNixos", {
-			command: Output.interpolate`${DEPLOY_SCRIPT} ${marsIp.ip} ${marsServer.serverId} ${netbirdRecord.content}`,
+			command: Output.interpolate`${DEPLOY_SCRIPT} ${marsIp} ${marsServer.serverId} ${netbirdRecord.content}`,
 			cwd: REPO_ROOT,
 			memo: {
 				include: ["**/*.nix", "flake.lock", "infra/stack/scripts/deploy-mars-nixos.sh"],
@@ -159,7 +108,7 @@ export default Alchemy.Stack(
 		});
 
 		const setup = yield* NetBird.Setup("Admin", {
-			apiBaseUrl: NETBIRD_URL,
+			apiBaseUrl: netbirdApiBaseUrl,
 			email: ADMIN_EMAIL,
 			name: ADMIN_NAME,
 			password: adminPassword.text,
@@ -179,7 +128,7 @@ export default Alchemy.Stack(
 			peers: Output.map(credentials, () => [] as string[]),
 		});
 
-		const infraSetupKey = yield* NetBird.SetupKey("InfraSetupKey", {
+		yield* NetBird.SetupKey("InfraSetupKey", {
 			name: "infra-peers-bootstrap",
 			type: "reusable",
 			expiresIn: 31_536_000,
@@ -188,19 +137,12 @@ export default Alchemy.Stack(
 		});
 
 		return {
-			zoneId: zone.zoneId,
-			mars: {
-				serverId: marsServer.serverId,
-				ipv4: marsIp.ip,
-				primaryIpId: marsIp.primaryIpId,
-				firewallId: firewall.firewallId,
-			},
-			netbirdUrl: Output.interpolate`${NETBIRD_URL}`,
-			adminEmail: ADMIN_EMAIL,
-			infraPeersGroupId: infraPeers.groupId,
-			infraSetupKeyId: infraSetupKey.keyId,
-			dns: {
-				netbird: netbirdRecord.content,
+			zone: zone.name,
+			marsIp,
+			apiBaseUrl: netbirdApiBaseUrl,
+			admin: {
+				email: setup.email,
+				password: setup.password,
 			},
 		};
 	}),
