@@ -9,7 +9,7 @@ import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
-import { catchNotFound } from "../errors.ts";
+import { catchNotFound, catchNotFoundOrUnavailable } from "../errors.ts";
 
 export interface GroupProps {
 	/**
@@ -144,7 +144,7 @@ export const GroupProvider = () =>
 			return { groupId: observed.id, name: observed.name };
 		}),
 		delete: Effect.fn(function* ({ output }) {
-			yield* catchNotFound(groupsGroupIdDelete({ groupId: output.groupId }));
+			yield* catchNotFoundOrUnavailable(groupsGroupIdDelete({ groupId: output.groupId }));
 		}),
 	});
 

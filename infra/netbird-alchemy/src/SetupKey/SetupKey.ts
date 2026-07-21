@@ -10,7 +10,7 @@ import { Resource } from "alchemy/Resource";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
-import { catchNotFound } from "../errors.ts";
+import { catchNotFound, catchNotFoundOrUnavailable } from "../errors.ts";
 
 export type SetupKeyType = "reusable" | "one-off";
 
@@ -209,7 +209,7 @@ export const SetupKeyProvider = () =>
 			return toAttributes(observed, output?.key);
 		}),
 		delete: Effect.fn(function* ({ output }) {
-			yield* catchNotFound(setupKeysKeyIdDelete({ keyId: output.keyId }));
+			yield* catchNotFoundOrUnavailable(setupKeysKeyIdDelete({ keyId: output.keyId }));
 		}),
 	});
 
