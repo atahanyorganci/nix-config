@@ -1,4 +1,6 @@
-{
+{config, ...}: let
+  infra = config.flake.infra;
+in {
   flake.modules.nixos.netbird-proxy = {
     lib,
     config,
@@ -13,7 +15,7 @@
 
       domain = lib.mkOption {
         type = lib.types.str;
-        default = "yorganci.dev";
+        default = infra.domain;
         description = "Apex domain for the proxy cluster (NB_PROXY_DOMAIN).";
       };
 

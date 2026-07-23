@@ -1,4 +1,4 @@
-{
+{flake, ...}: {
   flake.modules.darwin.arr-stack = {
     config,
     lib,
@@ -96,7 +96,7 @@
             enable = true;
             secretFile = "/var/lib/jellyfin-oidc/client-secret";
             providerName = "netbird";
-            endpoint = "https://netbird.${cfg.domain}/oauth2";
+            endpoint = "https://${flake.infra.netbirdManagementDomain}/oauth2";
             clientId = "jellyfin";
             usernameClaim = "email";
             # Keep admin when signing in with NetBird email.

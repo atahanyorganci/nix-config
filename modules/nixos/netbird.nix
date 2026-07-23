@@ -1,4 +1,6 @@
-{
+{config, ...}: let
+  infra = config.flake.infra;
+in {
   flake.modules.nixos.netbird = {
     lib,
     config,
@@ -11,7 +13,7 @@
       enable = lib.mkEnableOption "NetBird client (connect to self-hosted management)";
       managementUrl = lib.mkOption {
         type = lib.types.str;
-        default = "https://netbird.yorganci.dev";
+        default = "https://${infra.netbirdManagementDomain}";
         description = "NetBird management service URL.";
       };
       setupKeyFile = lib.mkOption {

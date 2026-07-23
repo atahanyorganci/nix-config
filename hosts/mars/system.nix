@@ -81,13 +81,11 @@
   security.sudo.wheelNeedsPassword = false;
   netbird-server = {
     enable = true;
-    domain = "netbird.yorganci.dev";
     acmeEmail = user.email;
     enableAgentNetwork = true;
   };
   netbird-proxy = {
     enable = true;
-    domain = "yorganci.dev";
     tokenFile = "/var/lib/netbird-proxy/token";
     private = true;
   };

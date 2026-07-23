@@ -1,4 +1,6 @@
-{
+{config, ...}: let
+  infra = config.flake.infra;
+in {
   flake.modules.darwin.netbird = {
     lib,
     config,
@@ -12,7 +14,7 @@
 
       managementUrl = lib.mkOption {
         type = lib.types.str;
-        default = "https://netbird.yorganci.dev";
+        default = "https://${infra.netbirdManagementDomain}";
         description = "NetBird management service URL.";
       };
 

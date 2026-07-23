@@ -1,4 +1,4 @@
-{
+{flake, ...}: {
   flake.modules.darwin.jellyfin = {
     config,
     pkgs,
@@ -189,7 +189,6 @@
           };
           endpoint = mkOption {
             type = str;
-            default = "https://netbird.yorganci.dev/oauth2";
             description = "OIDC issuer (must expose /.well-known/openid-configuration).";
           };
           clientId = mkOption {

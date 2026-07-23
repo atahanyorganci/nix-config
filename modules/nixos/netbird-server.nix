@@ -1,4 +1,6 @@
-{
+{config, ...}: let
+  infra = config.flake.infra;
+in {
   flake.modules.nixos.netbird-server = {
     lib,
     config,
@@ -155,6 +157,7 @@
 
       domain = lib.mkOption {
         type = lib.types.str;
+        default = infra.netbirdManagementDomain;
         example = "netbird.example.com";
         description = "Public hostname for the NetBird dashboard, API, signal, and relay.";
       };
