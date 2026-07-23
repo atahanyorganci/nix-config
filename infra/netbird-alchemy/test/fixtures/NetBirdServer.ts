@@ -12,7 +12,7 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import { findAvailablePort } from "./Runtime.ts";
 
 export const NETBIRD_SERVER_IMAGE = "netbirdio/netbird-server";
-export const NETBIRD_SERVER_TAG = "0.74.6";
+export const NETBIRD_SERVER_TAG = "0.75.0";
 
 export class NetBirdBootstrapError extends Data.TaggedError("NetBirdBootstrapError")<{
 	readonly message: string;

@@ -3,11 +3,11 @@
     prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
       netbird-app = final.stdenvNoCC.mkDerivation rec {
         pname = "netbird-app";
-        version = "0.74.6";
+        version = "0.75.0";
 
         src = final.fetchurl {
           url = "https://github.com/netbirdio/netbird/releases/download/v${version}/netbird_${version}_darwin.pkg";
-          hash = "sha256-cm2LcjD4Ob30T6KT5q1HGO5QZYkyoRENXkultBwiWfk=";
+          hash = "sha256-HFKDAx3STt2PFtA0wK7YyTE0C4PU5FwIRQYDQ5i3R3c=";
         };
 
         nativeBuildInputs = with final; [

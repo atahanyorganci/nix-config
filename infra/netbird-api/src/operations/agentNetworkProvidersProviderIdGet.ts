@@ -25,6 +25,7 @@ export interface AgentNetworkProvidersProviderIdGetOutput {
 	identity_header_groups?: string;
 	enabled: boolean;
 	skip_tls_verification: boolean;
+	metadata_disabled: boolean;
 	created_at: string;
 	updated_at: string;
 }
@@ -45,6 +46,7 @@ export const AgentNetworkProvidersProviderIdGetOutput = /*@__PURE__*/ Schema.Str
 	identity_header_groups: Schema.optional(Schema.String),
 	enabled: Schema.Boolean,
 	skip_tls_verification: Schema.Boolean,
+	metadata_disabled: Schema.Boolean,
 	created_at: Schema.String,
 	updated_at: Schema.String,
 }) as unknown as Schema.Codec<AgentNetworkProvidersProviderIdGetOutput>;

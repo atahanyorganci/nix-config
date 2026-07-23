@@ -19,6 +19,7 @@ export interface AgentNetworkProvidersProviderIdPutInput {
 	identity_header_groups?: string;
 	enabled?: boolean;
 	skip_tls_verification?: boolean;
+	metadata_disabled?: boolean;
 }
 export const AgentNetworkProvidersProviderIdPutInput = /*@__PURE__*/ Schema.Struct({
 	providerId: Schema.String.pipe(T.PathParam()),
@@ -41,6 +42,7 @@ export const AgentNetworkProvidersProviderIdPutInput = /*@__PURE__*/ Schema.Stru
 	identity_header_groups: Schema.optional(Schema.String),
 	enabled: Schema.optional(Schema.Boolean),
 	skip_tls_verification: Schema.optional(Schema.Boolean),
+	metadata_disabled: Schema.optional(Schema.Boolean),
 }).pipe(
 	T.Http({ method: "PUT", path: "/api/agent-network/providers/{providerId}" }),
 ) as unknown as Schema.Codec<AgentNetworkProvidersProviderIdPutInput>;
@@ -57,6 +59,7 @@ export interface AgentNetworkProvidersProviderIdPutOutput {
 	identity_header_groups?: string;
 	enabled: boolean;
 	skip_tls_verification: boolean;
+	metadata_disabled: boolean;
 	created_at: string;
 	updated_at: string;
 }
@@ -77,6 +80,7 @@ export const AgentNetworkProvidersProviderIdPutOutput = /*@__PURE__*/ Schema.Str
 	identity_header_groups: Schema.optional(Schema.String),
 	enabled: Schema.Boolean,
 	skip_tls_verification: Schema.Boolean,
+	metadata_disabled: Schema.Boolean,
 	created_at: Schema.String,
 	updated_at: Schema.String,
 }) as unknown as Schema.Codec<AgentNetworkProvidersProviderIdPutOutput>;

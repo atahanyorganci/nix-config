@@ -84,7 +84,7 @@ const svc =
 
 Integration tests use `alchemy/Test/Vitest` with an Alchemy Docker fixture:
 
-1. `beforeAll` deploys `netbirdio/netbird-server:0.74.6` (fresh volume + bind-mounted config)
+1. `beforeAll` deploys `netbirdio/netbird-server:0.75.0` (fresh volume + bind-mounted config)
 2. Bootstrap a PAT via `POST /api/setup`
 3. Each `test.provider` scratch stack exercises resources against that API
 4. Scratch `destroy()` deletes NetBird API resources; `afterAll` destroys the container/volume

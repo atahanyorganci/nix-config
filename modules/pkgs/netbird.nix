@@ -2,13 +2,13 @@
   flake.overlays.netbird = final: _prev: {
     netbird = final.buildGoModule rec {
       pname = "netbird";
-      version = "0.74.6";
+      version = "0.75.0";
 
       src = final.fetchFromGitHub {
         owner = "netbirdio";
         repo = "netbird";
         tag = "v${version}";
-        hash = "sha256-KkmLeZgEZmUG7MpKqv7Dpk4ut40RiZ/lTdG/2x6n+Oo=";
+        hash = "sha256-1nFpeOWkWZIajjQU1jlSjQoxq+lyvR+rlsAxSV0vJZc=";
       };
 
       # Share the go-modules derivation name across NetBird components.
@@ -16,7 +16,9 @@
         name = "netbird-${version}-go-modules";
       };
 
-      vendorHash = "sha256-z/2+LUBocWQ06EfdJ4nujr4vb1e2zjmlufsGgGWN0ak=";
+      vendorHash = "sha256-KVGCV89qGHrg2GQVw6MnftQswbdihcqozptjf5vs5BA=";
+
+      proxyVendor = true;
 
       nativeBuildInputs = [final.installShellFiles];
 
@@ -35,7 +37,7 @@
         # Compatible with systemd RuntimeDirectory=netbird
         substituteInPlace client/cmd/root.go \
           --replace-fail 'unix:///var/run/netbird.sock' 'unix:///var/run/netbird/sock'
-        substituteInPlace client/ui/client_ui.go \
+        substituteInPlace client/ui/grpc.go \
           --replace-fail 'unix:///var/run/netbird.sock' 'unix:///var/run/netbird/sock'
       '';
 

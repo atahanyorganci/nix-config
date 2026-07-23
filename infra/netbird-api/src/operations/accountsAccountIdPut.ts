@@ -33,6 +33,8 @@ export interface AccountsAccountIdPutInput {
 		auto_update_version?: string;
 		auto_update_always?: boolean;
 		metrics_push_enabled?: boolean;
+		agent_network_only?: boolean;
+		dashboard_features?: { agent_network?: boolean };
 		embedded_idp_enabled?: boolean;
 		local_auth_disabled?: boolean;
 		local_mfa_enabled?: boolean;
@@ -71,6 +73,12 @@ export const AccountsAccountIdPutInput = /*@__PURE__*/ Schema.Struct({
 		auto_update_version: Schema.optional(Schema.String),
 		auto_update_always: Schema.optional(Schema.Boolean),
 		metrics_push_enabled: Schema.optional(Schema.Boolean),
+		agent_network_only: Schema.optional(Schema.Boolean),
+		dashboard_features: Schema.optional(
+			Schema.Struct({
+				agent_network: Schema.optional(Schema.Boolean),
+			}),
+		),
 		embedded_idp_enabled: Schema.optional(Schema.Boolean),
 		local_auth_disabled: Schema.optional(Schema.Boolean),
 		local_mfa_enabled: Schema.optional(Schema.Boolean),
@@ -116,6 +124,8 @@ export interface AccountsAccountIdPutOutput {
 		auto_update_version?: string;
 		auto_update_always?: boolean;
 		metrics_push_enabled?: boolean;
+		agent_network_only?: boolean;
+		dashboard_features?: { agent_network?: boolean };
 		embedded_idp_enabled?: boolean;
 		local_auth_disabled?: boolean;
 		local_mfa_enabled?: boolean;
@@ -158,6 +168,12 @@ export const AccountsAccountIdPutOutput = /*@__PURE__*/ Schema.Struct({
 		auto_update_version: Schema.optional(Schema.String),
 		auto_update_always: Schema.optional(Schema.Boolean),
 		metrics_push_enabled: Schema.optional(Schema.Boolean),
+		agent_network_only: Schema.optional(Schema.Boolean),
+		dashboard_features: Schema.optional(
+			Schema.Struct({
+				agent_network: Schema.optional(Schema.Boolean),
+			}),
+		),
 		embedded_idp_enabled: Schema.optional(Schema.Boolean),
 		local_auth_disabled: Schema.optional(Schema.Boolean),
 		local_mfa_enabled: Schema.optional(Schema.Boolean),

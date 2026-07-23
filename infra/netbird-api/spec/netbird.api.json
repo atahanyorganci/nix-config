@@ -505,6 +505,14 @@
 						"type": "boolean",
 						"example": false
 					},
+					"agent_network_only": {
+						"description": "Limits the dashboard to the Agent Network surface for this account. Set for accounts created via netbird.ai signups and can be disabled later. Enabling this requires dashboard_features.agent_network to be true in the same request.",
+						"type": "boolean",
+						"example": false
+					},
+					"dashboard_features": {
+						"$ref": "#/components/schemas/AccountDashboardFeatures"
+					},
 					"embedded_idp_enabled": {
 						"description": "Indicates whether the embedded identity provider (Dex) is enabled for this account. This is a read-only field.",
 						"type": "boolean",
@@ -540,6 +548,17 @@
 					"peer_expose_enabled",
 					"peer_expose_groups"
 				]
+			},
+			"AccountDashboardFeatures": {
+				"description": "Per-account dashboard section visibility overrides. Omitted keys follow the default dashboard behavior.",
+				"type": "object",
+				"properties": {
+					"agent_network": {
+						"description": "Controls the Agent Network menu for the account regardless of the deployment feature flag. When true the menu is shown, when false it is hidden, and when omitted the default behavior applies. Must be true when agent_network_only is enabled.",
+						"type": "boolean",
+						"example": true
+					}
+				}
 			},
 			"AccountExtraSettings": {
 				"type": "object",
@@ -3495,6 +3514,33 @@
 						"description": "Number of packets transmitted.",
 						"example": 5
 					},
+					"num_of_starts": {
+						"type": "integer",
+						"description": "Number of start events.",
+						"example": 3
+					},
+					"num_of_ends": {
+						"type": "integer",
+						"description": "Number of end events.",
+						"example": 4
+					},
+					"num_of_drops": {
+						"type": "integer",
+						"description": "Number of drop events.",
+						"example": 5
+					},
+					"window_start": {
+						"type": "string",
+						"format": "date-time",
+						"description": "Timestamp of the start of the aggregation window.",
+						"example": "2025-03-20T16:23:58.125397Z"
+					},
+					"window_end": {
+						"type": "string",
+						"format": "date-time",
+						"description": "Timestamp of the end of the aggregation window.",
+						"example": "2025-03-20T16:23:58.125397Z"
+					},
 					"events": {
 						"type": "array",
 						"description": "List of events that are correlated to this flow (e.g., start, end).",
@@ -3519,6 +3565,11 @@
 					"rx_packets",
 					"tx_bytes",
 					"tx_packets",
+					"num_of_starts",
+					"num_of_ends",
+					"num_of_drops",
+					"window_start",
+					"window_end",
 					"events"
 				]
 			},
@@ -6334,6 +6385,11 @@
 						"description": "Whether upstream TLS certificate verification is skipped when the proxy dials this provider's URL. Intended for self-hosted / internal gateways behind a private or self-signed certificate.",
 						"example": false
 					},
+					"metadata_disabled": {
+						"type": "boolean",
+						"description": "Whether identity metadata injection is disabled for this provider. When enabled (the default), the proxy stamps the caller's user and authorizing group onto upstream requests as provider-specific metadata (e.g. AWS Bedrock's X-Amzn-Bedrock-Request-Metadata header). Set true to suppress it.",
+						"example": false
+					},
 					"created_at": {
 						"type": "string",
 						"format": "date-time",
@@ -6357,6 +6413,7 @@
 					"models",
 					"enabled",
 					"skip_tls_verification",
+					"metadata_disabled",
 					"created_at",
 					"updated_at"
 				]
@@ -6424,6 +6481,11 @@
 					"skip_tls_verification": {
 						"type": "boolean",
 						"description": "Skip upstream TLS certificate verification when the proxy dials this provider's URL. For self-hosted / internal gateways behind a private or self-signed certificate. Defaults to false. When omitted on update, the stored value is left unchanged.",
+						"example": false
+					},
+					"metadata_disabled": {
+						"type": "boolean",
+						"description": "Disable identity metadata injection (the caller's user + authorizing group) for this provider. Defaults to false (metadata is injected). When omitted on update, the stored value is left unchanged.",
 						"example": false
 					}
 				},
@@ -12782,6 +12844,24 @@
 						"name": "reporter_id",
 						"in": "query",
 						"description": "Filter by reporter ID",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "source_id",
+						"in": "query",
+						"description": "Filter by source endpoint ID",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "destination_id",
+						"in": "query",
+						"description": "Filter by destination endpoint ID",
 						"required": false,
 						"schema": {
 							"type": "string"

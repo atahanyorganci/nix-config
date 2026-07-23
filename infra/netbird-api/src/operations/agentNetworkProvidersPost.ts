@@ -18,6 +18,7 @@ export interface AgentNetworkProvidersPostInput {
 	identity_header_groups?: string;
 	enabled?: boolean;
 	skip_tls_verification?: boolean;
+	metadata_disabled?: boolean;
 }
 export const AgentNetworkProvidersPostInput = /*@__PURE__*/ Schema.Struct({
 	provider_id: Schema.String,
@@ -39,6 +40,7 @@ export const AgentNetworkProvidersPostInput = /*@__PURE__*/ Schema.Struct({
 	identity_header_groups: Schema.optional(Schema.String),
 	enabled: Schema.optional(Schema.Boolean),
 	skip_tls_verification: Schema.optional(Schema.Boolean),
+	metadata_disabled: Schema.optional(Schema.Boolean),
 }).pipe(
 	T.Http({ method: "POST", path: "/api/agent-network/providers" }),
 ) as unknown as Schema.Codec<AgentNetworkProvidersPostInput>;
@@ -55,6 +57,7 @@ export interface AgentNetworkProvidersPostOutput {
 	identity_header_groups?: string;
 	enabled: boolean;
 	skip_tls_verification: boolean;
+	metadata_disabled: boolean;
 	created_at: string;
 	updated_at: string;
 }
@@ -75,6 +78,7 @@ export const AgentNetworkProvidersPostOutput = /*@__PURE__*/ Schema.Struct({
 	identity_header_groups: Schema.optional(Schema.String),
 	enabled: Schema.Boolean,
 	skip_tls_verification: Schema.Boolean,
+	metadata_disabled: Schema.Boolean,
 	created_at: Schema.String,
 	updated_at: Schema.String,
 }) as unknown as Schema.Codec<AgentNetworkProvidersPostOutput>;

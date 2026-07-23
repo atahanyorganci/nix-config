@@ -9,6 +9,8 @@ export interface EventsNetworkTrafficGetInput {
 	page_size?: number;
 	user_id?: string;
 	reporter_id?: string;
+	source_id?: string;
+	destination_id?: string;
 	protocol?: number;
 	type?: "TYPE_UNKNOWN" | "TYPE_START" | "TYPE_END" | "TYPE_DROP";
 	connection_type?: "P2P" | "ROUTED";
@@ -22,6 +24,8 @@ export const EventsNetworkTrafficGetInput = /*@__PURE__*/ Schema.Struct({
 	page_size: Schema.optional(Schema.Number),
 	user_id: Schema.optional(Schema.String),
 	reporter_id: Schema.optional(Schema.String),
+	source_id: Schema.optional(Schema.String),
+	destination_id: Schema.optional(Schema.String),
 	protocol: Schema.optional(Schema.Number),
 	type: Schema.optional(Schema.Literals(["TYPE_UNKNOWN", "TYPE_START", "TYPE_END", "TYPE_DROP"])),
 	connection_type: Schema.optional(Schema.Literals(["P2P", "ROUTED"])),
@@ -65,6 +69,11 @@ export interface EventsNetworkTrafficGetOutput {
 		rx_packets: number;
 		tx_bytes: number;
 		tx_packets: number;
+		num_of_starts: number;
+		num_of_ends: number;
+		num_of_drops: number;
+		window_start: string;
+		window_end: string;
 		events: ReadonlyArray<{ type: string; timestamp: string }>;
 	}>;
 	page: number;
@@ -120,6 +129,11 @@ export const EventsNetworkTrafficGetOutput = /*@__PURE__*/ Schema.Struct({
 			rx_packets: Schema.Number,
 			tx_bytes: Schema.Number,
 			tx_packets: Schema.Number,
+			num_of_starts: Schema.Number,
+			num_of_ends: Schema.Number,
+			num_of_drops: Schema.Number,
+			window_start: Schema.String,
+			window_end: Schema.String,
 			events: Schema.Array(
 				Schema.Struct({
 					type: Schema.String,
@@ -144,6 +158,8 @@ export const EventsNetworkTrafficGetOutput = /*@__PURE__*/ Schema.Struct({
  * @param page_size - Number of items per page
  * @param user_id - Filter by user ID
  * @param reporter_id - Filter by reporter ID
+ * @param source_id - Filter by source endpoint ID
+ * @param destination_id - Filter by destination endpoint ID
  * @param protocol - Filter by protocol
  * @param type - Filter by event type
  * @param connection_type - Filter by connection type
