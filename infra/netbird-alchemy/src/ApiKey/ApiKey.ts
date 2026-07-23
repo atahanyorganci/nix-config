@@ -35,6 +35,12 @@ export interface ApiKeyProps {
 	 * @default 30
 	 */
 	expiresIn?: number;
+	/**
+	 * Optional dependency edge (e.g. credentials hydration action output).
+	 * Ignored by the provider; include any upstream Output so ApiKey waits
+	 * for it before calling the management API.
+	 */
+	ready?: string | boolean | null;
 }
 
 export interface ApiKeyAttributes {

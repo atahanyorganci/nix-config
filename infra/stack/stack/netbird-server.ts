@@ -157,6 +157,7 @@ export default NetbirdServerStack.make(
 			userId: setup.userId,
 			name: "admin-full-access",
 			expiresIn: 365,
+			ready: Output.map(credentialsReady, () => true),
 		}).pipe(Alchemy.RemovalPolicy.retain());
 
 		yield* UpdateNetBirdCredentialsRef({
