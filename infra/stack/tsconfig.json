@@ -14,5 +14,5 @@
 		],
 		"types": ["bun"]
 	},
-	"include": ["./stack/**/*.ts", "./src/**/*.ts", "./oxfmt.config.ts", "./oxlint.config.ts"]
+	"include": ["./stack/**/*.ts", "./src/**/*.ts", "./scripts/**/*.ts", "./oxfmt.config.ts", "./oxlint.config.ts"]
 }

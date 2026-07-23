@@ -105,6 +105,7 @@
         "@effect/platform-node": "catalog:",
         "@yorganci/hetzner-alchemy": "workspace:*",
         "@yorganci/netbird-alchemy": "workspace:*",
+        "@yorganci/netbird-api": "workspace:*",
         "alchemy": "catalog:",
         "effect": "catalog:",
       },
