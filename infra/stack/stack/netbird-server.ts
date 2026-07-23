@@ -11,9 +11,6 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import { NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
 
-const DOMAIN = "yorganci.dev";
-const NETBIRD_HOST = `netbird-4.${DOMAIN}`;
-
 const FlakeMe = Schema.Struct({
 	name: Schema.String,
 	email: Schema.String,
@@ -21,6 +18,29 @@ const FlakeMe = Schema.Struct({
 	shell: Schema.String,
 	key: Schema.String,
 	authorizedKeys: Schema.Array(Schema.String),
+});
+
+const meExpr = Effect.gen(function* () {
+	const meExpr = yield* NixExpr.NixExpr("FlakeMe", {
+		cwd: REPO_ROOT,
+		expression: ".#me",
+	});
+	const me = yield* NixExpr.decode(meExpr, FlakeMe);
+	return me;
+});
+
+const Infra = Schema.Struct({
+	domain: Schema.String,
+	netbirdManagementDomain: Schema.String,
+});
+
+const infraExpr = Effect.gen(function* () {
+	const infraExpr = yield* NixExpr.NixExpr("Infra", {
+		cwd: REPO_ROOT,
+		expression: ".#infra",
+	});
+	const infra = yield* NixExpr.decode(infraExpr, Infra);
+	return infra;
 });
 
 /**
@@ -31,9 +51,7 @@ const REPO_ROOT = "../..";
 
 // Actions hydrate the PAT during the first deploy. Subsequent deploys and
 // destroys still need the current management endpoint before that action runs.
-const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({
-	NETBIRD_API_BASE_URL: `https://${NETBIRD_HOST}`,
-});
+const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({});
 
 const UpdateNetBirdCredentialsRef = Alchemy.Action(
 	"UpdateNetBirdCredentialsRef",
@@ -73,11 +91,11 @@ export default NetbirdServerStack.make(
 		state: Cloudflare.state(),
 	},
 	Effect.gen(function* () {
-		const meExpr = yield* NixExpr.NixExpr("FlakeMe", {
-			cwd: REPO_ROOT,
-			expression: ".#me",
+		const [me, infra] = yield* Effect.all([meExpr, infraExpr]);
+
+		yield* Ref.set(netbirdCredentials, {
+			NETBIRD_API_BASE_URL: `https://${infra.netbirdManagementDomain}`,
 		});
-		const me = yield* NixExpr.decode(meExpr, FlakeMe);
 
 		const deployKey = me.authorizedKeys[0];
 		if (!deployKey) {
@@ -100,20 +118,20 @@ export default NetbirdServerStack.make(
 		});
 
 		const zone = yield* Cloudflare.Zone.Zone("Domain", {
-			name: DOMAIN,
+			name: infra.domain,
 		});
 		const netbirdRecord = yield* Cloudflare.DNS.Record("NetbirdDnsRecord", {
 			zoneId: zone.zoneId,
-			name: NETBIRD_HOST,
+			name: infra.netbirdManagementDomain,
 			type: "A",
 			content: serverIp,
 			proxied: false,
 			ttl: "1",
 		});
-		const netbirdApiBaseUrl = Output.map(netbirdRecord.content, () => `https://${NETBIRD_HOST}`);
+		const netbirdApiBaseUrl = Output.map(netbirdRecord.content, () => `https://${infra.netbirdManagementDomain}`);
 		yield* Cloudflare.DNS.Record("ProxyWildcardDnsRecord", {
 			zoneId: zone.zoneId,
-			name: `*.${DOMAIN}`,
+			name: `*.${infra.domain}`,
 			type: "A",
 			content: serverIp,
 			proxied: false,
@@ -121,7 +139,7 @@ export default NetbirdServerStack.make(
 		});
 
 		const serverNixos = yield* Command.Exec("ServerNixos", {
-			command: Output.interpolate`nix run .#deploy-nixos -- ${serverIp} ${server.serverId} . mars ${NETBIRD_HOST}`,
+			command: Output.interpolate`nix run .#deploy-nixos -- ${serverIp} ${server.serverId} . mars ${infra.netbirdManagementDomain}`,
 			cwd: REPO_ROOT,
 			memo: {
 				include: [
@@ -148,7 +166,7 @@ export default NetbirdServerStack.make(
 		});
 
 		// Bootstrap credentials so NetBird API resources can authenticate.
-		yield* UpdateNetBirdCredentialsRef({
+		const credentialsReady = yield* UpdateNetBirdCredentialsRef({
 			apiBaseUrl: setup.apiBaseUrl,
 			apiToken: setup.personalAccessToken,
 		});
