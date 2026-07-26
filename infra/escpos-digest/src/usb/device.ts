@@ -1,13 +1,67 @@
-import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaParser from "effect/SchemaParser";
-import { usb } from "usb";
+import { UsbNativeError } from "./errors.ts";
 
-type NativeUsbDevice = Awaited<ReturnType<typeof usb.getDevices>>[number];
+/** Structural view of a node-usb device used at the schema boundary. */
+export interface NativeUsbDevice {
+	readonly vendorId: number;
+	readonly productId: number;
+	readonly deviceVersionMajor: number;
+	readonly deviceVersionMinor: number;
+	readonly deviceVersionSubminor: number;
+	readonly usbVersionMajor: number;
+	readonly usbVersionMinor: number;
+	readonly usbVersionSubminor: number;
+	readonly deviceClass: number;
+	readonly deviceSubclass: number;
+	readonly deviceProtocol: number;
+	readonly bus: string;
+	readonly address: number;
+	readonly ports: ReadonlyArray<number>;
+	readonly speed?: "low" | "full" | "high" | "super" | "superPlus";
+	readonly handle: string;
+	readonly manufacturerName: string | null;
+	readonly productName: string | null;
+	readonly serialNumber: string | null;
+	readonly opened: boolean;
+	readonly configuration: {
+		readonly configurationValue: number;
+		readonly configurationName: string | null;
+		readonly interfaces: ReadonlyArray<{
+			readonly interfaceNumber: number;
+			readonly claimed: boolean;
+			readonly alternate: {
+				readonly alternateSetting: number;
+				readonly interfaceClass: number;
+				readonly interfaceSubclass: number;
+				readonly interfaceProtocol: number;
+				readonly interfaceName: string | null;
+				readonly endpoints: ReadonlyArray<{
+					readonly endpointNumber: number;
+					readonly direction: "in" | "out";
+					readonly type: "bulk" | "interrupt" | "isochronous";
+					readonly packetSize: number;
+				}>;
+			};
+			readonly alternates: ReadonlyArray<{
+				readonly alternateSetting: number;
+				readonly interfaceClass: number;
+				readonly interfaceSubclass: number;
+				readonly interfaceProtocol: number;
+				readonly interfaceName: string | null;
+				readonly endpoints: ReadonlyArray<{
+					readonly endpointNumber: number;
+					readonly direction: "in" | "out";
+					readonly type: "bulk" | "interrupt" | "isochronous";
+					readonly packetSize: number;
+				}>;
+			}>;
+		}>;
+	};
+	readonly configurations: ReadonlyArray<NativeUsbDevice["configuration"]>;
+}
 
 const UsbSpeed = Schema.Literals(["low", "full", "high", "super", "superPlus"]);
 const UsbDirection = Schema.Literals(["in", "out"]);
@@ -41,6 +95,11 @@ const UsbConfiguration = Schema.Struct({
 	configurationName: Schema.optional(Schema.String),
 	interfaces: Schema.Array(UsbInterface),
 });
+
+export const UsbDeviceRef = Schema.Struct({
+	handle: Schema.String,
+});
+export type UsbDeviceRef = typeof UsbDeviceRef.Type;
 
 export const UsbDevice = Schema.Struct({
 	vendorId: Schema.Number,
@@ -174,39 +233,11 @@ export const UsbDeviceFrom = NativeUsbDeviceSchema.pipe(
 	}),
 );
 
-const decodeNativeDevice = (device: NativeUsbDevice) => SchemaParser.decodeEffect(UsbDeviceFrom)(device);
-
-export class Usb extends Context.Service<
-	Usb,
-	{
-		listDevices: () => Effect.Effect<UsbDevice[]>;
-		findDeviceByVidPid: (vid: number, pid: number) => Effect.Effect<Option.Option<UsbDevice>>;
-		findDeviceBySerialNumber: (serialNumber: string) => Effect.Effect<Option.Option<UsbDevice>>;
-	}
->()("Usb") {}
-
-export const layer = Layer.sync(Usb, () => {
-	return {
-		listDevices: () =>
-			Effect.gen(function* () {
-				const devices = yield* Effect.tryPromise(() => usb.getDevices());
-				return yield* Effect.forEach(devices, decodeNativeDevice);
-			}).pipe(Effect.orDie),
-		findDeviceByVidPid: (vid: number, pid: number) =>
-			Effect.gen(function* () {
-				const device = yield* Effect.tryPromise(() => usb.findDeviceByIds(vid, pid));
-				if (device === undefined) {
-					return Option.none<UsbDevice>();
-				}
-				return Option.some(yield* decodeNativeDevice(device));
-			}).pipe(Effect.orDie),
-		findDeviceBySerialNumber: (serialNumber: string) =>
-			Effect.gen(function* () {
-				const device = yield* Effect.tryPromise(() => usb.findDeviceBySerial(serialNumber));
-				if (device === undefined) {
-					return Option.none<UsbDevice>();
-				}
-				return Option.some(yield* decodeNativeDevice(device));
-			}).pipe(Effect.orDie),
-	};
+export const refFromDevice = (device: UsbDevice): UsbDeviceRef => ({
+	handle: device.handle,
 });
+
+export const decodeNativeDeviceEffect = (device: NativeUsbDevice) =>
+	SchemaParser.decodeEffect(UsbDeviceFrom)(device).pipe(
+		Effect.mapError(cause => new UsbNativeError({ operation: "decodeDevice", cause })),
+	);
