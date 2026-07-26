@@ -1,0 +1,24 @@
+{
+	"name": "@yorganci/escpos-digest",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"format": "oxfmt --check .",
+		"format:fix": "oxfmt --write .",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix ."
+	},
+	"dependencies": {
+		"effect": "catalog:"
+	},
+	"devDependencies": {
+		"@effect/language-service": "catalog:",
+		"@effect/platform-bun": "catalog:",
+		"@yorganci/config": "workspace:*",
+		"oxfmt": "catalog:",
+		"oxlint": "catalog:",
+		"oxlint-tsgolint": "catalog:",
+		"typescript": "catalog:"
+	}
+}
