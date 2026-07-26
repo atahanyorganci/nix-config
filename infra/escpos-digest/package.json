@@ -10,7 +10,8 @@
 		"lint:fix": "oxlint --fix ."
 	},
 	"dependencies": {
-		"effect": "catalog:"
+		"effect": "catalog:",
+		"usb": "^3.0.1"
 	},
 	"devDependencies": {
 		"@effect/language-service": "catalog:",
