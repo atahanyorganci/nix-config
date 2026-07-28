@@ -9,9 +9,11 @@ Nix flake for managing system and home configuration for various host machines.
 | [`sol`][sol]           | `aarch64-darwin`   | Personal computer           |
 | [`moon`][moon]         | `aarch64-linux`    | OrbStack VM for development |
 | [`mars`][mars]         | `x86_64-linux`     | Hetzner Cloud VPS           |
+| [`jupiter`][jupiter]   | `x86_64-linux`     | Minimal remote VPS          |
 
 [mercury]: ./hosts/mercury/default.nix
 [venus]: ./hosts/venus/default.nix
 [sol]: ./hosts/sol/default.nix
 [moon]: ./hosts/moon/default.nix
 [mars]: ./hosts/mars/default.nix
+[jupiter]: ./hosts/jupiter/default.nix

@@ -65,6 +65,7 @@
         ./hosts/sol
         ./hosts/moon
         ./hosts/mars
+        ./hosts/jupiter
       ];
     };
 }
