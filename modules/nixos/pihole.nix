@@ -93,17 +93,21 @@
       };
 
       # Skip start until the NetBird iface exists (avoids hanging nixos-rebuild).
+      # Do not use ConditionPathExists: if the path unit triggers before the
+      # iface is ready, systemd skips the service and PathExists will not
+      # re-fire until nb-wt0 is removed/recreated — leaving Pi-hole dead.
       systemd.services.pihole-ftl = {
         after = ["netbird-wt0.service"];
         wants = ["netbird-wt0.service"];
-        unitConfig = {
-          ConditionPathExists = "/sys/class/net/${netbirdInterface}";
-          StartLimitIntervalSec = 0;
+        wantedBy = ["multi-user.target"];
+        unitConfig.StartLimitIntervalSec = 0;
+        serviceConfig = {
+          Restart = lib.mkForce "on-failure";
+          RestartSec = lib.mkForce "5s";
         };
-        serviceConfig.RestartSec = lib.mkForce "5s";
       };
 
-      # Start Pi-hole when the NetBird interface appears.
+      # Start Pi-hole when the NetBird interface appears (boot race / reconnect).
       systemd.paths.pihole-ftl-on-wt0 = {
         wantedBy = ["multi-user.target"];
         pathConfig = {
