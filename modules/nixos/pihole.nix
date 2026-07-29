@@ -68,6 +68,16 @@
         auth = {type = "none";};
       };
 
+      nameServers.pihole-primary = {
+        description = "Pi-hole filtered DNS for mesh peers";
+        primary = true;
+        enabled = true;
+        port = 53;
+        groups = ["All"];
+        domains = [];
+        searchDomainsEnabled = false;
+      };
+
       # DNS + admin UI only on the NetBird interface (not the public NIC).
       networking.firewall.interfaces.${netbirdInterface} = {
         allowedUDPPorts = [53];
