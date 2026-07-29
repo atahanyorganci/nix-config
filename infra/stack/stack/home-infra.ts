@@ -9,7 +9,14 @@ import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
-import { ReverseProxy, HomeInfra, NixExpr, type HomeInfraPeerOutput } from "../src/index.ts";
+import {
+	ReverseProxy,
+	NameServers,
+	HomeInfra,
+	NixExpr,
+	type HomeInfraPeerOutput,
+	type HomeInfraNameserverOutput,
+} from "../src/index.ts";
 import { readNetbirdCredentials } from "../src/netbird-credentials.ts";
 
 const Infra = Schema.Struct({
@@ -55,34 +62,45 @@ export default HomeInfra.make(
 		});
 		const httpServices = yield* NixExpr.decode(httpServicesExpr, ReverseProxy.HttpServices);
 
-		if (Object.keys(httpServices).length === 0) {
-			return yield* Effect.die("flake.httpServices is empty — enable httpServices.expose in host modules first");
+		const nameServersExpr = yield* NixExpr.NixExpr("NameServers", {
+			cwd: REPO_ROOT,
+			expression: ".#nameServers",
+		});
+		const nameServers = yield* NixExpr.decode(nameServersExpr, NameServers.NameServers);
+
+		if (Object.keys(httpServices).length === 0 && Object.keys(nameServers).length === 0) {
+			return yield* Effect.die(
+				"flake.httpServices and flake.nameServers are empty — enable httpServices or nameServers in host modules first",
+			);
 		}
 
-		const hostKeys = Object.keys(httpServices);
+		const hostKeys = [...new Set([...Object.keys(httpServices), ...Object.keys(nameServers)])];
 
 		const groups = yield* groupsGet({}).pipe(Effect.orDie);
 		const allGroup = groups.find(group => group.name === "All");
 		if (!allGroup) {
 			return yield* Effect.die("NetBird All group not found");
 		}
+		const groupByName = new Map(groups.map(group => [group.name, group.id]));
 
 		const plans = yield* Schema.decodeEffect(ReverseProxy.ServicePlansFromHttpServices)({
 			httpServices,
 			domain: infra.domain,
 		});
 
-		if (plans.length === 0) {
+		if (Object.keys(httpServices).length > 0 && plans.length === 0) {
 			return yield* Effect.die("no httpServices entries have expose.enable — nothing to publish");
 		}
 
 		const clusters = yield* reverseProxiesClustersGet({}).pipe(Effect.orDie);
 		const targetCluster = clusters.find(entry => entry.online)?.address ?? clusters[0]?.address ?? infra.domain;
 
-		yield* NetBird.ReverseProxyDomain("YorganciDev", {
-			domain: infra.domain,
-			targetCluster,
-		});
+		if (plans.length > 0) {
+			yield* NetBird.ReverseProxyDomain("YorganciDev", {
+				domain: infra.domain,
+				targetCluster,
+			});
+		}
 
 		const peers: Record<string, NetBird.Peer> = {};
 		const peerOutputs: Record<string, HomeInfraPeerOutput> = {};
@@ -109,9 +127,45 @@ export default HomeInfra.make(
 			services[plan.serviceKey] = plan.domain;
 		}
 
+		const nsPlans = yield* Schema.decodeEffect(NameServers.NameServerPlansFromNameServers)(nameServers);
+		const dns: Record<string, HomeInfraNameserverOutput> = {};
+		for (const plan of nsPlans) {
+			const peer = peers[plan.hostKey];
+			if (!peer) {
+				return yield* Effect.die(`NetBird peer "${plan.hostKey}" not found for nameserver "${plan.nameserverKey}"`);
+			}
+
+			const distributionGroups: string[] = [];
+			for (const groupName of plan.cfg.groups) {
+				const id = groupByName.get(groupName);
+				if (!id) {
+					return yield* Effect.die(`NetBird group "${groupName}" not found for nameserver "${plan.nameserverKey}"`);
+				}
+				distributionGroups.push(id);
+			}
+
+			const ns = yield* NetBird.NameserverGroup(String.pascalCase(plan.nameserverKey), {
+				name: plan.nameserverKey,
+				description: plan.cfg.description || `DNS on ${plan.hostKey}`,
+				nameservers: [{ ip: peer.ip, ns_type: "udp", port: plan.cfg.port }],
+				enabled: plan.cfg.enabled,
+				groups: distributionGroups,
+				primary: plan.cfg.primary,
+				domains: [...plan.cfg.domains],
+				search_domains_enabled: plan.cfg.searchDomainsEnabled,
+			});
+
+			dns[plan.nameserverKey] = {
+				nameserverGroupId: ns.nsgroupId,
+				host: plan.hostKey,
+				ip: peer.ip,
+			};
+		}
+
 		return {
 			peers: peerOutputs,
 			services,
+			dns,
 		};
 	}).pipe(Effect.orDie),
 );

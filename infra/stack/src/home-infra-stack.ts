@@ -6,9 +6,16 @@ export interface HomeInfraPeerOutput {
 	peerId: string | Output<string>;
 }
 
+export interface HomeInfraNameserverOutput {
+	nameserverGroupId: string | Output<string>;
+	host: string;
+	ip: string | Output<string>;
+}
+
 export interface HomeInfraOutputs {
 	peers: Record<string, HomeInfraPeerOutput>;
 	services: Record<string, string>;
+	dns: Record<string, HomeInfraNameserverOutput>;
 }
 
 export class HomeInfra extends Alchemy.Stack<HomeInfra, HomeInfraOutputs>()("HomeInfra") {}
