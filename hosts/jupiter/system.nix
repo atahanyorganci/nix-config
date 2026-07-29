@@ -85,10 +85,22 @@
     enable = true;
     setupKeyFile = "/var/lib/netbird-client/setup.key";
   };
-  # Hermes agent systemd service.
+  # Hermes agent + web dashboard at https://hermes.yorganci.dev
   services.hermes-agent = {
     enable = true;
     settings.model.default = "deepseek/deepseek-v4-pro";
     environmentFiles = ["/var/lib/hermes/env"];
+    dashboard = {
+      enable = true;
+      host = "127.0.0.1";
+      port = 9120;
+      auth.type = "none";
+      bind = {
+        interface = "nb-wt0";
+        port = 9119;
+        netbirdClient = "wt0";
+      };
+      expose.key = "hermes";
+    };
   };
 }
