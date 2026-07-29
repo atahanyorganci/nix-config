@@ -69,10 +69,8 @@ const evalProps = (props: NixExprProps) =>
 			}),
 		);
 		const json = stdout.trim();
-		return {
-			json,
-			value: JSON.parse(json) as unknown,
-		};
+		const value = yield* Schema.decodeEffect(Schema.UnknownFromJsonString)(json);
+		return { json, value };
 	});
 
 /**
@@ -82,25 +80,33 @@ const evalProps = (props: NixExprProps) =>
  * {@link RuntimeContext} is available (e.g. inside Actions). During stack
  * planning/destroy, fall back to persisted state or the same `nix eval` path
  * the provider uses on first deploy.
+ *
+ * If the cached value no longer matches the schema (e.g. flake output gained
+ * a required field), re-evaluate the expression live so planning can proceed
+ * and the next reconcile can persist the updated value.
  */
 export const decode = <A>(expr: NixExpr, schema: Schema.Schema<A>) =>
 	Effect.gen(function* () {
+		const tryDecode = (value: unknown) => Schema.decodeUnknownEffect(schema)(value).pipe(Effect.option);
+
 		const runtime = yield* Effect.serviceOption(RuntimeContext);
 		if (Option.isSome(runtime)) {
 			const value = yield* expr.value;
-			return yield* Schema.decodeUnknownEffect(schema)(value).pipe(Effect.orDie);
-		}
-
-		const state = yield* yield* State.State;
-		const stack = yield* Stack;
-		const row = yield* state.get({
-			stack: stack.name,
-			stage: stack.stage,
-			fqn: expr.FQN,
-		});
-		if (isResourceState(row) && row.attr !== undefined) {
-			const value = (row.attr as NixExprAttributes).value;
-			return yield* Schema.decodeUnknownEffect(schema)(value).pipe(Effect.orDie);
+			const decoded = yield* tryDecode(value);
+			if (Option.isSome(decoded)) return decoded.value;
+		} else {
+			const state = yield* yield* State.State;
+			const stack = yield* Stack;
+			const row = yield* state.get({
+				stack: stack.name,
+				stage: stack.stage,
+				fqn: expr.FQN,
+			});
+			if (isResourceState(row) && row.attr !== undefined) {
+				const value = (row.attr as NixExprAttributes).value;
+				const decoded = yield* tryDecode(value);
+				if (Option.isSome(decoded)) return decoded.value;
+			}
 		}
 
 		const value = yield* evalProps(expr.Props).pipe(Effect.map(({ value }) => value));
