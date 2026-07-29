@@ -81,6 +81,10 @@
   # Key-only SSH; allow remote nixos-rebuild --elevate=sudo.
   ssh.enable = true;
   security.sudo.wheelNeedsPassword = false;
+  netbird = {
+    enable = true;
+    setupKeyFile = "/var/lib/netbird-client/setup.key";
+  };
   # Hermes agent systemd service.
   services.hermes-agent = {
     enable = true;
