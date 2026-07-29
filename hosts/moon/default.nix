@@ -9,8 +9,6 @@ in {
     system = "aarch64-linux";
     modules = [
       ./system.nix
-      inputs.home-manager.nixosModules.home-manager
-      inputs.stylix.nixosModules.stylix
       {
         home-manager.useGlobalPkgs = true;
         home-manager.useUserPackages = true;

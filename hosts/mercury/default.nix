@@ -10,9 +10,6 @@ in {
     modules = [
       ./system.nix
       ./hardware-configuration.nix
-      inputs.stylix.nixosModules.stylix
-      inputs.vscode-server.nixosModules.default
-      inputs.home-manager.nixosModules.home-manager
       {
         home-manager.useGlobalPkgs = true;
         home-manager.useUserPackages = true;

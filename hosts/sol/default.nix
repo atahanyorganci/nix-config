@@ -9,8 +9,6 @@ in {
     system = "aarch64-darwin";
     modules = [
       ./system.nix
-      inputs.home-manager.darwinModules.home-manager
-      inputs.stylix.darwinModules.stylix
       {
         home-manager.useGlobalPkgs = true;
         home-manager.useUserPackages = true;
