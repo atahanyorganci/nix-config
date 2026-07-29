@@ -81,4 +81,10 @@
   # Key-only SSH; allow remote nixos-rebuild --elevate=sudo.
   ssh.enable = true;
   security.sudo.wheelNeedsPassword = false;
+  # Hermes agent systemd service.
+  services.hermes-agent = {
+    enable = true;
+    settings.model.default = "deepseek/deepseek-v4-pro";
+    environmentFiles = ["/var/lib/hermes/env"];
+  };
 }

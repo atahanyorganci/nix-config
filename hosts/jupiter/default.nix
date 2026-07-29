@@ -12,6 +12,7 @@ in {
       ./system.nix
       inputs.disko.nixosModules.disko
       inputs.stylix.nixosModules.stylix
+      inputs.hermes-agent.nixosModules.default
       inputs.home-manager.nixosModules.home-manager
       {
         home-manager.useGlobalPkgs = true;
