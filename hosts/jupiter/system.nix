@@ -1,5 +1,17 @@
-{user, ...}: {
+{
+  user,
+  pkgs,
+  ...
+}: {
   hostInventory.role = "managedTarget";
+  environment.systemPackages = with pkgs; [
+    git
+    gh
+  ];
+  systemd.services.hermes-agent.path = with pkgs; [
+    git
+    gh
+  ];
   # KVM virtio modules so root disk/network appear in the initrd.
   boot.initrd.availableKernelModules = [
     "ahci"
