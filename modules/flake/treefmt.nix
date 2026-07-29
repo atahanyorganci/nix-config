@@ -2,6 +2,8 @@
   perSystem = {pkgs, ...}: {
     treefmt = {
       projectRootFile = "flake.nix";
+      flakeFormatter = true;
+      flakeCheck = true;
       programs = {
         deadnix.enable = true;
         mdsh.enable = true;
@@ -13,7 +15,11 @@
         };
       };
       settings.formatter = {
-        shellcheck.options = ["--exclude=SC2154" "--exclude=SC2148"];
+        shellcheck.options = [
+          "--exclude=SC2154"
+          "--exclude=SC2148"
+          "--exclude=SC2029"
+        ];
         shfmt.options = [
           "--case-indent"
           "--space-redirects"

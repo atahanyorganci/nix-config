@@ -1,4 +1,4 @@
-{flake, ...}: {
+{...}: {
   flake.modules.darwin.jellyfin = {
     config,
     pkgs,
