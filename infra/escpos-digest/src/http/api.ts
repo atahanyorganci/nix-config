@@ -14,6 +14,7 @@ import {
 	TransferFailed,
 	UsbNativeError,
 } from "../usb/errors.ts";
+import { hello } from "./templates/hello.tsx";
 
 const HealthOk = Schema.Struct({ ok: Schema.Literal(true) });
 
@@ -70,6 +71,7 @@ export const Api = HttpApi.make("EscposDigest").add(
 			],
 		}),
 		HttpApiEndpoint.post("templateHello", "/template/hello", {
+			payload: hello.props,
 			success: HttpApiSchema.NoContent,
 			error: [
 				HttpApiError.BadRequest,
