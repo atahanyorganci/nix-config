@@ -6,6 +6,16 @@ export class DeviceNotFound extends Data.TaggedError("DeviceNotFound")<{
 	readonly ref: UsbDeviceRef;
 }> {}
 
+export class PrinterNotFound extends Data.TaggedError("PrinterNotFound")<{
+	readonly vendorId: number;
+	readonly productId: number;
+}> {}
+
+export class NoBulkOutEndpoint extends Data.TaggedError("NoBulkOutEndpoint")<{
+	readonly vendorId: number;
+	readonly productId: number;
+}> {}
+
 export class OpenFailed extends Data.TaggedError("OpenFailed")<{
 	readonly ref: UsbDeviceRef;
 	readonly cause: unknown;
@@ -28,7 +38,14 @@ export class UsbNativeError extends Data.TaggedError("UsbNativeError")<{
 	readonly cause: unknown;
 }> {}
 
-export type UsbError = DeviceNotFound | OpenFailed | ClaimFailed | TransferFailed | UsbNativeError;
+export type UsbError =
+	| DeviceNotFound
+	| PrinterNotFound
+	| NoBulkOutEndpoint
+	| OpenFailed
+	| ClaimFailed
+	| TransferFailed
+	| UsbNativeError;
 
 export const tryNative = <A>(operation: string, fn: () => Promise<A>) =>
 	Effect.tryPromise({
