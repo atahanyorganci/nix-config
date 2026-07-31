@@ -7,15 +7,16 @@
 		"format": "oxfmt --check .",
 		"format:fix": "oxfmt --write .",
 		"lint": "oxlint .",
-		"lint:fix": "oxlint --fix ."
+		"lint:fix": "oxlint --fix .",
+		"serve": "bun run src/index.ts serve"
 	},
 	"dependencies": {
+		"@effect/platform-bun": "catalog:",
 		"effect": "catalog:",
 		"usb": "^3.0.1"
 	},
 	"devDependencies": {
 		"@effect/language-service": "catalog:",
-		"@effect/platform-bun": "catalog:",
 		"@yorganci/config": "workspace:*",
 		"oxfmt": "catalog:",
 		"oxlint": "catalog:",
