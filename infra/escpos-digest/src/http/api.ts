@@ -49,5 +49,9 @@ export const Api = HttpApi.make("EscposDigest").add(
 			success: HttpApiSchema.NoContent,
 			error: [HttpApiError.BadRequest, PrintError],
 		}),
+		HttpApiEndpoint.post("cut", "/cut", {
+			success: HttpApiSchema.NoContent,
+			error: PrintError,
+		}),
 	),
 );
