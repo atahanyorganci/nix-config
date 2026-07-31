@@ -5,17 +5,15 @@ import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiError from "effect/unstable/httpapi/HttpApiError";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
-
-export class PrintError extends Schema.TaggedErrorClass<PrintError>()(
-	"PrinterError",
-	{
-		reason: Schema.Unknown,
-	},
-	{
-		description: "USB print failed",
-		httpApiStatus: 500,
-	},
-) {}
+import {
+	ClaimFailed,
+	DeviceNotFound,
+	NoBulkOutEndpoint,
+	OpenFailed,
+	PrinterNotFound,
+	TransferFailed,
+	UsbNativeError,
+} from "../usb/errors.ts";
 
 const HealthOk = Schema.Struct({ ok: Schema.Literal(true) });
 
@@ -47,15 +45,42 @@ export const Api = HttpApi.make("EscposDigest").add(
 		HttpApiEndpoint.post("print", "/print", {
 			payload: PrintPayload.pipe(HttpApiSchema.asText()),
 			success: HttpApiSchema.NoContent,
-			error: [HttpApiError.BadRequest, PrintError],
+			error: [
+				HttpApiError.BadRequest,
+				DeviceNotFound,
+				PrinterNotFound,
+				NoBulkOutEndpoint,
+				OpenFailed,
+				ClaimFailed,
+				TransferFailed,
+				UsbNativeError,
+			],
 		}),
 		HttpApiEndpoint.post("cut", "/cut", {
 			success: HttpApiSchema.NoContent,
-			error: PrintError,
+			error: [
+				HttpApiError.BadRequest,
+				DeviceNotFound,
+				PrinterNotFound,
+				NoBulkOutEndpoint,
+				OpenFailed,
+				ClaimFailed,
+				TransferFailed,
+				UsbNativeError,
+			],
 		}),
 		HttpApiEndpoint.post("templateHello", "/template/hello", {
 			success: HttpApiSchema.NoContent,
-			error: PrintError,
+			error: [
+				HttpApiError.BadRequest,
+				DeviceNotFound,
+				PrinterNotFound,
+				NoBulkOutEndpoint,
+				OpenFailed,
+				ClaimFailed,
+				TransferFailed,
+				UsbNativeError,
+			],
 		}),
 	),
 );

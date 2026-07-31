@@ -1,42 +1,74 @@
-import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
-import type { UsbDeviceRef } from "./device.ts";
+import * as Schema from "effect/Schema";
 
-export class DeviceNotFound extends Data.TaggedError("DeviceNotFound")<{
-	readonly ref: UsbDeviceRef;
-}> {}
+/** Inline to avoid a device ↔ errors import cycle. */
+const UsbDeviceRef = Schema.Struct({
+	handle: Schema.String,
+});
 
-export class PrinterNotFound extends Data.TaggedError("PrinterNotFound")<{
-	readonly vendorId: number;
-	readonly productId: number;
-}> {}
+export class DeviceNotFound extends Schema.TaggedErrorClass<DeviceNotFound>()(
+	"DeviceNotFound",
+	{
+		ref: UsbDeviceRef,
+	},
+	{ httpApiStatus: 404 },
+) {}
 
-export class NoBulkOutEndpoint extends Data.TaggedError("NoBulkOutEndpoint")<{
-	readonly vendorId: number;
-	readonly productId: number;
-}> {}
+export class PrinterNotFound extends Schema.TaggedErrorClass<PrinterNotFound>()(
+	"PrinterNotFound",
+	{
+		vendorId: Schema.Number,
+		productId: Schema.Number,
+	},
+	{ httpApiStatus: 404 },
+) {}
 
-export class OpenFailed extends Data.TaggedError("OpenFailed")<{
-	readonly ref: UsbDeviceRef;
-	readonly cause: unknown;
-}> {}
+export class NoBulkOutEndpoint extends Schema.TaggedErrorClass<NoBulkOutEndpoint>()(
+	"NoBulkOutEndpoint",
+	{
+		vendorId: Schema.Number,
+		productId: Schema.Number,
+	},
+	{ httpApiStatus: 500 },
+) {}
 
-export class ClaimFailed extends Data.TaggedError("ClaimFailed")<{
-	readonly ref: UsbDeviceRef;
-	readonly interfaceNumber: number;
-	readonly cause: unknown;
-}> {}
+export class OpenFailed extends Schema.TaggedErrorClass<OpenFailed>()(
+	"OpenFailed",
+	{
+		ref: UsbDeviceRef,
+		cause: Schema.Unknown,
+	},
+	{ httpApiStatus: 500 },
+) {}
 
-export class TransferFailed extends Data.TaggedError("TransferFailed")<{
-	readonly direction: "in" | "out";
-	readonly endpointNumber: number;
-	readonly cause: unknown;
-}> {}
+export class ClaimFailed extends Schema.TaggedErrorClass<ClaimFailed>()(
+	"ClaimFailed",
+	{
+		ref: UsbDeviceRef,
+		interfaceNumber: Schema.Number,
+		cause: Schema.Unknown,
+	},
+	{ httpApiStatus: 500 },
+) {}
 
-export class UsbNativeError extends Data.TaggedError("UsbNativeError")<{
-	readonly operation: string;
-	readonly cause: unknown;
-}> {}
+export class TransferFailed extends Schema.TaggedErrorClass<TransferFailed>()(
+	"TransferFailed",
+	{
+		direction: Schema.Literals(["in", "out"]),
+		endpointNumber: Schema.Number,
+		cause: Schema.Unknown,
+	},
+	{ httpApiStatus: 500 },
+) {}
+
+export class UsbNativeError extends Schema.TaggedErrorClass<UsbNativeError>()(
+	"UsbNativeError",
+	{
+		operation: Schema.String,
+		cause: Schema.Unknown,
+	},
+	{ httpApiStatus: 500 },
+) {}
 
 export type UsbError =
 	| DeviceNotFound
