@@ -53,5 +53,9 @@ export const Api = HttpApi.make("EscposDigest").add(
 			success: HttpApiSchema.NoContent,
 			error: PrintError,
 		}),
+		HttpApiEndpoint.post("templateHello", "/template/hello", {
+			success: HttpApiSchema.NoContent,
+			error: PrintError,
+		}),
 	),
 );

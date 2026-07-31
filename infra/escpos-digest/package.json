@@ -13,10 +13,13 @@
 	"dependencies": {
 		"@effect/platform-bun": "catalog:",
 		"effect": "catalog:",
+		"react": "^19.2.8",
+		"react-thermal-printer": "^0.22.0",
 		"usb": "^3.0.1"
 	},
 	"devDependencies": {
 		"@effect/language-service": "catalog:",
+		"@types/react": "^19.2.18",
 		"@yorganci/config": "workspace:*",
 		"oxfmt": "catalog:",
 		"oxlint": "catalog:",

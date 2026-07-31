@@ -4,6 +4,7 @@
 	"compilerOptions": {
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
+		"jsx": "react-jsx",
 		"plugins": [
 			{
 				"name": "@effect/language-service",
@@ -13,5 +14,5 @@
 			}
 		]
 	},
-	"include": ["./src/**/*.ts", "./oxfmt.config.ts", "./oxlint.config.ts"]
+	"include": ["./src/**/*.ts", "./src/**/*.tsx", "./oxfmt.config.ts", "./oxlint.config.ts"]
 }

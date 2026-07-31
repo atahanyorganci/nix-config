@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { UsbPrinter } from "../usb/print.ts";
 import { Api, PrintError } from "./api.ts";
+import { helloWorld } from "./templates/hello.tsx";
 
 /** ESC/POS GS V 0 — full cut. */
 const CutCommand = new Uint8Array([0x1d, 0x56, 0x00]);
@@ -16,5 +17,14 @@ export const live = HttpApiBuilder.group(Api, "api", handlers =>
 	handlers
 		.handle("health", () => Effect.succeed({ ok: true as const }))
 		.handle("print", ({ payload }) => print(payload))
-		.handle("cut", () => print(CutCommand)),
+		.handle("cut", () => print(CutCommand))
+		.handle("templateHello", () =>
+			Effect.gen(function* () {
+				const data = yield* Effect.tryPromise({
+					try: () => helloWorld(),
+					catch: e => new PrintError({ reason: e }),
+				});
+				yield* print(data);
+			}),
+		),
 );
