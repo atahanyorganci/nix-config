@@ -3,6 +3,7 @@
     devShells.infra = pkgs.mkShellNoCC {
       buildInputs = with pkgs; [
         bun
+        usbutils
       ];
     };
   };
