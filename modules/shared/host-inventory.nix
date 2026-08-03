@@ -12,15 +12,13 @@
         description = "Flake inventory role; null excludes this host from inventory";
       };
       ssh = {
+        localHostName.enable = lib.mkEnableOption "Include hostname.local in SSH Host patterns";
         hostNames = lib.mkOption {
           type = lib.types.listOf lib.types.str;
-          default = let
-            hostname = config.networking.hostName or "";
-          in
-            if hostname == "" || hostname == null
-            then []
-            else [hostname "${hostname}.netbird.selfhosted"];
-          defaultText = lib.literalExpression ''[ hostname "''${hostname}.netbird.selfhosted" ]'';
+          defaultText = lib.literalExpression ''
+            [ hostname "''${hostname}.netbird.selfhosted" ]
+            ++ lib.optional config.hostInventory.ssh.localHostName.enable "''${hostname}.local"
+          '';
           description = "SSH Host patterns for this machine";
         };
         uid = lib.mkOption {
@@ -35,6 +33,18 @@
           description = "SSH login user";
         };
       };
+    };
+    config = {
+      hostInventory.ssh.hostNames = lib.mkDefault (
+        let
+          hostname = config.networking.hostName or "";
+        in
+          if hostname == "" || hostname == null
+          then []
+          else
+            [hostname "${hostname}.netbird.selfhosted"]
+            ++ lib.optional config.hostInventory.ssh.localHostName.enable "${hostname}.local"
+      );
     };
   };
 in {

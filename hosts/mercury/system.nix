@@ -1,5 +1,6 @@
 {user, ...}: {
   hostInventory.role = "managedTarget";
+  hostInventory.ssh.localHostName.enable = true;
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;

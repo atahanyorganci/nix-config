@@ -5,6 +5,7 @@
   ...
 }: {
   hostInventory.role = "managedTarget";
+  hostInventory.ssh.localHostName.enable = true;
   # Hostname
   networking.hostName = "venus";
   # Disable `nix-darwin` documentation
