@@ -5,6 +5,7 @@
   ...
 }: {
   hostInventory.role = "agentHolder";
+  hostInventory.netbird.group = "Admin";
   # Disable `nix-darwin` documentation
   documentation.enable = false;
   # Work around nix-darwin manual generation failing with newer nixos-render-docs.
