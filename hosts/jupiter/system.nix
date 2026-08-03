@@ -100,7 +100,7 @@
   # Hermes agent + web dashboard at https://hermes.yorganci.dev
   services.hermes-agent = {
     enable = true;
-    settings.model.default = "deepseek/deepseek-v4-pro";
+    settings.model.default = "~deepseek/deepseek-v4-flash-latest";
     environmentFiles = ["/var/lib/hermes/env"];
     dashboard = {
       enable = true;
