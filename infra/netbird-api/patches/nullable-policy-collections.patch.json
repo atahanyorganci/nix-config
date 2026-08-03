@@ -1,0 +1,20 @@
+{
+	"description": "Self-hosted NetBird returns null for Default policy source_posture_checks and rule sources/destinations.",
+	"patches": [
+		{
+			"op": "add",
+			"path": "/components/schemas/Policy/allOf/1/properties/source_posture_checks/nullable",
+			"value": true
+		},
+		{
+			"op": "add",
+			"path": "/components/schemas/PolicyRule/allOf/1/properties/sources/nullable",
+			"value": true
+		},
+		{
+			"op": "add",
+			"path": "/components/schemas/PolicyRule/allOf/1/properties/destinations/nullable",
+			"value": true
+		}
+	]
+}

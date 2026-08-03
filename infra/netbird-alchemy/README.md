@@ -13,6 +13,7 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 - `NetBird.User` — management / service users (optional `password` is `Redacted`)
 - `NetBird.ReverseProxyDomain` — reverse-proxy domains
 - `NetBird.ReverseProxyService` — reverse-proxy services (auth secrets are `Redacted`)
+- `NetBird.Policy` — access-control policies (one rule per policy on NetBird 0.75; the dashboard Default policy is adopted and restored on destroy, never deleted)
 
 ## Credentials
 
