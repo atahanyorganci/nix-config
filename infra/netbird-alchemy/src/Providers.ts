@@ -6,6 +6,7 @@ import { GroupProvider } from "./Group/Group.ts";
 import { NameserverGroupProvider } from "./NameserverGroup/NameserverGroup.ts";
 import { NetworkProvider } from "./Network/Network.ts";
 import { PolicyProvider } from "./Policy/Policy.ts";
+import { PostureCheckProvider } from "./PostureCheck/PostureCheck.ts";
 import { PeerProvider } from "./Peer/Peer.ts";
 import { ReverseProxyDomainProvider } from "./ReverseProxyDomain/ReverseProxyDomain.ts";
 import { ReverseProxyServiceProvider } from "./ReverseProxyService/ReverseProxyService.ts";
@@ -26,6 +27,7 @@ export const resourceProviders = () =>
 		NameserverGroupProvider(),
 		NetworkProvider(),
 		PolicyProvider(),
+		PostureCheckProvider(),
 		PeerProvider(),
 		SetupKeyProvider(),
 		ApiKeyProvider(),
