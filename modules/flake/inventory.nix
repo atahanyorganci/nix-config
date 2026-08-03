@@ -17,6 +17,9 @@
       inherit (c.hostInventory.ssh) hostNames uid user;
       isDarwin = lib.hasSuffix "-darwin" system;
     };
+    netbird = {
+      inherit (c.hostInventory.netbird) group loginExpirationEnabled inactivityExpirationEnabled;
+    };
   };
 
   allSystems =

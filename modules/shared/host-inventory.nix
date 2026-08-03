@@ -33,6 +33,23 @@
           description = "SSH login user";
         };
       };
+      netbird = {
+        group = lib.mkOption {
+          type = lib.types.nullOr (lib.types.enum ["Admin" "Users" "Servers" "Agents"]);
+          default = null;
+          description = "Peer group for this host (Servers, Agents). Admin/Users membership comes from NetBird login, not this option.";
+        };
+        loginExpirationEnabled = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Require periodic NetBird re-authentication on this peer";
+        };
+        inactivityExpirationEnabled = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Disconnect peer after inactivity";
+        };
+      };
     };
     config = {
       hostInventory.ssh.hostNames = lib.mkDefault (

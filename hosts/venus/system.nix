@@ -5,6 +5,7 @@
   ...
 }: {
   hostInventory.role = "managedTarget";
+  hostInventory.netbird.group = "Servers";
   hostInventory.ssh.localHostName.enable = true;
   # Hostname
   networking.hostName = "venus";

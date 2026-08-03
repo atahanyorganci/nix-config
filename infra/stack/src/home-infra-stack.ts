@@ -6,6 +6,11 @@ export interface HomeInfraPeerOutput {
 	peerId: string | Output<string>;
 }
 
+export interface HomeInfraGroupOutput {
+	groupId: string | Output<string>;
+	name: string | Output<string>;
+}
+
 export interface HomeInfraNameserverOutput {
 	nameserverGroupId: string | Output<string>;
 	host: string;
@@ -14,6 +19,7 @@ export interface HomeInfraNameserverOutput {
 
 export interface HomeInfraOutputs {
 	peers: Record<string, HomeInfraPeerOutput>;
+	groups: Record<string, HomeInfraGroupOutput>;
 	services: Record<string, string>;
 	dns: Record<string, HomeInfraNameserverOutput>;
 }

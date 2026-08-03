@@ -4,6 +4,7 @@
   ...
 }: {
   hostInventory.role = "managedTarget";
+  hostInventory.netbird.group = "Servers";
   environment.systemPackages = with pkgs; [
     git
     gh
