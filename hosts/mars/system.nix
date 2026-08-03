@@ -1,5 +1,6 @@
 {user, ...}: rec {
   hostInventory.role = "managedTarget";
+  hostInventory.netbird.group = "Servers";
   # Hetzner Cloud (KVM): virtio must be in the initrd or root never appears.
   boot.initrd.availableKernelModules = [
     "ahci"

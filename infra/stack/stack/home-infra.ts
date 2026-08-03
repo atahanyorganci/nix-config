@@ -10,12 +10,15 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import {
-	ReverseProxy,
-	NameServers,
+	AccessMatrix,
 	HomeInfra,
+	Inventory,
+	NameServers,
 	NixExpr,
-	type HomeInfraPeerOutput,
+	ReverseProxy,
+	type HomeInfraGroupOutput,
 	type HomeInfraNameserverOutput,
+	type HomeInfraPeerOutput,
 } from "../src/index.ts";
 import { readNetbirdCredentials } from "../src/netbird-credentials.ts";
 
@@ -56,6 +59,12 @@ export default HomeInfra.make(
 		});
 		const infra = yield* NixExpr.decode(infraExpr, Infra);
 
+		const inventoryExpr = yield* NixExpr.NixExpr("Inventory", {
+			cwd: REPO_ROOT,
+			expression: ".#inventory",
+		});
+		const inventory = yield* NixExpr.decode(inventoryExpr, Inventory.Inventory);
+
 		const httpServicesExpr = yield* NixExpr.NixExpr("HttpServices", {
 			cwd: REPO_ROOT,
 			expression: ".#httpServices",
@@ -68,20 +77,50 @@ export default HomeInfra.make(
 		});
 		const nameServers = yield* NixExpr.decode(nameServersExpr, NameServers.NameServers);
 
+		yield* Schema.decodeEffect(AccessMatrix.AccessMatrixFromFlake)({
+			httpServices,
+			nameServers,
+		});
+
 		if (Object.keys(httpServices).length === 0 && Object.keys(nameServers).length === 0) {
 			return yield* Effect.die(
 				"flake.httpServices and flake.nameServers are empty — enable httpServices or nameServers in host modules first",
 			);
 		}
 
-		const hostKeys = [...new Set([...Object.keys(httpServices), ...Object.keys(nameServers)])];
+		const inventoryHostKeys = Inventory.inventoryHosts(inventory).map(([hostKey]) => hostKey);
+		const hostKeys = [
+			...new Set([
+				...Object.keys(httpServices),
+				...Object.keys(nameServers),
+				...inventoryHostKeys.filter(hostKey => {
+					const host = inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
+					return host?.netbird.group !== null;
+				}),
+			]),
+		];
 
-		const groups = yield* groupsGet({}).pipe(Effect.orDie);
-		const allGroup = groups.find(group => group.name === "All");
+		const existingGroups = yield* groupsGet({}).pipe(Effect.orDie);
+		const allGroup = existingGroups.find(group => group.name === "All");
 		if (!allGroup) {
 			return yield* Effect.die("NetBird All group not found");
 		}
-		const groupByName = new Map(groups.map(group => [group.name, group.id]));
+
+		const groupResources: Record<string, NetBird.Group> = {};
+		const groupOutputs: Record<string, HomeInfraGroupOutput> = {};
+		for (const groupName of Inventory.ZERO_TRUST_GROUP_NAMES) {
+			const group = yield* NetBird.Group(groupName, { name: groupName });
+			groupResources[groupName] = group;
+			groupOutputs[groupName] = {
+				groupId: group.groupId,
+				name: group.name,
+			};
+		}
+		const groupByName = new Map<string, string | NetBird.Group["groupId"]>();
+		for (const groupName of Inventory.ZERO_TRUST_GROUP_NAMES) {
+			groupByName.set(groupName, groupResources[groupName]!.groupId);
+		}
+		groupByName.set("All", allGroup.id);
 
 		const plans = yield* Schema.decodeEffect(ReverseProxy.ServicePlansFromHttpServices)({
 			httpServices,
@@ -105,14 +144,33 @@ export default HomeInfra.make(
 		const peers: Record<string, NetBird.Peer> = {};
 		const peerOutputs: Record<string, HomeInfraPeerOutput> = {};
 		for (const hostKey of hostKeys) {
+			const host = inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
 			const peer = yield* NetBird.Peer(peerLogicalId(hostKey), {
 				host: hostKey,
+				...(host
+					? {
+							loginExpirationEnabled: host.netbird.loginExpirationEnabled,
+							inactivityExpirationEnabled: host.netbird.inactivityExpirationEnabled,
+						}
+					: {}),
 			});
 			peers[hostKey] = peer;
 			peerOutputs[hostKey] = {
 				hostname: peer.hostname,
 				peerId: peer.peerId,
 			};
+		}
+
+		const hostsByGroup = Inventory.hostsByNetBirdGroup(inventory);
+		for (const groupName of Inventory.ZERO_TRUST_GROUP_NAMES) {
+			const memberHostKeys = hostsByGroup.get(groupName) ?? [];
+			const memberPeerIds = memberHostKeys
+				.filter(hostKey => peers[hostKey] !== undefined)
+				.map(hostKey => peers[hostKey]!.peerId);
+			yield* NetBird.Group(groupName, {
+				name: groupName,
+				peers: memberPeerIds,
+			});
 		}
 
 		const services: Record<string, string> = {};
@@ -135,7 +193,7 @@ export default HomeInfra.make(
 				return yield* Effect.die(`NetBird peer "${plan.hostKey}" not found for nameserver "${plan.nameserverKey}"`);
 			}
 
-			const distributionGroups: string[] = [];
+			const distributionGroups: Array<string | NetBird.Group["groupId"]> = [];
 			for (const groupName of plan.cfg.groups) {
 				const id = groupByName.get(groupName);
 				if (!id) {
@@ -164,6 +222,7 @@ export default HomeInfra.make(
 
 		return {
 			peers: peerOutputs,
+			groups: groupOutputs,
 			services,
 			dns,
 		};

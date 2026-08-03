@@ -105,6 +105,18 @@ export const SshKeyProvider = () =>
 						Effect.gen(function* () {
 							const existing = yield* findSshKeyByName(name);
 							if (existing) return { ssh_key: existing };
+							const byPublicKey = yield* findSshKeyByPublicKey(publicKey);
+							if (byPublicKey) {
+								if (byPublicKey.name !== name || !labelsEqual(byPublicKey.labels, labels)) {
+									const updated = yield* sshKeysIdPut({
+										id: byPublicKey.id,
+										name,
+										labels,
+									});
+									return { ssh_key: updated.ssh_key };
+								}
+								return { ssh_key: byPublicKey };
+							}
 							return yield* Effect.fail(err);
 						}),
 					),
@@ -145,6 +157,12 @@ const resolveName = (id: string, name: string | undefined) =>
 const findSshKeyByName = (name: string) =>
 	sshKeysGet({ name }).pipe(
 		Effect.map(res => res.ssh_keys.find(k => k.name === name)),
+		Effect.catch(() => Effect.succeed(undefined)),
+	);
+
+const findSshKeyByPublicKey = (publicKey: string) =>
+	sshKeysGet({}).pipe(
+		Effect.map(res => res.ssh_keys.find(k => k.public_key.trim() === publicKey.trim())),
 		Effect.catch(() => Effect.succeed(undefined)),
 	);
 

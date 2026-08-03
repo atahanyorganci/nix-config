@@ -146,16 +146,19 @@ const sameNameservers = (a: ReadonlyArray<Nameserver>, b: ReadonlyArray<Nameserv
 	});
 };
 
-const hasDrift = (observed: ApiNameserverGroup, desired: {
-	name: string;
-	description: string;
-	nameservers: ReadonlyArray<Nameserver>;
-	enabled: boolean;
-	groups: ReadonlyArray<string>;
-	primary: boolean;
-	domains: ReadonlyArray<string>;
-	search_domains_enabled: boolean;
-}) =>
+const hasDrift = (
+	observed: ApiNameserverGroup,
+	desired: {
+		name: string;
+		description: string;
+		nameservers: ReadonlyArray<Nameserver>;
+		enabled: boolean;
+		groups: ReadonlyArray<string>;
+		primary: boolean;
+		domains: ReadonlyArray<string>;
+		search_domains_enabled: boolean;
+	},
+) =>
 	observed.name !== desired.name ||
 	observed.description !== desired.description ||
 	observed.enabled !== desired.enabled ||
