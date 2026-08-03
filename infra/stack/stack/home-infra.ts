@@ -10,6 +10,7 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import {
+	AccessMatrix,
 	HomeInfra,
 	Inventory,
 	NameServers,
@@ -76,6 +77,11 @@ export default HomeInfra.make(
 		});
 		const nameServers = yield* NixExpr.decode(nameServersExpr, NameServers.NameServers);
 
+		yield* Schema.decodeEffect(AccessMatrix.AccessMatrixFromFlake)({
+			httpServices,
+			nameServers,
+		});
+
 		if (Object.keys(httpServices).length === 0 && Object.keys(nameServers).length === 0) {
 			return yield* Effect.die(
 				"flake.httpServices and flake.nameServers are empty — enable httpServices or nameServers in host modules first",
@@ -88,8 +94,7 @@ export default HomeInfra.make(
 				...Object.keys(httpServices),
 				...Object.keys(nameServers),
 				...inventoryHostKeys.filter(hostKey => {
-					const host =
-						inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
+					const host = inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
 					return host?.netbird.group !== null;
 				}),
 			]),
