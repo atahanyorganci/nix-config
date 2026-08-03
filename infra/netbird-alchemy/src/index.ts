@@ -12,6 +12,7 @@ export * from "./Group/index.ts";
 export * from "./NameserverGroup/index.ts";
 export * from "./Network/index.ts";
 export * from "./Policy/index.ts";
+export * from "./PostureCheck/index.ts";
 export * from "./Peer/index.ts";
 export * from "./Providers.ts";
 export * from "./ReverseProxyDomain/index.ts";
