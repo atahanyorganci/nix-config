@@ -17,6 +17,7 @@
 	"scripts": {
 		"format": "oxfmt --check .",
 		"format:fix": "oxfmt --write .",
+		"generate": "bun run scripts/generate.ts && bun run format:fix && bun run lint:fix",
 		"lint": "oxlint .",
 		"lint:fix": "oxlint --fix ."
 	},

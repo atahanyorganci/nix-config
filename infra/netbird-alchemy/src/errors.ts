@@ -1,9 +1,12 @@
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
-import type { NotFound } from "@yorganci/netbird-api/Errors";
+import type { BadRequest, NotFound } from "@yorganci/netbird-api/Errors";
 
 export const isNotFound = (error: unknown): error is InstanceType<typeof NotFound> =>
 	Predicate.hasProperty(error, "_tag") && error._tag === "NotFound";
+
+export const isBadRequest = (error: unknown): error is InstanceType<typeof BadRequest> =>
+	Predicate.hasProperty(error, "_tag") && error._tag === "BadRequest";
 
 export const isTransportError = (error: unknown) =>
 	(Predicate.hasProperty(error, "_tag") && error._tag === "HttpClientError") ||

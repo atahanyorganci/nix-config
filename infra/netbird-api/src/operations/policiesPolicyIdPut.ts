@@ -78,7 +78,7 @@ export interface PoliciesPolicyIdPutOutput {
 	description?: string;
 	enabled: boolean;
 	id?: string;
-	source_posture_checks: ReadonlyArray<string>;
+	source_posture_checks: ReadonlyArray<string> | null;
 	rules: ReadonlyArray<{
 		name: string;
 		description?: string;
@@ -96,7 +96,7 @@ export interface PoliciesPolicyIdPutOutput {
 			peers_count: number;
 			resources_count: number;
 			issued?: "api" | "integration" | "jwt";
-		}>;
+		}> | null;
 		sourceResource?: { id: string; type: {} };
 		destinations?: ReadonlyArray<{
 			id: string;
@@ -104,7 +104,7 @@ export interface PoliciesPolicyIdPutOutput {
 			peers_count: number;
 			resources_count: number;
 			issued?: "api" | "integration" | "jwt";
-		}>;
+		}> | null;
 		destinationResource?: { id: string; type: {} };
 	}>;
 }
@@ -113,7 +113,7 @@ export const PoliciesPolicyIdPutOutput = /*@__PURE__*/ Schema.Struct({
 	description: Schema.optional(Schema.String),
 	enabled: Schema.Boolean,
 	id: Schema.optional(Schema.String),
-	source_posture_checks: Schema.Array(Schema.String),
+	source_posture_checks: Schema.NullOr(Schema.Array(Schema.String)),
 	rules: Schema.Array(
 		Schema.Struct({
 			name: Schema.String,
@@ -134,14 +134,16 @@ export const PoliciesPolicyIdPutOutput = /*@__PURE__*/ Schema.Struct({
 			authorized_groups: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
 			id: Schema.optional(Schema.String),
 			sources: Schema.optional(
-				Schema.Array(
-					Schema.Struct({
-						id: Schema.String,
-						name: Schema.String,
-						peers_count: Schema.Number,
-						resources_count: Schema.Number,
-						issued: Schema.optional(Schema.Literals(["api", "integration", "jwt"])),
-					}),
+				Schema.NullOr(
+					Schema.Array(
+						Schema.Struct({
+							id: Schema.String,
+							name: Schema.String,
+							peers_count: Schema.Number,
+							resources_count: Schema.Number,
+							issued: Schema.optional(Schema.Literals(["api", "integration", "jwt"])),
+						}),
+					),
 				),
 			),
 			sourceResource: Schema.optional(
@@ -151,14 +153,16 @@ export const PoliciesPolicyIdPutOutput = /*@__PURE__*/ Schema.Struct({
 				}),
 			),
 			destinations: Schema.optional(
-				Schema.Array(
-					Schema.Struct({
-						id: Schema.String,
-						name: Schema.String,
-						peers_count: Schema.Number,
-						resources_count: Schema.Number,
-						issued: Schema.optional(Schema.Literals(["api", "integration", "jwt"])),
-					}),
+				Schema.NullOr(
+					Schema.Array(
+						Schema.Struct({
+							id: Schema.String,
+							name: Schema.String,
+							peers_count: Schema.Number,
+							resources_count: Schema.Number,
+							issued: Schema.optional(Schema.Literals(["api", "integration", "jwt"])),
+						}),
+					),
 				),
 			),
 			destinationResource: Schema.optional(
