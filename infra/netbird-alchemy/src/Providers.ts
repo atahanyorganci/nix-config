@@ -5,11 +5,14 @@ import { CredentialsFromEnv, type Credentials } from "./Credentials.ts";
 import { GroupProvider } from "./Group/Group.ts";
 import { NameserverGroupProvider } from "./NameserverGroup/NameserverGroup.ts";
 import { NetworkProvider } from "./Network/Network.ts";
+import { NetworkResourceProvider } from "./NetworkResource/NetworkResource.ts";
+import { NetworkRouterProvider } from "./NetworkRouter/NetworkRouter.ts";
+import { PeerProvider } from "./Peer/Peer.ts";
 import { PolicyProvider } from "./Policy/Policy.ts";
 import { PostureCheckProvider } from "./PostureCheck/PostureCheck.ts";
-import { PeerProvider } from "./Peer/Peer.ts";
 import { ReverseProxyDomainProvider } from "./ReverseProxyDomain/ReverseProxyDomain.ts";
 import { ReverseProxyServiceProvider } from "./ReverseProxyService/ReverseProxyService.ts";
+import { RouteProvider } from "./Route/Route.ts";
 import { SetupProvider } from "./Setup/Setup.ts";
 import { SetupKeyProvider } from "./SetupKey/SetupKey.ts";
 import { UserProvider } from "./User/User.ts";
@@ -26,6 +29,9 @@ export const resourceProviders = () =>
 		GroupProvider(),
 		NameserverGroupProvider(),
 		NetworkProvider(),
+		NetworkResourceProvider(),
+		NetworkRouterProvider(),
+		RouteProvider(),
 		PolicyProvider(),
 		PostureCheckProvider(),
 		PeerProvider(),
