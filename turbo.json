@@ -2,8 +2,18 @@
 	"$schema": "https://turbo.build/schema.json",
 	"tasks": {
 		"check": {},
-		"format": {},
+		"format": {
+			"dependsOn": ["//#format:root"],
+			"outputs": []
+		},
+		"//#format:root": {
+			"inputs": ["$TURBO_DEFAULT$", "!infra/**", "!hosts/**", "!modules/**"]
+		},
 		"format:fix": {
+			"cache": false,
+			"dependsOn": ["//#format:root:fix", "^format:fix"]
+		},
+		"//#format:root:fix": {
 			"cache": false
 		},
 		"lint": {},

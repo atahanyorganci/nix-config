@@ -1,9 +1,26 @@
 {
 	"name": "@yorganci/nix-config",
 	"private": true,
+	"workspaces": [
+		"infra/*"
+	],
 	"type": "module",
+	"scripts": {
+		"check": "turbo run check",
+		"format": "turbo run format",
+		"format:fix": "turbo run format:fix",
+		"format:root": "oxfmt --check --disable-nested-config .",
+		"format:root:fix": "oxfmt --write --disable-nested-config .",
+		"lint": "turbo run lint",
+		"lint:fix": "turbo run lint:fix",
+		"test": "turbo run test"
+	},
+	"devDependencies": {
+		"@yorganci/config": "workspace:*",
+		"oxfmt": "catalog:",
+		"turbo": "catalog:"
+	},
 	"packageManager": "bun@1.3.13",
-	"workspaces": ["infra/*"],
 	"catalog": {
 		"@distilled.cloud/core": "0.29.1",
 		"@effect/language-service": "^0.86.2",
@@ -18,16 +35,5 @@
 		"turbo": "^2.10.5",
 		"typescript": "^7.0.2",
 		"vitest": "^4.1.8"
-	},
-	"scripts": {
-		"check": "turbo run check",
-		"format": "turbo run format",
-		"format:fix": "turbo run format:fix",
-		"lint": "turbo run lint",
-		"lint:fix": "turbo run lint:fix",
-		"test": "turbo run test"
-	},
-	"devDependencies": {
-		"turbo": "catalog:"
 	}
 }
