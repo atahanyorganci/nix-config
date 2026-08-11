@@ -107,8 +107,8 @@ export default NetbirdServerStack.make(
 			publicKey: deployKey,
 		});
 		const {
-			ipv4: { ip: serverIp },
-			server,
+			ipv4: { ip: marsIp },
+			server: marsServer,
 		} = yield* NetbirdServer.stack({
 			name: "mars",
 			location: "nbg1",
@@ -116,30 +116,8 @@ export default NetbirdServerStack.make(
 			serverType: "cx23",
 			sshKey: sshKey.name,
 		});
-
-		const zone = yield* Cloudflare.Zone.Zone("Domain", {
-			name: infra.domain,
-		});
-		const netbirdRecord = yield* Cloudflare.DNS.Record("NetbirdDnsRecord", {
-			zoneId: zone.zoneId,
-			name: infra.netbirdManagementDomain,
-			type: "A",
-			content: serverIp,
-			proxied: false,
-			ttl: "1",
-		});
-		const netbirdApiBaseUrl = Output.map(netbirdRecord.content, () => `https://${infra.netbirdManagementDomain}`);
-		yield* Cloudflare.DNS.Record("ProxyWildcardDnsRecord", {
-			zoneId: zone.zoneId,
-			name: `*.${infra.domain}`,
-			type: "A",
-			content: serverIp,
-			proxied: false,
-			ttl: "1",
-		});
-
-		const serverNixos = yield* Command.Exec("ServerNixos", {
-			command: Output.interpolate`nix run .#deploy-nixos -- ${serverIp} ${server.serverId} . mars ${infra.netbirdManagementDomain}`,
+		const marsNixos = yield* Command.Exec("MarsNixos", {
+			command: Output.interpolate`nix run .#deploy-nixos -- ${marsIp} ${marsServer.serverId} . mars ${infra.netbirdManagementDomain}`,
 			cwd: REPO_ROOT,
 			memo: {
 				include: [
@@ -149,6 +127,27 @@ export default NetbirdServerStack.make(
 					"modules/pkgs/deploy-nixos/deploy-nixos.sh",
 				],
 			},
+		});
+
+		const zone = yield* Cloudflare.Zone.Zone("Domain", {
+			name: infra.domain,
+		});
+		const netbirdRecord = yield* Cloudflare.DNS.Record("NetbirdDnsRecord", {
+			zoneId: zone.zoneId,
+			name: infra.netbirdManagementDomain,
+			type: "A",
+			content: marsIp,
+			proxied: false,
+			ttl: "1",
+		});
+		const netbirdApiBaseUrl = Output.map(netbirdRecord.content, () => `https://${infra.netbirdManagementDomain}`);
+		yield* Cloudflare.DNS.Record("ProxyWildcardDnsRecord", {
+			zoneId: zone.zoneId,
+			name: `*.${infra.domain}`,
+			type: "A",
+			content: marsIp,
+			proxied: false,
+			ttl: "1",
 		});
 
 		const adminPassword = yield* Alchemy.Random("NetBirdAdminPassword", {
@@ -162,7 +161,7 @@ export default NetbirdServerStack.make(
 			password: adminPassword.text,
 			patExpireIn: 365,
 			// Wait for NixOS install/rebuild before hitting the management API.
-			ready: Output.map(serverNixos.hash, hash => hash.input ?? "pending"),
+			ready: Output.map(marsNixos.hash, hash => hash.input ?? "pending"),
 		});
 
 		// Bootstrap credentials so NetBird API resources can authenticate.
@@ -187,7 +186,10 @@ export default NetbirdServerStack.make(
 
 		return {
 			zone: zone.name,
-			serverIp,
+			mars: {
+				ip: marsIp,
+				serverId: marsServer.serverId,
+			},
 			apiBaseUrl: netbirdApiBaseUrl,
 			admin: {
 				email: setup.email,
