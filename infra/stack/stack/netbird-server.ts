@@ -90,6 +90,10 @@ const AdminPassword = Action.Action(
 	}),
 );
 
+const NIX_MEMO = {
+	include: ["flake.nix", "flake.lock", "modules/**/*", "hosts/**/*"],
+};
+
 const preferProvisionedApiToken = (
 	provisioned: Redacted.Redacted<string>,
 	fallback: Redacted.Redacted<string>,
@@ -131,17 +135,21 @@ export default NetbirdServerStack.make(
 			serverType: "cx23",
 			sshKey: sshKey.name,
 		});
-		const marsNixos = yield* Command.Exec("MarsNixos", {
-			command: Output.interpolate`nix run .#deploy-nixos -- ${marsIp} ${marsServer.serverId} . mars ${infra.netbirdManagementDomain}`,
+		const marsBootstrap = yield* Command.Exec("MarsNixosBootstrap", {
+			command: Output.map(
+				Output.all(marsServer.serverId, marsIp),
+				([, host]) => `nix run .#nixos-bootstrap -- root@${host} .#pluto`,
+			),
 			cwd: REPO_ROOT,
-			memo: {
-				include: [
-					"**/*.nix",
-					"flake.lock",
-					"modules/pkgs/deploy-nixos/default.nix",
-					"modules/pkgs/deploy-nixos/deploy-nixos.sh",
-				],
-			},
+			memo: NIX_MEMO,
+		});
+		const marsNixos = yield* Command.Exec("MarsNixos", {
+			command: Output.map(
+				Output.all(marsBootstrap.hash, marsIp),
+				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#mars`,
+			),
+			cwd: REPO_ROOT,
+			memo: NIX_MEMO,
 		});
 
 		const zone = yield* Cloudflare.Zone.Zone("Domain", {
