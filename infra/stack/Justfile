@@ -1,0 +1,24 @@
+set export := true
+set dotenv-filename := ".env.local"
+set dotenv-load
+
+ALCHEMY_PROFILE := "personal"
+ALCHEMY_NO_TUI := "1"
+ALCHEMY_PLAIN := "1"
+
+bunx := require("bunx")
+
+plan *args:
+    {{ bunx }} alchemy plan --log-level all {{ args }}
+
+deploy *args:
+    {{ bunx }} alchemy deploy --yes --log-level all {{ args }}
+
+destroy *args:
+    {{ bunx }} alchemy destroy --yes --log-level all {{ args }}
+
+bootstrap:
+    {{ bunx }} alchemy cloudflare bootstrap
+
+configure:
+    {{ bunx }} alchemy login --configure
