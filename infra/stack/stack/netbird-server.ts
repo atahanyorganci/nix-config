@@ -152,6 +152,51 @@ export default NetbirdServerStack.make(
 			memo: NIX_MEMO,
 		});
 
+		const jupiterFirewall = yield* Hetzner.Firewall("JupiterFirewall", {
+			name: "jupiter",
+			rules: [
+				{
+					direction: "in",
+					protocol: "tcp",
+					port: "22",
+					sourceIps: ["0.0.0.0/0", "::/0"],
+					description: "SSH",
+				},
+			],
+		});
+		const jupiterIpv4 = yield* Hetzner.PrimaryIp("JupiterIpv4", {
+			name: "jupiter-ipv4",
+			type: "ipv4",
+			location: "nbg1",
+			autoDelete: false,
+		});
+		const jupiter = yield* Hetzner.Server("JupiterServer", {
+			name: "jupiter",
+			serverType: "cx33",
+			image: "ubuntu-24.04",
+			location: "nbg1",
+			sshKeys: [sshKey.name],
+			firewalls: [jupiterFirewall.firewallId],
+			primaryIpv4Id: jupiterIpv4.primaryIpId,
+			enableIpv6: false,
+		});
+		const jupiterNixosBootstrap = yield* Command.Exec("JupiterNixosBootstrap", {
+			command: Output.map(
+				Output.all(jupiter.serverId, jupiterIpv4.ip),
+				([, host]) => `nix run .#nixos-bootstrap -- root@${host} .#pluto`,
+			),
+			cwd: REPO_ROOT,
+			memo: NIX_MEMO,
+		});
+		yield* Command.Exec("JupiterNixos", {
+			command: Output.map(
+				Output.all(jupiterNixosBootstrap.hash, jupiterIpv4.ip),
+				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#jupiter`,
+			),
+			cwd: REPO_ROOT,
+			memo: NIX_MEMO,
+		});
+
 		const zone = yield* Cloudflare.Zone.Zone("Domain", {
 			name: infra.domain,
 		});
@@ -209,6 +254,10 @@ export default NetbirdServerStack.make(
 			mars: {
 				ip: marsIp,
 				serverId: marsServer.serverId,
+			},
+			jupiter: {
+				ip: jupiterIpv4.ip,
+				serverId: jupiter.serverId,
 			},
 			apiBaseUrl: netbirdApiBaseUrl,
 			admin: {
