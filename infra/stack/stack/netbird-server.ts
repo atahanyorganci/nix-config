@@ -1,9 +1,11 @@
 import * as Hetzner from "@yorganci/hetzner-alchemy";
 import * as NetBird from "@yorganci/netbird-alchemy";
 import * as Alchemy from "alchemy";
+import * as Action from "alchemy/Action";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Command from "alchemy/Command";
 import * as Output from "alchemy/Output";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -73,6 +75,19 @@ const UpdateNetBirdCredentialsRef = Alchemy.Action(
 			};
 		}),
 	),
+);
+
+const AdminPassword = Action.Action(
+	"AdminPassword",
+	Effect.fn(function* ({ length }: { length: number }) {
+		const crypto = yield* Crypto.Crypto;
+		const bytes = yield* crypto.randomBytes(length);
+		const hex = Array.from(bytes)
+			.map(byte => byte.toString(16))
+			.join("");
+		const password = Redacted.make(`Nb${hex}!`);
+		return password;
+	}),
 );
 
 const preferProvisionedApiToken = (
@@ -150,15 +165,12 @@ export default NetbirdServerStack.make(
 			ttl: "1",
 		});
 
-		const adminPassword = yield* Alchemy.Random("NetBirdAdminPassword", {
-			bytes: 24,
-		});
-
+		const adminPassword = yield* AdminPassword({ length: 24 });
 		const setup = yield* NetBird.Setup("Admin", {
 			apiBaseUrl: netbirdApiBaseUrl,
 			email: me.email,
 			name: me.name,
-			password: adminPassword.text,
+			password: adminPassword,
 			patExpireIn: 365,
 			// Wait for NixOS install/rebuild before hitting the management API.
 			ready: Output.map(marsNixos.hash, hash => hash.input ?? "pending"),
@@ -193,7 +205,7 @@ export default NetbirdServerStack.make(
 			apiBaseUrl: netbirdApiBaseUrl,
 			admin: {
 				email: setup.email,
-				password: setup.password,
+				password: adminPassword,
 			},
 		};
 	}),
