@@ -13,6 +13,23 @@ in {
       experimental-features = ["nix-command" "flakes"];
       trusted-users = ["root" "@wheel"];
     };
+    # ssh-ng / nixos-rebuild --build-host inherit the SSH session ulimit.
+    # The default 1024 FDs is too low for a full system+home-manager closure.
+    security.pam.loginLimits = [
+      {
+        domain = "*";
+        type = "soft";
+        item = "nofile";
+        value = "1048576";
+      }
+      {
+        domain = "*";
+        type = "hard";
+        item = "nofile";
+        value = "1048576";
+      }
+    ];
+    systemd.settings.Manager.DefaultLimitNOFILE = "1048576";
     system.stateVersion = "26.05";
     users.users.${user.username} = {
       isNormalUser = true;
