@@ -39,11 +39,12 @@
       };
     };
     config = mkIf cfg.enable (let
-      privateHttpService = port: {
+      privateHttpService = port: accessGroups: {
         inherit port;
         expose = {
           enable = true;
           private = true;
+          inherit accessGroups;
         };
         auth = {type = "none";};
       };
@@ -52,16 +53,17 @@
         expose = {
           enable = true;
           private = false;
+          accessGroups = ["Admin" "Users"];
         };
         auth = {type = "none";};
       };
     in {
       httpServices = {
-        tv = privateHttpService config.services.sonarr.settings.port;
-        film = privateHttpService config.services.radarr.settings.port;
-        indexer = privateHttpService config.services.prowlarr.settings.port;
+        tv = privateHttpService config.services.sonarr.settings.port ["Admin"];
+        film = privateHttpService config.services.radarr.settings.port ["Admin"];
+        indexer = privateHttpService config.services.prowlarr.settings.port ["Admin"];
         watch = publicHttpService 8096;
-        download = privateHttpService config.services.transmission.settings."rpc-port";
+        download = privateHttpService config.services.transmission.settings."rpc-port" ["Admin"];
       };
       services = {
         sonarr = {

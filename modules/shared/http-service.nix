@@ -24,7 +24,7 @@
                 accessGroups = lib.mkOption {
                   type = lib.types.listOf lib.types.str;
                   default = [];
-                  description = "NetBird group IDs; empty uses stack default (All group)";
+                  description = "NetBird group names (Admin, Users, Servers, Agents); empty uses stack default (Admin for private services)";
                 };
               };
             };
