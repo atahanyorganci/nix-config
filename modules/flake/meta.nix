@@ -35,6 +35,6 @@
   };
   config.flake.infra = rec {
     domain = "yorganci.dev";
-    netbirdManagementDomain = "netbird.${domain}";
+    netbirdManagementDomain = "netbird4.${domain}";
   };
 }
