@@ -9,14 +9,14 @@ export interface RoutesPostInput {
 	network_id: string;
 	enabled: boolean;
 	peer?: string;
-	peer_groups?: ReadonlyArray<string>;
+	peer_groups?: ReadonlyArray<string> | null;
 	network?: string;
-	domains?: ReadonlyArray<string>;
+	domains?: ReadonlyArray<string> | null;
 	metric: number;
 	masquerade: boolean;
 	groups: ReadonlyArray<string>;
 	keep_route: boolean;
-	access_control_groups?: ReadonlyArray<string>;
+	access_control_groups?: ReadonlyArray<string> | null;
 	skip_auto_apply?: boolean;
 }
 export const RoutesPostInput = /*@__PURE__*/ Schema.Struct({
@@ -24,14 +24,14 @@ export const RoutesPostInput = /*@__PURE__*/ Schema.Struct({
 	network_id: Schema.String,
 	enabled: Schema.Boolean,
 	peer: Schema.optional(Schema.String),
-	peer_groups: Schema.optional(Schema.Array(Schema.String)),
+	peer_groups: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 	network: Schema.optional(Schema.String),
-	domains: Schema.optional(Schema.Array(Schema.String)),
+	domains: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 	metric: Schema.Number,
 	masquerade: Schema.Boolean,
 	groups: Schema.Array(Schema.String),
 	keep_route: Schema.Boolean,
-	access_control_groups: Schema.optional(Schema.Array(Schema.String)),
+	access_control_groups: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 	skip_auto_apply: Schema.optional(Schema.Boolean),
 }).pipe(T.Http({ method: "POST", path: "/api/routes" })) as unknown as Schema.Codec<RoutesPostInput>;
 
@@ -43,14 +43,14 @@ export interface RoutesPostOutput {
 	network_id: string;
 	enabled: boolean;
 	peer?: string;
-	peer_groups?: ReadonlyArray<string>;
+	peer_groups?: ReadonlyArray<string> | null;
 	network?: string;
-	domains?: ReadonlyArray<string>;
+	domains?: ReadonlyArray<string> | null;
 	metric: number;
 	masquerade: boolean;
 	groups: ReadonlyArray<string>;
 	keep_route: boolean;
-	access_control_groups?: ReadonlyArray<string>;
+	access_control_groups?: ReadonlyArray<string> | null;
 	skip_auto_apply?: boolean;
 }
 export const RoutesPostOutput = /*@__PURE__*/ Schema.Struct({
@@ -60,14 +60,14 @@ export const RoutesPostOutput = /*@__PURE__*/ Schema.Struct({
 	network_id: Schema.String,
 	enabled: Schema.Boolean,
 	peer: Schema.optional(Schema.String),
-	peer_groups: Schema.optional(Schema.Array(Schema.String)),
+	peer_groups: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 	network: Schema.optional(Schema.String),
-	domains: Schema.optional(Schema.Array(Schema.String)),
+	domains: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 	metric: Schema.Number,
 	masquerade: Schema.Boolean,
 	groups: Schema.Array(Schema.String),
 	keep_route: Schema.Boolean,
-	access_control_groups: Schema.optional(Schema.Array(Schema.String)),
+	access_control_groups: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 	skip_auto_apply: Schema.optional(Schema.Boolean),
 }) as unknown as Schema.Codec<RoutesPostOutput>;
 

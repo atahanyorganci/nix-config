@@ -1,0 +1,20 @@
+{
+	"description": "Self-hosted NetBird returns null for empty Route domains, peer_groups, and access_control_groups.",
+	"patches": [
+		{
+			"op": "add",
+			"path": "/components/schemas/RouteRequest/properties/domains/nullable",
+			"value": true
+		},
+		{
+			"op": "add",
+			"path": "/components/schemas/RouteRequest/properties/peer_groups/nullable",
+			"value": true
+		},
+		{
+			"op": "add",
+			"path": "/components/schemas/RouteRequest/properties/access_control_groups/nullable",
+			"value": true
+		}
+	]
+}
