@@ -10,9 +10,9 @@
     cfg = config.shell;
     shellAliases = {
       # `ll` - list files with long format with `eza`
-      ll = "${pkgs.eza}/bin/eza --long --header --icons";
+      ll = "${pkgs.eza}/bin/eza --long --header --icons always";
       # `tree` - list files in a tree format with `eza`
-      tree = "${pkgs.eza}/bin/eza --tree --long --header --icons";
+      tree = "${pkgs.eza}/bin/eza --tree --long --header --icons always";
       # `nd` - activate a development shell with default shell
       nd = "nix develop --command ${user.shell}";
     };

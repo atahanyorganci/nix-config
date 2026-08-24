@@ -23,7 +23,7 @@ function cdi --description "Interactively change directory"
             set list "$list\n$item"
         end
     end
-    set -l dir (printf $list | fzf --prompt="cd " --preview 'eza --icons (string replace "~" $HOME {})')
+    set -l dir (printf $list | fzf --prompt="cd " --preview 'eza --icons always (string replace "~" $HOME {})')
     if test $status != 0 -o "$dir" = ""
         return 1
     end
