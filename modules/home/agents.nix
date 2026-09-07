@@ -14,13 +14,21 @@
       ]
       else [];
   in {
-    options.agents.enable = lib.mkEnableOption "OpenAI Codex";
+    options.agents.enable = lib.mkEnableOption "Agent harnesses";
     config = lib.mkIf config.agents.enable {
-      home.packages = with pkgs; [pi-coding-agent] ++ darwinPackages;
+      home.packages = darwinPackages;
       programs = {
         codex.enable = true;
         opencode.enable = true;
         claude-code.enable = true;
+        pi-coding-agent.enable = true;
+        t3code = {
+          enable = true;
+          package =
+            if pkgs.stdenv.isDarwin
+            then inputs.nix-casks.packages.${system}.t3-code
+            else pkgs.t3code;
+        };
       };
     };
   };
