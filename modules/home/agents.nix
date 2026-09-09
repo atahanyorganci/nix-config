@@ -16,7 +16,7 @@
   in {
     options.agents.enable = lib.mkEnableOption "Agent harnesses";
     config = lib.mkIf config.agents.enable {
-      home.packages = darwinPackages ++ [pkgs.cursor-cli];
+      home.packages = darwinPackages ++ [pkgs.cursor-cli pkgs."9router"];
       programs = {
         codex.enable = true;
         opencode.enable = true;
