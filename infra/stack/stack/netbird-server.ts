@@ -89,9 +89,15 @@ const AdminPassword = Action.Action(
 	}),
 );
 
+// A NixOS deploy re-runs whenever the flake or a host configuration changes.
 const NIX_MEMO = {
 	include: ["flake.nix", "flake.lock", "modules/**/*", "hosts/**/*"],
 };
+
+// Bootstrapping installs NixOS once per server, so its memo tracks no
+// repository content: configuration changes must not re-run it. A server
+// replacement changes the command (new host) and runs it again.
+const BOOTSTRAP_MEMO = { include: [] as string[] };
 
 const preferProvisionedApiToken = (
 	provisioned: Redacted.Redacted<string>,
@@ -140,7 +146,7 @@ export default NetbirdServerStack.make(
 				([, host]) => `nix run .#nixos-bootstrap -- root@${host} .#pluto`,
 			),
 			cwd: REPO_ROOT,
-			memo: NIX_MEMO,
+			memo: BOOTSTRAP_MEMO,
 		});
 		const marsNixos = yield* Command.Exec("MarsNixos", {
 			command: Output.map(
@@ -184,7 +190,7 @@ export default NetbirdServerStack.make(
 				([, host]) => `nix run .#nixos-bootstrap -- root@${host} .#pluto`,
 			),
 			cwd: REPO_ROOT,
-			memo: NIX_MEMO,
+			memo: BOOTSTRAP_MEMO,
 		});
 		yield* Command.Exec("JupiterNixos", {
 			command: Output.map(
