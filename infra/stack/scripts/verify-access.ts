@@ -1,9 +1,11 @@
 import { BunRuntime } from "@effect/platform-bun";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
+import { dnsNameserversGet } from "@yorganci/netbird-api/dnsNameserversGet";
 import { groupsGet } from "@yorganci/netbird-api/groupsGet";
 import { peersGet } from "@yorganci/netbird-api/peersGet";
 import { policiesGet } from "@yorganci/netbird-api/policiesGet";
+import { routesGet } from "@yorganci/netbird-api/routesGet";
 import { usersGet } from "@yorganci/netbird-api/usersGet";
 import { AlchemyContextLive } from "alchemy/AlchemyContext";
 import { ArtifactStore, createArtifactStore } from "alchemy/Artifacts";
@@ -106,7 +108,7 @@ const verifyAccess = Command.make("verify-access", {
 	envFile: envFileFlag,
 }).pipe(
 	Command.withDescription(
-		"Print NetBird users, groups, peers and policy rules to check zero-trust access before and after the Default policy cut-over",
+		"Print NetBird users, groups, peers, routes, nameservers and policy rules to check zero-trust access before and after the Default policy cut-over",
 	),
 	Command.withHandler(
 		Effect.fn(function* ({ stage, profile, envFile }) {
@@ -114,14 +116,19 @@ const verifyAccess = Command.make("verify-access", {
 				Effect.gen(function* () {
 					const credentials = yield* readNetbirdCredentialsFromState(state, stage);
 					const netbirdApi = Layer.mergeAll(CredentialsFromConfig(credentials), FetchHttpClient.layer);
-					const [users, groups, peers, policies] = yield* Effect.all([
+					const [users, groups, peers, policies, routes, nameservers] = yield* Effect.all([
 						usersGet({}),
 						groupsGet({}),
 						peersGet({}),
 						policiesGet({}),
+						routesGet({}),
+						dnsNameserversGet({}),
 					]).pipe(Effect.provide(netbirdApi));
 
 					const peerById = new Map(peers.map(peer => [peer.id, peer]));
+					const groupNameById = new Map(groups.map(group => [group.id, group.name]));
+					const groupNames = (ids: ReadonlyArray<string> | null | undefined) =>
+						(ids ?? []).map(id => groupNameById.get(id) ?? id).join(",");
 					for (const user of users) {
 						yield* Console.log(
 							`USER\t${user.email}\trole=${user.role}\tstatus=${user.status}\tauto_groups=${JSON.stringify(user.auto_groups)}`,
@@ -138,6 +145,19 @@ const verifyAccess = Command.make("verify-access", {
 					for (const peer of peers) {
 						yield* Console.log(
 							`PEER\t${peer.name || peer.dns_label}\tssh=${peer.ssh_enabled}\tconnected=${peer.connected}\tip=${peer.ip}`,
+						);
+					}
+					for (const route of routes) {
+						const via = route.peer
+							? (peerById.get(route.peer)?.name ?? route.peer)
+							: `groups:${groupNames(route.peer_groups)}`;
+						yield* Console.log(
+							`ROUTE\t${route.description}\tnetwork=${route.network ?? (route.domains ?? []).join(",")}\tvia=${via}\tenabled=${route.enabled}\tgroups=[${groupNames(route.groups)}]\taccess=[${groupNames(route.access_control_groups)}]`,
+						);
+					}
+					for (const nameserver of nameservers) {
+						yield* Console.log(
+							`NAMESERVER\t${nameserver.name}\tprimary=${nameserver.primary}\tenabled=${nameserver.enabled}\tservers=[${nameserver.nameservers.map(entry => `${entry.ip}:${entry.port}`).join(",")}]\tgroups=[${groupNames(nameserver.groups)}]\tdomains=[${nameserver.domains.join(",")}]`,
 						);
 					}
 					for (const policy of policies) {
