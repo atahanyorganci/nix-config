@@ -1,5 +1,4 @@
 import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
@@ -35,9 +34,12 @@ const sourceGroups = (
 	const unknown = groups.filter(group => !isPolicySourceGroupName(group));
 	if (unknown.length > 0) {
 		return Effect.fail(
-			new SchemaIssue.InvalidValue(Option.some(groups), {
-				message: `${label}: group(s) ${unknown.join(", ")} cannot be granted access — expected Admin, Users, Servers or Proxy (Agents peers are isolated, and All would include them)`,
-			}),
+			new SchemaIssue.InvalidValue(
+				{
+					message: `${label}: group(s) ${unknown.join(", ")} cannot be granted access — expected Admin, Users, Servers or Proxy (Agents peers are isolated, and All would include them)`,
+				},
+				groups,
+			),
 		);
 	}
 	return Effect.succeed([...new Set(groups.filter(isPolicySourceGroupName))]);

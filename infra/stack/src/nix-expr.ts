@@ -69,7 +69,7 @@ const evalProps = (props: NixExprProps) =>
 			}),
 		);
 		const json = stdout.trim();
-		const value = yield* Schema.decodeEffect(Schema.UnknownFromJsonString)(json);
+		const value = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(json);
 		return { json, value };
 	});
 

@@ -1,6 +1,5 @@
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
@@ -78,9 +77,12 @@ const readPasswordFile = (path: string) =>
 	}).pipe(
 		Effect.catch(cause =>
 			Effect.fail(
-				new SchemaIssue.InvalidValue(Option.some(path), {
-					message: `failed to read password file ${path}: ${String(cause)}`,
-				}),
+				new SchemaIssue.InvalidValue(
+					{
+						message: `failed to read password file ${path}: ${String(cause)}`,
+					},
+					path,
+				),
 			),
 		),
 	);
@@ -106,9 +108,12 @@ const ReverseProxyAuthFromAuth = Auth.pipe(
 					case "password": {
 						if (auth.passwordFile === null) {
 							return yield* Effect.fail(
-								new SchemaIssue.InvalidValue(Option.some(auth), {
-									message: "password auth requires passwordFile",
-								}),
+								new SchemaIssue.InvalidValue(
+									{
+										message: "password auth requires passwordFile",
+									},
+									auth,
+								),
 							);
 						}
 						const password = yield* readPasswordFile(auth.passwordFile);
@@ -122,9 +127,12 @@ const ReverseProxyAuthFromAuth = Auth.pipe(
 					case "pin":
 						if (auth.pin === null) {
 							return yield* Effect.fail(
-								new SchemaIssue.InvalidValue(Option.some(auth), {
-									message: "pin auth requires pin",
-								}),
+								new SchemaIssue.InvalidValue(
+									{
+										message: "pin auth requires pin",
+									},
+									auth,
+								),
 							);
 						}
 						return {
@@ -166,9 +174,12 @@ export const ServicePlansFromHttpServices = Schema.Struct({
 					const existingHost = serviceHosts.get(serviceKey);
 					if (existingHost !== undefined) {
 						return Effect.fail(
-							new SchemaIssue.InvalidValue(Option.some({ httpServices, domain }), {
-								message: `duplicate exposed service "${serviceKey}" on hosts "${existingHost}" and "${hostKey}" — use unique service keys across the fleet`,
-							}),
+							new SchemaIssue.InvalidValue(
+								{
+									message: `duplicate exposed service "${serviceKey}" on hosts "${existingHost}" and "${hostKey}" — use unique service keys across the fleet`,
+								},
+								{ httpServices, domain },
+							),
 						);
 					}
 					serviceHosts.set(serviceKey, hostKey);
