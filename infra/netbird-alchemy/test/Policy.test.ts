@@ -1,4 +1,5 @@
 import { policiesPolicyIdGet } from "@yorganci/netbird-api/policiesPolicyIdGet";
+import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import { catchNotFound } from "../src/errors.ts";
@@ -20,10 +21,9 @@ const deployPolicyFixture = (buildRules: (groups: { admin: string; servers: stri
 			name: NAME_BASIC,
 			description: "alchemy test policy",
 			enabled: true,
-			rules: buildRules({
-				admin: adminGroup.groupId as unknown as string,
-				servers: serversGroup.groupId as unknown as string,
-			}),
+			rules: Output.all(adminGroup.groupId, serversGroup.groupId).pipe(
+				Output.map(([admin, servers]) => buildRules({ admin, servers })),
+			),
 		});
 		return { adminGroup, serversGroup, policy };
 	});

@@ -22,8 +22,5 @@ export const readHomeInfraGroupId = (stage: string, groupName: NetBirdGroupName)
 		if (!group?.groupId) {
 			return yield* Effect.die(`HomeInfra output is missing group "${groupName}" for stage "${stage}"`);
 		}
-		if (typeof group.groupId === "string") {
-			return group.groupId;
-		}
-		return yield* Effect.die(`HomeInfra group "${groupName}" id is unresolved in stage "${stage}"`);
+		return group.groupId;
 	});

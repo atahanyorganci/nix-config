@@ -1,13 +1,12 @@
 import * as Hetzner from "@yorganci/hetzner-alchemy";
 import * as Effect from "effect/Effect";
-import type * as Output from "alchemy/Output";
 
 export interface NetbirdServerStackProps {
 	name: string;
 	location: string;
 	image: string;
 	serverType: string;
-	sshKey: string | Output.Output<string>;
+	sshKey: Hetzner.SshKey;
 }
 
 export const stack = Effect.fn("NetbirdServerStack")(function* ({
@@ -70,7 +69,7 @@ export const stack = Effect.fn("NetbirdServerStack")(function* ({
 		serverType,
 		image,
 		location,
-		sshKeys: [sshKey],
+		sshKeys: [sshKey.name],
 		firewalls: [firewall.firewallId],
 		primaryIpv4Id: ipv4.primaryIpId,
 		enableIpv6: false,

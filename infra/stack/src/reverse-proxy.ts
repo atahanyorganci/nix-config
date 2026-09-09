@@ -1,4 +1,3 @@
-import { isOutput, type Output } from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
@@ -7,7 +6,7 @@ import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
 import * as SchemaParser from "effect/SchemaParser";
-import type { ReverseProxyAuth, ReverseProxyServiceProps, ReverseProxyTarget } from "@yorganci/netbird-alchemy";
+import type { ReverseProxyAuth, ReverseProxyServiceProps } from "@yorganci/netbird-alchemy";
 
 const AuthType = Schema.Union([
 	Schema.Literal("none"),
@@ -66,10 +65,7 @@ const ServicePlan = Schema.Struct({
 	cfg: HttpService,
 });
 
-type ServicePlan = typeof ServicePlan.Type;
-
-const PeerId = Schema.Union([Schema.String, Schema.declare((u): u is Output<string> => isOutput(u))]);
-const GroupId = PeerId;
+export type ServicePlan = typeof ServicePlan.Type;
 
 /** Opaque target schema so Encoded === Type for one-way `decodeTo` transforms. */
 const ReverseProxyAuthSchema = Schema.declare((u): u is ReverseProxyAuth => typeof u === "object" && u !== null);
@@ -192,77 +188,81 @@ export const ServicePlansFromHttpServices = Schema.Struct({
 	}),
 );
 
-type ReverseProxyServiceInput = Omit<ReverseProxyServiceProps, "targets"> & {
-	targets: ReadonlyArray<Omit<ReverseProxyTarget, "targetId"> & { targetId: string | Output<string> }>;
+export const decodeAuth = (auth: Auth) => SchemaParser.decodeEffect(ReverseProxyAuthFromAuth)(auth);
+
+const requireGroupId = (groupIds: Record<string, string>, groupName: string, label: string) => {
+	const groupId = groupIds[groupName];
+	if (groupId === undefined) {
+		throw new Error(`unknown NetBird group "${groupName}" in ${label}`);
+	}
+	return groupId;
 };
 
-const ReverseProxyServiceInputSchema = Schema.declare(
-	(u): u is ReverseProxyServiceInput => typeof u === "object" && u !== null,
-);
+/** Flake group names this service needs resolved before `bindServiceProps`. */
+export const groupNamesForPlan = (plan: ServicePlan): ReadonlyArray<string> => {
+	const names = [...plan.cfg.expose.accessGroups];
+	if (plan.cfg.expose.private && names.length === 0) {
+		names.push("Admin");
+	}
+	if (plan.cfg.auth.type === "bearer") {
+		names.push(...plan.cfg.auth.distributionGroups);
+	}
+	return names;
+};
 
-const ReverseProxyServicePropsInput = Schema.Struct({
+export const bindServiceProps = (
 	plan: ServicePlan,
-	/** Access group for private services that declare no `expose.accessGroups`. */
-	defaultAccessGroup: GroupId,
-	/** NetBird group IDs by group name; every `expose.accessGroups` entry must resolve here. */
-	groupIdsByName: Schema.Record(Schema.String, GroupId),
-	peerId: PeerId,
-});
+	auth: ReverseProxyAuth | undefined,
+	peerId: string,
+	groupIds: Record<string, string>,
+): ReverseProxyServiceProps => {
+	const label = `service "${plan.serviceKey}"`;
+	const configuredAccessGroups = plan.cfg.expose.accessGroups.map(group =>
+		requireGroupId(groupIds, group, `${label} expose.accessGroups`),
+	);
+	const accessGroups =
+		configuredAccessGroups.length > 0
+			? configuredAccessGroups
+			: plan.cfg.expose.private
+				? [requireGroupId(groupIds, "Admin", `${label} default access group`)]
+				: undefined;
 
-type ReverseProxyServicePropsInput = typeof ReverseProxyServicePropsInput.Type;
+	let boundAuth = auth;
+	if (auth?.bearerAuth?.distributionGroups !== undefined) {
+		boundAuth = {
+			...auth,
+			bearerAuth: {
+				...auth.bearerAuth,
+				distributionGroups: auth.bearerAuth.distributionGroups.map(group =>
+					requireGroupId(groupIds, group, `${label} auth.distributionGroups`),
+				),
+			},
+		};
+	}
 
-export const ReverseProxyServicePropsFromPlan = ReverseProxyServicePropsInput.pipe(
-	Schema.decodeTo(ReverseProxyServiceInputSchema, {
-		decode: SchemaGetter.transformOrFail(({ plan, defaultAccessGroup, groupIdsByName, peerId }) =>
-			Effect.gen(function* () {
-				const configuredAccessGroups: Array<string | Output<string>> = [];
-				for (const group of plan.cfg.expose.accessGroups) {
-					const groupId = groupIdsByName[group];
-					if (groupId === undefined) {
-						return yield* Effect.fail(
-							new SchemaIssue.InvalidValue(Option.some(plan.cfg.expose.accessGroups), {
-								message: `service "${plan.serviceKey}": unknown NetBird group "${group}" in expose.accessGroups`,
-							}),
-						);
-					}
-					configuredAccessGroups.push(groupId);
-				}
-				const accessGroups =
-					configuredAccessGroups.length > 0
-						? configuredAccessGroups
-						: plan.cfg.expose.private
-							? [defaultAccessGroup]
-							: undefined;
+	const props: ReverseProxyServiceProps = {
+		name: plan.serviceKey,
+		domain: plan.domain,
+		enabled: true,
+		passHostHeader: true,
+		private: plan.cfg.expose.private,
+		targets: [
+			{
+				targetId: peerId,
+				targetType: "peer",
+				protocol: plan.cfg.protocol,
+				port: plan.cfg.port,
+				enabled: true,
+			},
+		],
+	};
 
-				const auth = yield* SchemaParser.decodeEffect(ReverseProxyAuthFromAuth)(plan.cfg.auth);
+	if (accessGroups !== undefined) {
+		props.accessGroups = accessGroups;
+	}
+	if (boundAuth !== undefined) {
+		props.auth = boundAuth;
+	}
 
-				const props: ReverseProxyServiceInput = {
-					name: plan.serviceKey,
-					domain: plan.domain,
-					enabled: true,
-					passHostHeader: true,
-					private: plan.cfg.expose.private,
-					targets: [
-						{
-							targetId: peerId,
-							targetType: "peer",
-							protocol: plan.cfg.protocol,
-							port: plan.cfg.port,
-							enabled: true,
-						},
-					],
-				};
-
-				if (accessGroups !== undefined) {
-					props.accessGroups = accessGroups as ReadonlyArray<string>;
-				}
-				if (auth !== undefined) {
-					props.auth = auth;
-				}
-
-				return props;
-			}),
-		),
-		encode: encodeForbidden("ReverseProxyServiceInput -> plan encoding is not supported"),
-	}),
-);
+	return props;
+};
