@@ -91,6 +91,8 @@ const withAlchemyState = <A, E>(
 			ConfigProvider.layer(withProfileOverride(yield* loadConfigProvider(options.envFile), options.profile)),
 			Logger.layer([], { mergeWithExisting: true }),
 			Layer.succeed(Stage, options.stage),
+			// Alchemy's stack and state layers take the HTTP client from the environment.
+			FetchHttpClient.layer,
 		);
 
 		return yield* Effect.gen(function* () {
