@@ -1,4 +1,5 @@
 # Bootstrap NixOS on a fresh host via nixos-anywhere.
+# Exits 0 without changes when the host already runs NixOS.
 #
 # Usage: nixos-bootstrap <ssh-target> <flake-expr>
 LOG_PREFIX=nixos-bootstrap
@@ -56,12 +57,23 @@ SSH_HOST="${SSH_TARGET#*@}"
 
 cd "$FLAKE_ROOT" || exit 1
 
-log "waiting for SSH on ${SSH_TARGET}"
-wait_for_ssh "$SSH_TARGET" 60 || exit 1
+already_installed() {
+    log "target already runs NixOS; nothing to bootstrap (use nixos-deploy to update it)"
+    exit 0
+}
 
-if is_nixos "$SSH_TARGET"; then
-    log "target is already NixOS; use nixos-deploy instead"
+log "waiting for SSH on ${SSH_TARGET}"
+ssh_status=0
+wait_for_ssh "$SSH_TARGET" 60 || ssh_status=$?
+if ((ssh_status == 2)) && is_nixos "${SSH_USER}@${SSH_HOST}"; then
+    # Installed hosts refuse root logins; the deploy user still answers.
+    already_installed
+fi
+if ((ssh_status != 0)); then
     exit 1
+fi
+if is_nixos "$SSH_TARGET"; then
+    already_installed
 fi
 
 run_nixos_anywhere() {
