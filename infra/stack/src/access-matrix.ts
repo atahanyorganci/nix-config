@@ -3,7 +3,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
-import { PolicySourceGroupName, isPolicySourceGroupName } from "./inventory.ts";
+import { PROXY_GROUP_NAME, PolicySourceGroupName, isPolicySourceGroupName } from "./inventory.ts";
 import { NameServers, type NameServerPlan } from "./name-servers.ts";
 import { HttpServices, type HttpHost, type HttpService } from "./reverse-proxy.ts";
 
@@ -36,7 +36,7 @@ const sourceGroups = (
 	if (unknown.length > 0) {
 		return Effect.fail(
 			new SchemaIssue.InvalidValue(Option.some(groups), {
-				message: `${label}: unknown NetBird group name(s) ${unknown.join(", ")} — expected Admin, Users, Servers, Agents or All`,
+				message: `${label}: unknown NetBird group name(s) ${unknown.join(", ")} — expected Admin, Users, Servers, Agents, Proxy or All`,
 			}),
 		);
 	}
@@ -45,7 +45,12 @@ const sourceGroups = (
 
 const httpEntries = (hostKey: string, serviceKey: string, cfg: HttpService) =>
 	Effect.gen(function* () {
-		const configured = cfg.expose.accessGroups.length > 0 ? cfg.expose.accessGroups : DEFAULT_HTTP_SOURCE_GROUPS;
+		// The reverse proxy reaches every exposed service over the mesh, so its
+		// group is always a source alongside the configured groups.
+		const configured = [
+			...(cfg.expose.accessGroups.length > 0 ? cfg.expose.accessGroups : DEFAULT_HTTP_SOURCE_GROUPS),
+			PROXY_GROUP_NAME,
+		];
 		const allowedSourceGroups = yield* sourceGroups(`${hostKey}.${serviceKey}.expose.accessGroups`, configured);
 		const entry: AccessMatrixEntry = {
 			host: hostKey,

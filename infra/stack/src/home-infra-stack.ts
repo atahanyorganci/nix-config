@@ -29,6 +29,10 @@ export interface HomeInfraOutputs {
 	services: Record<string, string>;
 	dns: Record<string, HomeInfraNameserverOutput>;
 	owner: HomeInfraOwnerOutput;
+	policies: {
+		allowRuleCount: number;
+		legacyDefaultDisabled: boolean;
+	};
 }
 
 export class HomeInfra extends Alchemy.Stack<HomeInfra, HomeInfraOutputs>()("HomeInfra") {}
