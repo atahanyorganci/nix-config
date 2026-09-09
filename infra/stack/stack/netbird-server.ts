@@ -1,4 +1,3 @@
-import * as Hetzner from "@yorganci/hetzner-alchemy";
 import * as NetBird from "@yorganci/netbird-alchemy";
 import * as Alchemy from "alchemy";
 import * as Action from "alchemy/Action";
@@ -11,7 +10,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
-import { NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
+import { Hetzner, NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
 
 const FlakeMe = Schema.Struct({
 	name: Schema.String,
@@ -152,18 +151,6 @@ export default NetbirdServerStack.make(
 			memo: NIX_MEMO,
 		});
 
-		const jupiterFirewall = yield* Hetzner.Firewall("JupiterFirewall", {
-			name: "jupiter",
-			rules: [
-				{
-					direction: "in",
-					protocol: "tcp",
-					port: "22",
-					sourceIps: ["0.0.0.0/0", "::/0"],
-					description: "SSH",
-				},
-			],
-		});
 		const jupiterIpv4 = yield* Hetzner.PrimaryIp("JupiterIpv4", {
 			name: "jupiter-ipv4",
 			type: "ipv4",
@@ -175,10 +162,21 @@ export default NetbirdServerStack.make(
 			serverType: "cx33",
 			image: "ubuntu-24.04",
 			location: "nbg1",
-			sshKeys: [sshKey.name],
-			firewalls: [jupiterFirewall.firewallId],
-			primaryIpv4Id: jupiterIpv4.primaryIpId,
+			sshKeys: [sshKey],
 			enableIpv6: false,
+		});
+		yield* Hetzner.Firewall("JupiterFirewall", {
+			name: "jupiter",
+			rules: [
+				{
+					direction: "in",
+					protocol: "tcp",
+					port: "22",
+					sourceIps: ["0.0.0.0/0", "::/0"],
+					description: "SSH",
+				},
+			],
+			applyTo: [jupiter],
 		});
 		const jupiterNixosBootstrap = yield* Command.Exec("JupiterNixosBootstrap", {
 			command: Output.map(
