@@ -10,5 +10,6 @@ export {
 	type HomeInfraGroupOutput,
 	type HomeInfraNameserverOutput,
 	type HomeInfraOutputs,
+	type HomeInfraOwnerOutput,
 	type HomeInfraPeerOutput,
 } from "./home-infra-stack.ts";
