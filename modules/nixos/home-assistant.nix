@@ -245,7 +245,6 @@
             });
           };
         };
-        openFirewall = false;
         # Integrations cannot install Python deps at runtime on NixOS.
         extraComponents =
           [
