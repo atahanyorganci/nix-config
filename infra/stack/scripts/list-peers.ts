@@ -2,7 +2,7 @@ import { BunRuntime } from "@effect/platform-bun";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { matchesHost } from "@yorganci/netbird-alchemy";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
-import { peersGet } from "@yorganci/netbird-api/peersGet";
+import { peersGet } from "@yorganci/netbird-api/peers";
 import { AlchemyContextLive } from "alchemy/AlchemyContext";
 import { ArtifactStore, createArtifactStore } from "alchemy/Artifacts";
 import { AuthProviders } from "alchemy/Auth/AuthProvider";

@@ -1,8 +1,10 @@
-import { networksNetworkIdRoutersGet } from "@yorganci/netbird-api/networksNetworkIdRoutersGet";
-import { networksNetworkIdRoutersPost } from "@yorganci/netbird-api/networksNetworkIdRoutersPost";
-import { networksNetworkIdRoutersRouterIdDelete } from "@yorganci/netbird-api/networksNetworkIdRoutersRouterIdDelete";
-import { networksNetworkIdRoutersRouterIdGet } from "@yorganci/netbird-api/networksNetworkIdRoutersRouterIdGet";
-import { networksNetworkIdRoutersRouterIdPut } from "@yorganci/netbird-api/networksNetworkIdRoutersRouterIdPut";
+import {
+	networksNetworkIdRoutersGet,
+	networksNetworkIdRoutersPost,
+	networksNetworkIdRoutersRouterIdDelete,
+	networksNetworkIdRoutersRouterIdGet,
+	networksNetworkIdRoutersRouterIdPut,
+} from "@yorganci/netbird-api/networks";
 import { isResolved } from "alchemy/Diff";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";

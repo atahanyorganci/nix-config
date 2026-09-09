@@ -1,8 +1,10 @@
-import { postureChecksGet } from "@yorganci/netbird-api/postureChecksGet";
-import { postureChecksPost } from "@yorganci/netbird-api/postureChecksPost";
-import { postureChecksPostureCheckIdDelete } from "@yorganci/netbird-api/postureChecksPostureCheckIdDelete";
-import { postureChecksPostureCheckIdGet } from "@yorganci/netbird-api/postureChecksPostureCheckIdGet";
-import { postureChecksPostureCheckIdPut } from "@yorganci/netbird-api/postureChecksPostureCheckIdPut";
+import {
+	postureChecksGet,
+	postureChecksPost,
+	postureChecksPostureCheckIdDelete,
+	postureChecksPostureCheckIdGet,
+	postureChecksPostureCheckIdPut,
+} from "@yorganci/netbird-api/posture_checks";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";

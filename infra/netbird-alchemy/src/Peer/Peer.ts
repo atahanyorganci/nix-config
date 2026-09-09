@@ -1,6 +1,4 @@
-import { peersGet } from "@yorganci/netbird-api/peersGet";
-import { peersPeerIdGet } from "@yorganci/netbird-api/peersPeerIdGet";
-import { peersPeerIdPut } from "@yorganci/netbird-api/peersPeerIdPut";
+import { peersGet, peersPeerIdGet, peersPeerIdPut } from "@yorganci/netbird-api/peers";
 import { isResolved } from "alchemy/Diff";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";

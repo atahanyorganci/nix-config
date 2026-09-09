@@ -1,4 +1,4 @@
-import { postureChecksPostureCheckIdGet } from "@yorganci/netbird-api/postureChecksPostureCheckIdGet";
+import { postureChecksPostureCheckIdGet } from "@yorganci/netbird-api/posture_checks";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import { catchNotFound } from "../src/errors.ts";

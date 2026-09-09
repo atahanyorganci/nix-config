@@ -1,8 +1,10 @@
-import { usersCurrentGet } from "@yorganci/netbird-api/usersCurrentGet";
-import { usersUserIdTokensGet } from "@yorganci/netbird-api/usersUserIdTokensGet";
-import { usersUserIdTokensPost } from "@yorganci/netbird-api/usersUserIdTokensPost";
-import { usersUserIdTokensTokenIdDelete } from "@yorganci/netbird-api/usersUserIdTokensTokenIdDelete";
-import { usersUserIdTokensTokenIdGet } from "@yorganci/netbird-api/usersUserIdTokensTokenIdGet";
+import {
+	usersUserIdTokensGet,
+	usersUserIdTokensPost,
+	usersUserIdTokensTokenIdDelete,
+	usersUserIdTokensTokenIdGet,
+} from "@yorganci/netbird-api/tokens";
+import { usersCurrentGet } from "@yorganci/netbird-api/users";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";

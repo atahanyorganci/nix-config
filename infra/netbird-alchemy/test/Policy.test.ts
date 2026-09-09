@@ -1,4 +1,4 @@
-import { policiesPolicyIdGet } from "@yorganci/netbird-api/policiesPolicyIdGet";
+import { policiesPolicyIdGet } from "@yorganci/netbird-api/policies";
 import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";

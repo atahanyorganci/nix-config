@@ -1,8 +1,10 @@
-import { setupKeysGet } from "@yorganci/netbird-api/setupKeysGet";
-import { setupKeysKeyIdDelete } from "@yorganci/netbird-api/setupKeysKeyIdDelete";
-import { setupKeysKeyIdGet } from "@yorganci/netbird-api/setupKeysKeyIdGet";
-import { setupKeysKeyIdPut } from "@yorganci/netbird-api/setupKeysKeyIdPut";
-import { setupKeysPost } from "@yorganci/netbird-api/setupKeysPost";
+import {
+	setupKeysGet,
+	setupKeysKeyIdDelete,
+	setupKeysKeyIdGet,
+	setupKeysKeyIdPut,
+	setupKeysPost,
+} from "@yorganci/netbird-api/setup_keys";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";

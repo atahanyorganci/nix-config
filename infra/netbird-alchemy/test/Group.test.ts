@@ -1,5 +1,5 @@
-import { groupsGroupIdGet } from "@yorganci/netbird-api/groupsGroupIdGet";
-import { peersGet } from "@yorganci/netbird-api/peersGet";
+import { groupsGroupIdGet } from "@yorganci/netbird-api/groups";
+import { peersGet } from "@yorganci/netbird-api/peers";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import { catchNotFound } from "../src/errors.ts";

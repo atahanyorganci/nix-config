@@ -1,7 +1,9 @@
-import { reverseProxiesClustersGet } from "@yorganci/netbird-api/reverseProxiesClustersGet";
-import { reverseProxiesDomainsDomainIdDelete } from "@yorganci/netbird-api/reverseProxiesDomainsDomainIdDelete";
-import { reverseProxiesDomainsGet } from "@yorganci/netbird-api/reverseProxiesDomainsGet";
-import { reverseProxiesDomainsPost } from "@yorganci/netbird-api/reverseProxiesDomainsPost";
+import {
+	reverseProxiesClustersGet,
+	reverseProxiesDomainsDomainIdDelete,
+	reverseProxiesDomainsGet,
+	reverseProxiesDomainsPost,
+} from "@yorganci/netbird-api/services";
 import { isResolved } from "alchemy/Diff";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";

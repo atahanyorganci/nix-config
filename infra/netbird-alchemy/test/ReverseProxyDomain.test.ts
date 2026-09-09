@@ -1,5 +1,4 @@
-import { reverseProxiesClustersGet } from "@yorganci/netbird-api/reverseProxiesClustersGet";
-import { reverseProxiesDomainsGet } from "@yorganci/netbird-api/reverseProxiesDomainsGet";
+import { reverseProxiesClustersGet, reverseProxiesDomainsGet } from "@yorganci/netbird-api/services";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import * as NetBird from "../src/index.ts";

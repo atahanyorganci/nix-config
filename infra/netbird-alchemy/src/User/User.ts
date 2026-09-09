@@ -1,15 +1,12 @@
-import { usersGet } from "@yorganci/netbird-api/usersGet";
-import { usersPost } from "@yorganci/netbird-api/usersPost";
-import { usersUserIdDelete } from "@yorganci/netbird-api/usersUserIdDelete";
-import { usersUserIdPut } from "@yorganci/netbird-api/usersUserIdPut";
+import { usersGet, usersPost, usersUserIdDelete, usersUserIdPut } from "@yorganci/netbird-api/users";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
+import * as Redacted from "effect/Redacted";
 import { catchNotFound } from "../errors.ts";
-import type * as Redacted from "effect/Redacted";
 
 export interface UserProps {
 	/**
@@ -104,7 +101,7 @@ type ApiUser = {
 	auto_groups: ReadonlyArray<string>;
 	is_service_user?: boolean;
 	is_blocked: boolean;
-	password?: Redacted.Redacted<string>;
+	password?: string | Redacted.Redacted<string>;
 };
 
 export const UserProvider = () =>
@@ -219,8 +216,13 @@ const findUserByEmail = (email: string) => listUsers().pipe(Effect.map(users => 
 
 const findUserByName = (name: string) => listUsers().pipe(Effect.map(users => users.find(u => u.name === name)));
 
-const toAttributes = (user: ApiUser, previousPassword?: Redacted.Redacted<string>): UserAttributes => {
-	const password = user.password ?? previousPassword;
+/** Sensitive values decode as `Redacted`; keep plain strings from older state redacted too. */
+const asRedacted = (value: string | Redacted.Redacted<string>): Redacted.Redacted<string> =>
+	Redacted.isRedacted(value) ? value : Redacted.make(value);
+
+const toAttributes = (user: ApiUser, previousPassword?: string | Redacted.Redacted<string>): UserAttributes => {
+	const raw = user.password ?? previousPassword;
+	const password = raw === undefined ? undefined : asRedacted(raw);
 	const attrs: UserAttributes = {
 		userId: user.id,
 		email: user.email,

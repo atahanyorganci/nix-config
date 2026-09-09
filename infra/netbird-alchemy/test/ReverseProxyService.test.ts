@@ -1,5 +1,4 @@
-import { reverseProxiesDomainsGet } from "@yorganci/netbird-api/reverseProxiesDomainsGet";
-import { reverseProxiesServicesServiceIdGet } from "@yorganci/netbird-api/reverseProxiesServicesServiceIdGet";
+import { reverseProxiesDomainsGet, reverseProxiesServicesServiceIdGet } from "@yorganci/netbird-api/services";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import { catchNotFound } from "../src/errors.ts";
