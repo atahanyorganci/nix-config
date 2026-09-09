@@ -11,6 +11,10 @@ in {
     client = config.services.netbird.clients.wt0;
     ip = lib.getExe' pkgs.iproute2 "ip";
     getent = lib.getExe' pkgs.unixtools.getent "getent";
+    head = lib.getExe' pkgs.coreutils "head";
+    cut = lib.getExe' pkgs.coreutils "cut";
+    sort = lib.getExe' pkgs.coreutils "sort";
+    sleep = lib.getExe' pkgs.coreutils "sleep";
     controlPlaneHost = let
       match = builtins.match "^[^:]+://([^/:]+)(:[0-9]+)?(/.*)?$" cfg.managementUrl;
     in
@@ -18,7 +22,7 @@ in {
       then throw "netbird.managementUrl must contain an HTTP(S) hostname"
       else builtins.elemAt match 0;
     controlPlaneRouting = pkgs.writeShellScript "netbird-wt0-control-plane-routing" ''
-      set -eu
+      set -u
 
       state_file="/run/${client.dir.baseName}/control-plane-routes"
 
@@ -33,52 +37,65 @@ in {
 
       remove_routes
 
-      if [ "$1" = add ]; then
-        read -r default_route < <(${ip} -4 route show table main default)
-        gateway=
-        device=
-        set -- $default_route
-        while [ "$#" -gt 0 ]; do
-          case "$1" in
-            via)
-              gateway="$2"
-              shift 2
-              ;;
-            dev)
-              device="$2"
-              shift 2
-              ;;
-            *)
-              shift
-              ;;
-          esac
-        done
-
-        if [ -z "$device" ]; then
-          echo "No IPv4 default route available for NetBird control traffic" >&2
-          exit 1
-        fi
-
-        declare -A seen=()
-        while read -r address _; do
-          if [ -n "''${seen[$address]+x}" ]; then
-            continue
-          fi
-          seen["$address"]=1
-
-          if [ -n "$gateway" ]; then
-            ${ip} -4 route replace "$address/32" via "$gateway" dev "$device"
-          else
-            ${ip} -4 route replace "$address/32" dev "$device"
-          fi
-          printf '%s\n' "$address" >> "$state_file"
-        done < <(${getent} ahostsv4 ${lib.escapeShellArg controlPlaneHost})
-
-        if [ ! -s "$state_file" ]; then
-          echo "Could not resolve NetBird control host ${controlPlaneHost}" >&2
-          exit 1
-        fi
+      if [ "$1" != add ]; then
+        exit 0
       fi
+
+      # Boot and nixos-rebuild activation can briefly leave the host without a
+      # default route or working name resolution. Wait a while, then give up
+      # without failing the unit: these pins only matter once an exit-node
+      # route is installed, and the daemon must come up regardless.
+      attempt=0
+      while :; do
+        default_route=$(${ip} -4 route show table main default 2>/dev/null | ${head} -n 1)
+        addresses=$(${getent} ahostsv4 ${lib.escapeShellArg controlPlaneHost} 2>/dev/null | ${cut} -d ' ' -f 1 | ${sort} -u)
+        if [ -n "$default_route" ] && [ -n "$addresses" ]; then
+          break
+        fi
+        attempt=$((attempt + 1))
+        if [ "$attempt" -ge 30 ]; then
+          echo "netbird-wt0: no default route or cannot resolve ${controlPlaneHost} after 30s; not pinning control-plane routes" >&2
+          exit 0
+        fi
+        ${sleep} 1
+      done
+
+      gateway=
+      device=
+      read -r -a route_words <<< "$default_route"
+      set -- "''${route_words[@]}"
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          via)
+            gateway="$2"
+            shift 2
+            ;;
+          dev)
+            device="$2"
+            shift 2
+            ;;
+          *)
+            shift
+            ;;
+        esac
+      done
+
+      if [ -z "$device" ]; then
+        echo "netbird-wt0: default route has no device; not pinning control-plane routes" >&2
+        exit 0
+      fi
+
+      while IFS= read -r address; do
+        if [ -n "$gateway" ]; then
+          ${ip} -4 route replace "$address/32" via "$gateway" dev "$device"
+        else
+          ${ip} -4 route replace "$address/32" dev "$device"
+        fi || {
+          echo "netbird-wt0: could not pin $address via $device" >&2
+          continue
+        }
+        printf '%s\n' "$address" >> "$state_file"
+      done <<< "$addresses"
     '';
   in {
     options.netbird = {
