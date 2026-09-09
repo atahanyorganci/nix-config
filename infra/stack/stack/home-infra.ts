@@ -217,6 +217,36 @@ export default HomeInfra.make(
 			autoGroups: [adminGroupId],
 		};
 
+		const usersGroupId = groupResources.Users!.groupId;
+
+		const marsPeer = peers.mars;
+		if (!marsPeer) {
+			return yield* Effect.die('NetBird peer "mars" is required for exit routes and Pi-hole DNS');
+		}
+		const exitGroups = [adminGroupId, usersGroupId];
+		yield* NetBird.Route("MarsExitV4", {
+			description: "mars-exit-ipv4",
+			networkId: "mars-exit",
+			network: "0.0.0.0/0",
+			peer: marsPeer.peerId,
+			groups: exitGroups,
+			accessControlGroups: exitGroups,
+			masquerade: true,
+			metric: 100,
+			keepRoute: false,
+		});
+		yield* NetBird.Route("MarsExitV6", {
+			description: "mars-exit-ipv6",
+			networkId: "mars-exit",
+			network: "::/0",
+			peer: marsPeer.peerId,
+			groups: exitGroups,
+			accessControlGroups: exitGroups,
+			masquerade: true,
+			metric: 100,
+			keepRoute: false,
+		});
+
 		const services: Record<string, string> = {};
 		for (const plan of plans) {
 			const peer = peers[plan.hostKey]!;
