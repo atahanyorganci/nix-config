@@ -229,7 +229,15 @@ in {
           # Do not enable api/ping — both create a default :8080 "traefik" entrypoint.
           entryPoints = {
             web.address = ":80";
-            websecure.address = ":443";
+            websecure = {
+              address = ":443";
+              # Traefik v3 aborts any request whose body is still being read after
+              # readTimeout (60s by default). NetBird's signal and management job
+              # streams and the relay WebSocket are exactly that, so every client
+              # lost them once a minute. Disable it; idleTimeout still reaps idle
+              # connections.
+              transport.respondingTimeouts.readTimeout = "0";
+            };
           };
           certificatesResolvers.letsencrypt.acme = {
             email = cfg.acmeEmail;
