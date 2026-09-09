@@ -252,7 +252,8 @@ export default HomeInfra.make(
 			const peer = peers[plan.hostKey]!;
 			const props = yield* Schema.decodeEffect(ReverseProxy.ReverseProxyServicePropsFromPlan)({
 				plan,
-				defaultAccessGroup: allGroup.id,
+				defaultAccessGroup: adminGroupId,
+				groupIdsByName,
 				peerId: peer.peerId,
 			});
 			yield* NetBird.ReverseProxyService(String.pascalCase(plan.serviceKey), props);

@@ -69,6 +69,7 @@ const ServicePlan = Schema.Struct({
 type ServicePlan = typeof ServicePlan.Type;
 
 const PeerId = Schema.Union([Schema.String, Schema.declare((u): u is Output<string> => isOutput(u))]);
+const GroupId = PeerId;
 
 /** Opaque target schema so Encoded === Type for one-way `decodeTo` transforms. */
 const ReverseProxyAuthSchema = Schema.declare((u): u is ReverseProxyAuth => typeof u === "object" && u !== null);
@@ -201,7 +202,10 @@ const ReverseProxyServiceInputSchema = Schema.declare(
 
 const ReverseProxyServicePropsInput = Schema.Struct({
 	plan: ServicePlan,
-	defaultAccessGroup: Schema.String,
+	/** Access group for private services that declare no `expose.accessGroups`. */
+	defaultAccessGroup: GroupId,
+	/** NetBird group IDs by group name; every `expose.accessGroups` entry must resolve here. */
+	groupIdsByName: Schema.Record(Schema.String, GroupId),
 	peerId: PeerId,
 });
 
@@ -209,11 +213,23 @@ type ReverseProxyServicePropsInput = typeof ReverseProxyServicePropsInput.Type;
 
 export const ReverseProxyServicePropsFromPlan = ReverseProxyServicePropsInput.pipe(
 	Schema.decodeTo(ReverseProxyServiceInputSchema, {
-		decode: SchemaGetter.transformOrFail(({ plan, defaultAccessGroup, peerId }) =>
+		decode: SchemaGetter.transformOrFail(({ plan, defaultAccessGroup, groupIdsByName, peerId }) =>
 			Effect.gen(function* () {
+				const configuredAccessGroups: Array<string | Output<string>> = [];
+				for (const group of plan.cfg.expose.accessGroups) {
+					const groupId = groupIdsByName[group];
+					if (groupId === undefined) {
+						return yield* Effect.fail(
+							new SchemaIssue.InvalidValue(Option.some(plan.cfg.expose.accessGroups), {
+								message: `service "${plan.serviceKey}": unknown NetBird group "${group}" in expose.accessGroups`,
+							}),
+						);
+					}
+					configuredAccessGroups.push(groupId);
+				}
 				const accessGroups =
-					plan.cfg.expose.accessGroups.length > 0
-						? [...plan.cfg.expose.accessGroups]
+					configuredAccessGroups.length > 0
+						? configuredAccessGroups
 						: plan.cfg.expose.private
 							? [defaultAccessGroup]
 							: undefined;
@@ -238,7 +254,7 @@ export const ReverseProxyServicePropsFromPlan = ReverseProxyServicePropsInput.pi
 				};
 
 				if (accessGroups !== undefined) {
-					props.accessGroups = accessGroups;
+					props.accessGroups = accessGroups as ReadonlyArray<string>;
 				}
 				if (auth !== undefined) {
 					props.auth = auth;
