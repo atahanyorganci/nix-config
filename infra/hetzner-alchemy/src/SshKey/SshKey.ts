@@ -1,8 +1,4 @@
-import { sshKeysGet } from "@yorganci/hetzner-api/sshKeysGet";
-import { sshKeysIdDelete } from "@yorganci/hetzner-api/sshKeysIdDelete";
-import { sshKeysIdGet } from "@yorganci/hetzner-api/sshKeysIdGet";
-import { sshKeysIdPut } from "@yorganci/hetzner-api/sshKeysIdPut";
-import { sshKeysPost } from "@yorganci/hetzner-api/sshKeysPost";
+import { createSshKey, deleteSshKey, getSshKey, listSshKeys, updateSshKey } from "@distilled.cloud/hetzner/ssh_keys";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";
@@ -10,6 +6,7 @@ import { Resource } from "alchemy/Resource";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 import { catchNotFound } from "../errors.ts";
+import { compactLabels, labelsEqual, type LabelMap } from "../labels.ts";
 
 export interface SshKeyProps {
 	/**
@@ -68,7 +65,7 @@ export const SshKeyProvider = () =>
 			}),
 		read: Effect.fn(function* ({ id, output, olds }) {
 			if (output?.sshKeyId != null) {
-				const direct = yield* catchNotFound(sshKeysIdGet({ id: output.sshKeyId }));
+				const direct = yield* catchNotFound(getSshKey({ id: output.sshKeyId }));
 				if (direct) return toAttributes(direct.ssh_key);
 			}
 			const name = yield* resolveName(id, olds?.name ?? output?.name);
@@ -77,7 +74,7 @@ export const SshKeyProvider = () =>
 			return toAttributes(existing);
 		}),
 		list: Effect.fn(function* () {
-			const all = yield* sshKeysGet({});
+			const all = yield* listSshKeys({});
 			return all.ssh_keys.map(toAttributes);
 		}),
 		reconcile: Effect.fn(function* ({ id, news, output }) {
@@ -88,7 +85,7 @@ export const SshKeyProvider = () =>
 
 			let observed: SshKeyApi | undefined;
 			if (output?.sshKeyId != null) {
-				const direct = yield* catchNotFound(sshKeysIdGet({ id: output.sshKeyId }));
+				const direct = yield* catchNotFound(getSshKey({ id: output.sshKeyId }));
 				if (direct) observed = direct.ssh_key;
 			}
 			if (!observed) {
@@ -96,7 +93,7 @@ export const SshKeyProvider = () =>
 			}
 
 			if (!observed) {
-				const created = yield* sshKeysPost({
+				const created = yield* createSshKey({
 					name,
 					public_key: publicKey,
 					labels,
@@ -108,7 +105,7 @@ export const SshKeyProvider = () =>
 							const byPublicKey = yield* findSshKeyByPublicKey(publicKey);
 							if (byPublicKey) {
 								if (byPublicKey.name !== name || !labelsEqual(byPublicKey.labels, labels)) {
-									const updated = yield* sshKeysIdPut({
+									const updated = yield* updateSshKey({
 										id: byPublicKey.id,
 										name,
 										labels,
@@ -125,7 +122,7 @@ export const SshKeyProvider = () =>
 			}
 
 			if (observed.name !== name || !labelsEqual(observed.labels, labels)) {
-				const updated = yield* sshKeysIdPut({
+				const updated = yield* updateSshKey({
 					id: observed.id,
 					name,
 					labels,
@@ -136,7 +133,7 @@ export const SshKeyProvider = () =>
 			return toAttributes(observed);
 		}),
 		delete: Effect.fn(function* ({ output }) {
-			yield* catchNotFound(sshKeysIdDelete({ id: output.sshKeyId }));
+			yield* catchNotFound(deleteSshKey({ id: output.sshKeyId }));
 		}),
 	});
 
@@ -145,7 +142,7 @@ type SshKeyApi = {
 	name: string;
 	fingerprint: string;
 	public_key: string;
-	labels: Record<string, string>;
+	labels: LabelMap;
 };
 
 const resolveName = (id: string, name: string | undefined) =>
@@ -155,13 +152,13 @@ const resolveName = (id: string, name: string | undefined) =>
 	});
 
 const findSshKeyByName = (name: string) =>
-	sshKeysGet({ name }).pipe(
+	listSshKeys({ name }).pipe(
 		Effect.map(res => res.ssh_keys.find(k => k.name === name)),
 		Effect.catch(() => Effect.succeed(undefined)),
 	);
 
 const findSshKeyByPublicKey = (publicKey: string) =>
-	sshKeysGet({}).pipe(
+	listSshKeys({}).pipe(
 		Effect.map(res => res.ssh_keys.find(k => k.public_key.trim() === publicKey.trim())),
 		Effect.catch(() => Effect.succeed(undefined)),
 	);
@@ -171,12 +168,5 @@ const toAttributes = (key: SshKeyApi): SshKeyAttributes => ({
 	name: key.name,
 	publicKey: key.public_key,
 	fingerprint: key.fingerprint,
-	labels: key.labels,
+	labels: compactLabels(key.labels),
 });
-
-const labelsEqual = (a: Record<string, string>, b: Record<string, string>) => {
-	const aKeys = Object.keys(a).sort();
-	const bKeys = Object.keys(b).sort();
-	if (aKeys.length !== bKeys.length) return false;
-	return aKeys.every((k, i) => k === bKeys[i] && a[k] === b[k]);
-};

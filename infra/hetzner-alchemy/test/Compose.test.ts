@@ -1,7 +1,6 @@
+import { getPrimaryIp } from "@distilled.cloud/hetzner/primary_ips";
+import { deleteServer, getServer } from "@distilled.cloud/hetzner/servers";
 import { BunFileSystem } from "@effect/platform-bun";
-import { primaryIpsIdGet } from "@yorganci/hetzner-api/primaryIpsIdGet";
-import { serversIdDelete } from "@yorganci/hetzner-api/serversIdDelete";
-import { serversIdGet } from "@yorganci/hetzner-api/serversIdGet";
 import * as Test from "alchemy/Test/Vitest";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -106,23 +105,23 @@ test.provider(
 			expect(deployed.server.primaryIpv4Id).toEqual(deployed.primaryIp.primaryIpId);
 			expect(deployed.server.firewalls).toContain(deployed.firewall.firewallId);
 
-			const liveServer = yield* serversIdGet({ id: deployed.server.serverId });
+			const liveServer = yield* getServer({ id: deployed.server.serverId });
 			expect(liveServer.server?.public_net.ipv4?.ip).toEqual(deployed.primaryIp.ip);
 
 			// Deleting the server via API leaves the Primary IP when autoDelete is false.
-			const deleted = yield* serversIdDelete({ id: deployed.server.serverId });
+			const deleted = yield* deleteServer({ id: deployed.server.serverId });
 			yield* waitForActions(deleted.action ? [deleted.action] : []);
 
-			const retainedIp = yield* primaryIpsIdGet({ id: deployed.primaryIp.primaryIpId });
+			const retainedIp = yield* getPrimaryIp({ id: deployed.primaryIp.primaryIpId });
 			expect(retainedIp.primary_ip.ip).toEqual(deployed.primaryIp.ip);
 			expect(retainedIp.primary_ip.assignee_id).toBeNull();
 
 			yield* stack.destroy();
 
-			const afterServer = yield* catchNotFound(serversIdGet({ id: deployed.server.serverId }));
+			const afterServer = yield* catchNotFound(getServer({ id: deployed.server.serverId }));
 			expect(afterServer).toBeUndefined();
 
-			const afterIp = yield* catchNotFound(primaryIpsIdGet({ id: deployed.primaryIp.primaryIpId }));
+			const afterIp = yield* catchNotFound(getPrimaryIp({ id: deployed.primaryIp.primaryIpId }));
 			expect(afterIp).toBeUndefined();
 		}).pipe(withLogLevel),
 	{ timeout: 300_000 },

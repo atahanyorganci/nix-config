@@ -1,10 +1,5 @@
-import { firewallsIdActionsApplyToResourcesPost } from "@yorganci/hetzner-api/firewallsIdActionsApplyToResourcesPost";
-import { firewallsIdActionsRemoveFromResourcesPost } from "@yorganci/hetzner-api/firewallsIdActionsRemoveFromResourcesPost";
-import { serversGet } from "@yorganci/hetzner-api/serversGet";
-import { serversIdDelete } from "@yorganci/hetzner-api/serversIdDelete";
-import { serversIdGet } from "@yorganci/hetzner-api/serversIdGet";
-import { serversIdPut } from "@yorganci/hetzner-api/serversIdPut";
-import { serversPost } from "@yorganci/hetzner-api/serversPost";
+import { applyFirewallToResources, removeFirewallFromResources } from "@distilled.cloud/hetzner/firewall_actions";
+import { createServer, deleteServer, getServer, listServers, updateServer } from "@distilled.cloud/hetzner/servers";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";
@@ -13,6 +8,7 @@ import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 import { waitForActions } from "../actions.ts";
 import { catchNotFound } from "../errors.ts";
+import { compactLabels, labelsEqual, type LabelMap } from "../labels.ts";
 
 export interface ServerProps {
 	/**
@@ -115,7 +111,7 @@ export const ServerProvider = () =>
 			}),
 		read: Effect.fn(function* ({ id, output, olds }) {
 			if (output?.serverId != null) {
-				const direct = yield* catchNotFound(serversIdGet({ id: output.serverId }));
+				const direct = yield* catchNotFound(getServer({ id: output.serverId }));
 				if (direct?.server) {
 					return toAttributes(direct.server, output.sshKeys ?? olds?.sshKeys ?? []);
 				}
@@ -126,7 +122,7 @@ export const ServerProvider = () =>
 			return toAttributes(existing, output?.sshKeys ?? olds?.sshKeys ?? []);
 		}),
 		list: Effect.fn(function* () {
-			const all = yield* serversGet({});
+			const all = yield* listServers({});
 			return (all.servers ?? []).map(s => toAttributes(s, []));
 		}),
 		reconcile: Effect.fn(function* ({ id, news, output }) {
@@ -140,7 +136,7 @@ export const ServerProvider = () =>
 
 			let observed: ServerApi | undefined;
 			if (output?.serverId != null) {
-				const direct = yield* catchNotFound(serversIdGet({ id: output.serverId }));
+				const direct = yield* catchNotFound(getServer({ id: output.serverId }));
 				if (direct?.server) observed = direct.server;
 			}
 			if (!observed) {
@@ -148,7 +144,7 @@ export const ServerProvider = () =>
 			}
 
 			if (!observed) {
-				const createInput: Parameters<typeof serversPost>[0] = {
+				const createInput: Parameters<typeof createServer>[0] = {
 					name,
 					server_type: props.serverType,
 					image: props.image,
@@ -164,7 +160,7 @@ export const ServerProvider = () =>
 				if (firewalls.length > 0) createInput.firewalls = firewalls.map(firewall => ({ firewall }));
 				if (props.userData !== undefined) createInput.user_data = props.userData;
 
-				const created = yield* serversPost(createInput).pipe(
+				const created = yield* createServer(createInput).pipe(
 					Effect.catch(err =>
 						Effect.gen(function* () {
 							const existing = yield* findServerByName(name);
@@ -180,12 +176,12 @@ export const ServerProvider = () =>
 					),
 				);
 				yield* waitForActions([created.action, ...(created.next_actions ?? [])]);
-				const live = yield* serversIdGet({ id: created.server.id });
+				const live = yield* getServer({ id: created.server.id });
 				return toAttributes(live.server ?? created.server, sshKeys);
 			}
 
 			if (observed.name !== name || !labelsEqual(observed.labels, labels)) {
-				const updated = yield* serversIdPut({
+				const updated = yield* updateServer({
 					id: observed.id,
 					name,
 					labels,
@@ -198,14 +194,14 @@ export const ServerProvider = () =>
 			const toRemove = applied.filter(fid => !firewalls.includes(fid));
 
 			for (const firewallId of toAdd) {
-				const result = yield* firewallsIdActionsApplyToResourcesPost({
+				const result = yield* applyFirewallToResources({
 					id: firewallId,
 					apply_to: [{ type: "server", server: { id: observed.id } }],
 				});
 				yield* waitForActions(result.actions);
 			}
 			for (const firewallId of toRemove) {
-				const result = yield* firewallsIdActionsRemoveFromResourcesPost({
+				const result = yield* removeFirewallFromResources({
 					id: firewallId,
 					remove_from: [{ type: "server", server: { id: observed.id } }],
 				});
@@ -213,14 +209,14 @@ export const ServerProvider = () =>
 			}
 
 			if (toAdd.length > 0 || toRemove.length > 0) {
-				const refreshed = yield* serversIdGet({ id: observed.id });
+				const refreshed = yield* getServer({ id: observed.id });
 				if (refreshed.server) observed = refreshed.server;
 			}
 
 			return toAttributes(observed, sshKeys);
 		}),
 		delete: Effect.fn(function* ({ output }) {
-			const result = yield* catchNotFound(serversIdDelete({ id: output.serverId }));
+			const result = yield* catchNotFound(deleteServer({ id: output.serverId }));
 			if (result?.action) {
 				yield* waitForActions([result.action]);
 			}
@@ -230,7 +226,7 @@ export const ServerProvider = () =>
 type ServerApi = {
 	id: number;
 	name: string;
-	labels: Record<string, string>;
+	labels: LabelMap;
 	public_net: {
 		ipv4: { id?: number; ip: string } | null;
 		firewalls?: ReadonlyArray<{ id?: number }>;
@@ -247,7 +243,7 @@ const resolveName = (id: string, name: string | undefined) =>
 	});
 
 const findServerByName = (name: string) =>
-	serversGet({ name }).pipe(
+	listServers({ name }).pipe(
 		Effect.map(res => (res.servers ?? []).find(s => s.name === name)),
 		Effect.catch(() => Effect.succeed(undefined)),
 	);
@@ -265,12 +261,5 @@ const toAttributes = (server: ServerApi, sshKeys: ReadonlyArray<string>): Server
 	primaryIpv4Id: server.public_net.ipv4?.id ?? null,
 	sshKeys: [...sshKeys],
 	firewalls: appliedFirewallIds(server),
-	labels: server.labels,
+	labels: compactLabels(server.labels),
 });
-
-const labelsEqual = (a: Record<string, string>, b: Record<string, string>) => {
-	const aKeys = Object.keys(a).sort();
-	const bKeys = Object.keys(b).sort();
-	if (aKeys.length !== bKeys.length) return false;
-	return aKeys.every((k, i) => k === bKeys[i] && a[k] === b[k]);
-};
