@@ -1,6 +1,7 @@
 import * as NetBird from "@yorganci/netbird-alchemy";
 import { groupsGet } from "@yorganci/netbird-api/groupsGet";
 import { reverseProxiesClustersGet } from "@yorganci/netbird-api/reverseProxiesClustersGet";
+import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Stage } from "alchemy/Stage";
 import * as Effect from "effect/Effect";
@@ -28,10 +29,23 @@ const Infra = Schema.Struct({
 });
 
 const REPO_ROOT = "../..";
+/**
+ * `ALCHEMY_PLAN=1` plans fully offline: in-memory state, stub credentials and
+ * no management API calls, so the stack can be validated without a login.
+ */
+const PLAN_MODE = Bun.env.ALCHEMY_PLAN === "1";
 
 const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({});
 
 const peerLogicalId = (hostKey: string) => hostKey[0]!.toUpperCase() + hostKey.slice(1);
+
+const readStackCredentials = (stage: string) =>
+	PLAN_MODE
+		? Effect.succeed({
+				apiBaseUrl: Bun.env.NETBIRD_API_BASE_URL ?? "https://netbird.example.com",
+				apiToken: Redacted.make(Bun.env.NETBIRD_API_TOKEN ?? "plan-token"),
+			})
+		: readNetbirdCredentials(stage);
 
 export default HomeInfra.make(
 	{
@@ -39,11 +53,11 @@ export default HomeInfra.make(
 			NetBird.providers(NetBird.CredentialsFromRef(netbirdCredentials)),
 			NixExpr.NixExprProvider(),
 		),
-		state: Cloudflare.state(),
+		state: PLAN_MODE ? Alchemy.inMemoryState() : Cloudflare.state(),
 	},
 	Effect.gen(function* () {
 		const stage = yield* Stage;
-		const { apiBaseUrl, apiToken } = yield* readNetbirdCredentials(stage);
+		const { apiBaseUrl, apiToken } = yield* readStackCredentials(stage);
 		const token = Redacted.value(apiToken);
 		if (!token) {
 			return yield* Effect.die("NetBird AdminApiKey token is empty in NetbirdServer stack state");
@@ -100,7 +114,9 @@ export default HomeInfra.make(
 			]),
 		];
 
-		const existingGroups = yield* groupsGet({}).pipe(Effect.orDie);
+		const existingGroups = PLAN_MODE
+			? [{ id: "plan-all-group", name: "All" }]
+			: yield* groupsGet({}).pipe(Effect.orDie);
 		const allGroup = existingGroups.find(group => group.name === "All");
 		if (!allGroup) {
 			return yield* Effect.die("NetBird All group not found");
@@ -115,7 +131,9 @@ export default HomeInfra.make(
 			return yield* Effect.die("no httpServices entries have expose.enable — nothing to publish");
 		}
 
-		const clusters = yield* reverseProxiesClustersGet({}).pipe(Effect.orDie);
+		const clusters = PLAN_MODE
+			? [{ address: infra.domain, online: true }]
+			: yield* reverseProxiesClustersGet({}).pipe(Effect.orDie);
 		const targetCluster = clusters.find(entry => entry.online)?.address ?? clusters[0]?.address ?? infra.domain;
 
 		if (plans.length > 0) {
