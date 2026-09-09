@@ -308,7 +308,7 @@ in {
         accessGroups = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [];
-          description = "NetBird group names (Admin, Users, Servers, Agents); empty uses stack default (Admin for private services).";
+          description = "NetBird group names allowed to reach the dashboard (Admin, Users, Servers); Agents peers are isolated. Empty uses the stack default (Admin for private services).";
         };
 
         auth = {
