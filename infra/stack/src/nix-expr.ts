@@ -81,6 +81,10 @@ const evalProps = (props: NixExprProps) =>
  * planning/destroy, fall back to persisted state or the same `nix eval` path
  * the provider uses on first deploy.
  *
+ * Persisted state is only reused when its content hash still matches a live
+ * `nix eval` hash — otherwise planning would keep creating peers/services from
+ * a stale inventory while the NixExpr resource itself is only marked update.
+ *
  * If the cached value no longer matches the schema (e.g. flake output gained
  * a required field), re-evaluate the expression live so planning can proceed
  * and the next reconcile can persist the updated value.
@@ -103,9 +107,14 @@ export const decode = <A>(expr: NixExpr, schema: Schema.Schema<A>) =>
 				fqn: expr.FQN,
 			});
 			if (isResourceState(row) && row.attr !== undefined) {
-				const value = (row.attr as NixExprAttributes).value;
-				const decoded = yield* tryDecode(value);
-				if (Option.isSome(decoded)) return decoded.value;
+				const attrs = row.attr as NixExprAttributes;
+				const liveHash = yield* hashExpression(expr.Props).pipe(Effect.option);
+				const cacheFresh =
+					Option.isSome(liveHash) && attrs.hash.input !== undefined && attrs.hash.input === liveHash.value;
+				if (cacheFresh) {
+					const decoded = yield* tryDecode(attrs.value);
+					if (Option.isSome(decoded)) return decoded.value;
+				}
 			}
 		}
 
