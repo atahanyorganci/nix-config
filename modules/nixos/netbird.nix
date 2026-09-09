@@ -129,6 +129,19 @@ in {
       # takes effect when polkit itself runs; without it every DNS update fails
       # with "Permission denied".
       security.polkit.enable = true;
+      # NetBird 0.75 also sets DNSOverTLS on the link and flushes caches, which
+      # the upstream rule predates.
+      security.polkit.extraConfig = ''
+        polkit.addRule(function(action, subject) {
+          var actions = [
+            "org.freedesktop.resolve1.set-dns-over-tls",
+            "org.freedesktop.resolve1.flush-caches",
+          ];
+          if (actions.indexOf(action.id) >= 0 && subject.user == "netbird-wt0") {
+            return polkit.Result.YES;
+          }
+        });
+      '';
       services.netbird.package = cfg.package;
       # Client routes (exit nodes, network resources) and server routes (routing
       # peers) need loose rp_filter and IP forwarding respectively.
