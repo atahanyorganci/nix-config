@@ -16,14 +16,39 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Argument from "effect/unstable/cli/Argument";
 import * as Command from "effect/unstable/cli/Command";
 import * as Flag from "effect/unstable/cli/Flag";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import { readHomeInfraGroupId } from "../src/home-infra-state.ts";
+import * as Inventory from "../src/inventory.ts";
 import { readNetbirdCredentials } from "../src/netbird-credentials.ts";
 import netbirdServerStack from "../stack/netbird-server.ts";
 
 const SETUP_KEY_EXPIRES_IN_SECONDS = 86_400;
+const REPO_ROOT = `${import.meta.dir}/../..`;
+
+const evalInventory = Effect.tryPromise({
+	try: async () => {
+		const proc = Bun.spawn(["nix", "eval", "--json", ".#inventory"], {
+			cwd: REPO_ROOT,
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const stdout = await new Response(proc.stdout).text();
+		const stderr = await new Response(proc.stderr).text();
+		const code = await proc.exited;
+		if (code !== 0) {
+			throw new Error(stderr.trim() || `nix eval .#inventory exited ${code}`);
+		}
+		return JSON.parse(stdout) as unknown;
+	},
+	catch: cause => new Error(cause instanceof Error ? cause.message : String(cause)),
+}).pipe(Effect.flatMap(value => Schema.decodeUnknownEffect(Inventory.Inventory)(value)));
+
+const groupIdFromState = (state: State.StateService, stage: string, groupName: Inventory.NetBirdGroupName) =>
+	readHomeInfraGroupId(stage, groupName).pipe(Effect.provide(Layer.succeed(State.State, Effect.succeed(state))));
 
 const USER = Config.string("USER").pipe(
 	Config.orElse(() => Config.string("USERNAME")),
@@ -112,21 +137,34 @@ const createSetupKeys = Command.make("create-setup-keys", {
 	envFile: envFileFlag,
 }).pipe(
 	Command.withDescription(
-		"Create one-off NetBird setup keys for hosts using the AdminApiKey from the NetbirdServer Alchemy stack",
+		"Create one-off NetBird setup keys that assign each host to its inventory peer group (Servers or Agents)",
 	),
 	Command.withHandler(
 		Effect.fn(function* ({ hosts, stage, profile, envFile }) {
+			const inventory = yield* evalInventory;
 			yield* withAlchemyState({ stage, profile, envFile }, state =>
 				Effect.gen(function* () {
 					const credentials = yield* readNetbirdCredentialsFromState(state, stage);
 					const netbirdApi = Layer.mergeAll(CredentialsFromConfig(credentials), FetchHttpClient.layer);
 
 					for (const host of hosts) {
+						const groupName = Inventory.peerGroupForHost(inventory, host);
+						if (!groupName) {
+							const known = inventory.managedTargets[host] ?? inventory.agentHolders[host];
+							if (!known) {
+								return yield* Effect.die(`host "${host}" is not in flake inventory`);
+							}
+							return yield* Effect.die(
+								`host "${host}" has no peer group — Admin/Users devices enroll via NetBird login, not setup keys`,
+							);
+						}
+
+						const groupId = yield* groupIdFromState(state, stage, groupName);
 						const setupKey = yield* setupKeysPost({
 							name: host,
 							type: "one-off",
 							expires_in: SETUP_KEY_EXPIRES_IN_SECONDS,
-							auto_groups: [],
+							auto_groups: [groupId],
 							usage_limit: 1,
 							ephemeral: false,
 							allow_extra_dns_labels: false,
