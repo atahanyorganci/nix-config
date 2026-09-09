@@ -1,35 +1,105 @@
 #!/usr/bin/env bun
-
-import { mkdirSync, rmSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 /**
- * NetBird SDK code generator.
+ * generate — turn the Smithy JSON models in .generated-specs into the NetBird
+ * Effect SDK.
  *
- * Uses distilled's shared OpenAPI generator, then removes the operations barrel
- * so consumers deep-import via package exports `./*`.
+ * Input:  .generated-specs/<tag>.json  (one model per NetBird API tag, written
+ *         by scripts/convert.ts)
+ * Output: src/services/<tag>.ts + src/services/index.ts
  *
- * Published @distilled.cloud/core omits scripts/; use the vendored generator.
+ * The smithy→SDK compiler lives in `@distilled.cloud/core/codegen`; this file
+ * is NetBird's provider spec: nullable members, bare-array responses,
+ * sensitive strings redacted on the way out, passthrough unions, and the
+ * protocol/retry/error names of the hand-written runtime in src/.
+ *
+ * Wire member names are kept verbatim (snake_case), matching NetBird's docs
+ * and dashboard. Module files are named after the tag slug (`setup_keys.ts`)
+ * while the barrel exports them camelCased (`Services.setupKeys`).
  */
-import { generateFromOpenAPI } from "../../../vendor/distilled/packages/core/scripts/generate-openapi.ts";
+import { runGeneratorCli } from "@distilled.cloud/core/codegen/cli";
+import { ERROR_MATCHERS_TRAIT, NULLABLE_TRAIT, RAW_RESPONSE_TRAIT } from "@distilled.cloud/core/codegen/openapi";
+import type { SdkSpec } from "@distilled.cloud/core/codegen/generator";
 
-const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
-const outputDir = join(rootDir, "src/operations");
+const SENSITIVE_TRAIT = "smithy.api#sensitive";
 
-rmSync(outputDir, { recursive: true, force: true });
-mkdirSync(outputDir, { recursive: true });
+/** `setup_keys` → `setupKeys` (the barrel's export name). */
+const camel = (slug: string): string =>
+	slug
+		.split("_")
+		.filter(Boolean)
+		.map((part, index) => (index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+		.join("");
 
-generateFromOpenAPI({
-	specPath: join(rootDir, "spec/netbird.api.json"),
-	patchDir: join(rootDir, "patches"),
-	outputDir,
-	importPrefix: "..",
-	clientImport: "../client",
-	traitsImport: "../traits",
-	sensitiveImport: "../sensitive",
-	errorsImport: "../errors",
-	includeOperationErrors: true,
-	skipDeprecated: true,
+const spec: SdkSpec = {
+	nullableTrait: NULLABLE_TRAIT,
+	errorMatchersTrait: ERROR_MATCHERS_TRAIT,
+
+	extraBindings: [
+		{
+			// Sole member of a synthesized wrapper for bare array/scalar response
+			// bodies — as a response's sole member, the response IS the payload.
+			trait: RAW_RESPONSE_TRAIT,
+			binding: "rawResponse",
+			pipe: "T.RawResponse()",
+			rootPipe: "T.RawResponseRoot()",
+		},
+	],
+
+	// Setup keys, personal access tokens and proxy tokens are only returned in
+	// full once: Redacted on the way out, `string | Redacted` accepted on the way in.
+	memberTraitPipes: {
+		[SENSITIVE_TRAIT]: "T.SensitiveValue",
+	},
+	memberTsType: member =>
+		SENSITIVE_TRAIT in member.traits
+			? `string | Redacted.Redacted<string>${member.nullable ? " | null" : ""}`
+			: undefined,
+
+	// NetBird's `oneOf` unions decode passthrough: the TS type is the case
+	// union, the schema stays opaque, and wire names equal the TS names.
+	union: ({ name, caseTargets, tsRef }) => [
+		`export type ${name} = ${caseTargets.map(tsRef).join(" | ") || "unknown"};`,
+		`export const ${name} = /*@__PURE__*/ S.Unknown as any as S.Schema<${name}>;\n`,
+	],
+
+	sourceNote: ".generated-specs (spec/netbird.api.json)",
+
+	operationDecl: {
+		contextType: "NetbirdOpContext",
+		commonErrorType: "NetbirdOpError",
+		commonErrorClasses: ["UnknownNetbirdError"],
+		protocol: "NetbirdProtocol",
+		retry: "Retry.Retry",
+	},
+
+	// The consumers of this SDK (Alchemy providers) treat every list as
+	// read-only, look up map values without `undefined`, and match enums as
+	// closed unions, so the emitted TS surface is normalized to that shape:
+	//   - `Array<T>` list aliases become `ReadonlyArray<T>`
+	//   - map value types drop the trailing `| undefined`
+	//   - open enums (`Enum | (string & {})`) become the closed literal union
+	// `effect/Redacted` is only referenced by modules with sensitive members.
+	postProcess: code => {
+		let out = code
+			.replace(/^export type (\w+) = Array<(.+)>;$/gm, "export type $1 = ReadonlyArray<$2>;")
+			.replace(/\[key: string\]: ([^;{}]+?) \| undefined(;| \})/g, "[key: string]: $1$2")
+			.replace(/ \| \(string & \{\}\)/g, "");
+		if (out.includes("Redacted.Redacted<")) {
+			out = out.replace(
+				`import * as S from "@distilled.cloud/core/schema";`,
+				`import * as S from "@distilled.cloud/core/schema";\nimport * as Redacted from "effect/Redacted";`,
+			);
+		}
+		return out;
+	},
+};
+
+runGeneratorCli({
+	description: "Generate the NetBird Effect SDK from the Smithy models",
+	root: `${import.meta.dir}/..`,
+	// The RFC-6902 patch chain in patches/*.patch.json applies to the OpenAPI
+	// document in scripts/convert.ts, never to the Smithy models.
+	patchesDir: false,
+	barrelExportName: camel,
+	spec: () => spec,
 });
-
-rmSync(join(outputDir, "index.ts"), { force: true });
