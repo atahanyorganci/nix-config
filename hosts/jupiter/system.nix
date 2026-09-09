@@ -51,7 +51,10 @@
         port = 9119;
         netbirdClient = "wt0";
       };
-      expose.key = "hermes";
+      expose = {
+        key = "hermes";
+        accessGroups = ["Admin"];
+      };
     };
   };
 }
