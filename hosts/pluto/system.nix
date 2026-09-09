@@ -1,6 +1,5 @@
 {user, ...}: {
-  hostInventory.role = "managedTarget";
-  hostInventory.netbird.group = "Servers";
+  hostInventory.role = null;
   hetzner = {
     enable = true;
     consoleAutologin = true;
