@@ -71,3 +71,12 @@ export const hostNetBirdGroup = (inventory: Inventory, hostKey: string): NetBird
 	const host = inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
 	return host?.netbird.group ?? undefined;
 };
+
+/** Peer-list group used at setup-key enrollment. Undefined for login-only (Admin/Users) or unknown hosts. */
+export const peerGroupForHost = (inventory: Inventory, hostKey: string): NetBirdGroupName | undefined => {
+	const group = hostNetBirdGroup(inventory, hostKey);
+	if (!group || !isPeerGroupName(group)) {
+		return undefined;
+	}
+	return group;
+};
