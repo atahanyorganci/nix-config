@@ -17,11 +17,18 @@ export interface HomeInfraNameserverOutput {
 	ip: string | Output<string>;
 }
 
+export interface HomeInfraOwnerOutput {
+	userId: string | Output<string>;
+	email: string | Output<string>;
+	autoGroups: ReadonlyArray<string | Output<string>>;
+}
+
 export interface HomeInfraOutputs {
 	peers: Record<string, HomeInfraPeerOutput>;
 	groups: Record<string, HomeInfraGroupOutput>;
 	services: Record<string, string>;
 	dns: Record<string, HomeInfraNameserverOutput>;
+	owner: HomeInfraOwnerOutput;
 }
 
 export class HomeInfra extends Alchemy.Stack<HomeInfra, HomeInfraOutputs>()("HomeInfra") {}

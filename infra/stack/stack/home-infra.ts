@@ -19,6 +19,7 @@ import {
 	ReverseProxy,
 	type HomeInfraGroupOutput,
 	type HomeInfraNameserverOutput,
+	type HomeInfraOwnerOutput,
 	type HomeInfraPeerOutput,
 } from "../src/index.ts";
 import { readNetbirdCredentials } from "../src/netbird-credentials.ts";
@@ -26,6 +27,12 @@ import { readNetbirdCredentials } from "../src/netbird-credentials.ts";
 const Infra = Schema.Struct({
 	domain: Schema.String,
 	netbirdManagementDomain: Schema.String,
+});
+
+const Me = Schema.Struct({
+	name: Schema.String,
+	email: Schema.String,
+	username: Schema.String,
 });
 
 const REPO_ROOT = "../..";
@@ -72,6 +79,12 @@ export default HomeInfra.make(
 			expression: ".#infra",
 		});
 		const infra = yield* NixExpr.decode(infraExpr, Infra);
+
+		const meExpr = yield* NixExpr.NixExpr("Me", {
+			cwd: REPO_ROOT,
+			expression: ".#me",
+		});
+		const me = yield* NixExpr.decode(meExpr, Me);
 
 		const inventoryExpr = yield* NixExpr.NixExpr("Inventory", {
 			cwd: REPO_ROOT,
@@ -188,6 +201,22 @@ export default HomeInfra.make(
 			groupIdsByName[groupName] = groupResources[groupName]!.groupId;
 		}
 
+		const adminGroupId = groupResources.Admin!.groupId;
+
+		// NetBird setup created the owner; this adopts it and keeps every device
+		// it enrolls in Admin. Retained so a stack destroy can never delete it.
+		const owner = yield* NetBird.User("Owner", {
+			email: me.email,
+			name: me.name,
+			isServiceUser: false,
+			autoGroups: [adminGroupId],
+		}).pipe(Alchemy.RemovalPolicy.retain());
+		const ownerOutput: HomeInfraOwnerOutput = {
+			userId: owner.userId,
+			email: owner.email,
+			autoGroups: [adminGroupId],
+		};
+
 		const services: Record<string, string> = {};
 		for (const plan of plans) {
 			const peer = peers[plan.hostKey]!;
@@ -240,6 +269,7 @@ export default HomeInfra.make(
 			groups: groupOutputs,
 			services,
 			dns,
+			owner: ownerOutput,
 		};
 	}).pipe(Effect.orDie),
 );
