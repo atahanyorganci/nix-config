@@ -16,6 +16,7 @@ import {
 	Inventory,
 	NameServers,
 	NixExpr,
+	Policies,
 	ReverseProxy,
 	type HomeInfraGroupOutput,
 	type HomeInfraNameserverOutput,
@@ -41,6 +42,13 @@ const REPO_ROOT = "../..";
  * no management API calls, so the stack can be validated without a login.
  */
 const PLAN_MODE = Bun.env.ALCHEMY_PLAN === "1";
+/**
+ * Cut-over switch for NetBird's dashboard "Default" All->All policy. Leave it
+ * unset for a first deploy so only the allow rules are added, verify access
+ * from every group, then redeploy with NETBIRD_DISABLE_DEFAULT_POLICY=1.
+ * Unsetting it again (or destroying the stack) re-enables Default.
+ */
+const DISABLE_DEFAULT_POLICY = Bun.env.NETBIRD_DISABLE_DEFAULT_POLICY === "1";
 
 const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({});
 
@@ -104,7 +112,7 @@ export default HomeInfra.make(
 		});
 		const nameServers = yield* NixExpr.decode(nameServersExpr, NameServers.NameServers);
 
-		yield* Schema.decodeEffect(AccessMatrix.AccessMatrixFromFlake)({
+		const accessMatrix = yield* Schema.decodeEffect(AccessMatrix.AccessMatrixFromFlake)({
 			httpServices,
 			nameServers,
 		});
@@ -115,17 +123,10 @@ export default HomeInfra.make(
 			);
 		}
 
-		const inventoryHostKeys = Inventory.inventoryHosts(inventory).map(([hostKey]) => hostKey);
-		const hostKeys = [
-			...new Set([
-				...Object.keys(httpServices),
-				...Object.keys(nameServers),
-				...inventoryHostKeys.filter(hostKey => {
-					const host = inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
-					return host?.netbird.group !== null;
-				}),
-			]),
-		];
+		const managedHostKeys = Object.entries(inventory.managedTargets)
+			.filter(([, host]) => host.netbird.group !== null && Inventory.isPeerGroupName(host.netbird.group))
+			.map(([hostKey]) => hostKey);
+		const hostKeys = [...new Set([...Object.keys(httpServices), ...Object.keys(nameServers), ...managedHostKeys])];
 
 		const existingGroups = PLAN_MODE
 			? [{ id: "plan-all-group", name: "All" }]
@@ -162,6 +163,9 @@ export default HomeInfra.make(
 			const host = inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
 			const peer = yield* NetBird.Peer(peerLogicalId(hostKey), {
 				host: hostKey,
+				// OpenSSH on :22 is the login path. NetBird's embedded SSH (0.75)
+				// uses util-linux login on NixOS and ends sessions with nologin.
+				sshEnabled: false,
 				...(host
 					? {
 							loginExpirationEnabled: host.netbird.loginExpirationEnabled,
@@ -200,6 +204,17 @@ export default HomeInfra.make(
 		for (const groupName of Inventory.ZERO_TRUST_GROUP_NAMES) {
 			groupIdsByName[groupName] = groupResources[groupName]!.groupId;
 		}
+
+		// The reverse proxy joins the mesh as an embedded peer that is not in the
+		// flake inventory, so add it to this group once in the dashboard. Every
+		// exposed service allows the group; without it, disabling Default would
+		// cut the proxy off from its targets.
+		const proxyGroup = yield* NetBird.Group("Proxy", { name: Inventory.PROXY_GROUP_NAME });
+		groupIdsByName[Inventory.PROXY_GROUP_NAME] = proxyGroup.groupId;
+		groupOutputs[Inventory.PROXY_GROUP_NAME] = {
+			groupId: proxyGroup.groupId,
+			name: proxyGroup.name,
+		};
 
 		const adminGroupId = groupResources.Admin!.groupId;
 
@@ -295,12 +310,49 @@ export default HomeInfra.make(
 			};
 		}
 
+		const serversGroupId = groupResources.Servers!.groupId;
+		const agentsGroupId = groupResources.Agents!.groupId;
+		const resolveGroupId = (groupName: Inventory.PolicySourceGroupName) =>
+			groupIdsByName[groupName]! as unknown as string;
+
+		const allowRules = [
+			...Policies.adminAllowAllRules(adminGroupId as unknown as string, allGroup.id),
+			...Policies.adminSshRules(adminGroupId as unknown as string, allGroup.id),
+			...Policies.serverSshRules(serversGroupId as unknown as string, agentsGroupId as unknown as string),
+			...Policies.allowRulesFromMatrix(accessMatrix, inventory, resolveGroupId),
+		];
+		if (allowRules.length === 0) {
+			return yield* Effect.die("access matrix produced no allow rules — check host netbird.group assignments");
+		}
+
+		for (const rule of allowRules) {
+			const props = {
+				name: Policies.policyNameForRule(rule.name),
+				enabled: true,
+				rules: [rule],
+				...(rule.description !== undefined ? { description: rule.description } : {}),
+			};
+			// Alchemy types Policy's logical id as a string literal; matrix rule names are dynamic.
+			yield* NetBird.Policy(Policies.allowPolicyLogicalId(rule.name) as "AllowAdminAll", props);
+		}
+
+		// The dashboard All->All policy is adopted, never deleted, and only
+		// disabled once the cut-over switch is set.
+		yield* NetBird.Policy("LegacyDefault", {
+			name: NetBird.DEFAULT_POLICY_NAME,
+			enabled: !DISABLE_DEFAULT_POLICY,
+		});
+
 		return {
 			peers: peerOutputs,
 			groups: groupOutputs,
 			services,
 			dns,
 			owner: ownerOutput,
+			policies: {
+				allowRuleCount: allowRules.length,
+				legacyDefaultDisabled: DISABLE_DEFAULT_POLICY,
+			},
 		};
 	}).pipe(Effect.orDie),
 );

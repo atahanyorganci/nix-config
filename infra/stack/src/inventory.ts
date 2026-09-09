@@ -18,12 +18,18 @@ export const isPeerGroupName = (value: NetBirdGroupName): boolean =>
 export const isNetBirdGroupName = (value: string): value is NetBirdGroupName =>
 	(ZERO_TRUST_GROUP_NAMES as ReadonlyArray<string>).includes(value);
 
-/** Group names accepted as policy sources: the zero-trust groups plus NetBird's built-in All group. */
-export const PolicySourceGroupName = Schema.Literals(["Admin", "Users", "Servers", "Agents", "All"]);
+/**
+ * Reverse-proxy peers. The proxy's embedded NetBird client is not in the
+ * flake inventory, so its membership is added once in the dashboard.
+ */
+export const PROXY_GROUP_NAME = "Proxy";
+
+/** Group names accepted as policy sources: the zero-trust groups, Proxy, and NetBird's built-in All group. */
+export const PolicySourceGroupName = Schema.Literals(["Admin", "Users", "Servers", "Agents", "Proxy", "All"]);
 export type PolicySourceGroupName = typeof PolicySourceGroupName.Type;
 
 export const isPolicySourceGroupName = (value: string): value is PolicySourceGroupName =>
-	value === "All" || isNetBirdGroupName(value);
+	value === "All" || value === PROXY_GROUP_NAME || isNetBirdGroupName(value);
 
 export const InventoryHost = Schema.Struct({
 	name: Schema.String,
@@ -59,4 +65,9 @@ export const hostsByNetBirdGroup = (inventory: Inventory) => {
 		}
 	}
 	return grouped;
+};
+
+export const hostNetBirdGroup = (inventory: Inventory, hostKey: string): NetBirdGroupName | undefined => {
+	const host = inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
+	return host?.netbird.group ?? undefined;
 };
