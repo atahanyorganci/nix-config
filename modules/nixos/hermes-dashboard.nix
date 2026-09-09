@@ -107,17 +107,31 @@ in {
       }
     '';
 
-    caddyScript = pkgs.writeShellScript "hermes-dashboard-caddy" ''
+    waitForBindIp = pkgs.writeShellScript "hermes-dashboard-caddy-wait-iface" ''
       set -euo pipefail
       INTERFACE="${cfg.bind.interface}"
-      BIND_IP=$(${pkgs.iproute2}/bin/ip -4 -o addr show dev "$INTERFACE" \
-        | ${pkgs.gawk}/bin/awk '{print $4}' \
-        | ${pkgs.coreutils}/bin/cut -d/ -f1 \
-        | ${pkgs.coreutils}/bin/head -1)
-      if [ -z "$BIND_IP" ]; then
-        echo "hermes-dashboard-caddy: $INTERFACE has no IPv4 address yet" >&2
-        exit 1
-      fi
+      i=0
+      while [ "$i" -lt 90 ]; do
+        if [ -d "/sys/class/net/$INTERFACE" ]; then
+          BIND_IP=$(${pkgs.iproute2}/bin/ip -4 -o addr show dev "$INTERFACE" \
+            | ${pkgs.gawk}/bin/awk '{print $4}' \
+            | ${pkgs.coreutils}/bin/cut -d/ -f1 \
+            | ${pkgs.coreutils}/bin/head -1)
+          if [ -n "$BIND_IP" ]; then
+            printf '%s\n' "$BIND_IP"
+            exit 0
+          fi
+        fi
+        i=$((i + 1))
+        ${pkgs.coreutils}/bin/sleep 1
+      done
+      echo "hermes-dashboard-caddy: $INTERFACE has no IPv4 address after 90s" >&2
+      exit 1
+    '';
+
+    caddyScript = pkgs.writeShellScript "hermes-dashboard-caddy" ''
+      set -euo pipefail
+      BIND_IP=$(${waitForBindIp})
       export BIND_IP
       export LISTEN_PORT="${toString cfg.bind.port}"
       export UPSTREAM="${cfg.bind.upstreamHost}:${toString upstreamPort}"
@@ -489,40 +503,65 @@ in {
       }
 
       # Auto-deploy Caddy + httpServices when bind.interface is set.
+      # Do not use ConditionPathExists on the mesh iface: systemd skips the
+      # unit forever if NetBird comes up after multi-user.target.
       (lib.mkIf bindActive {
-        systemd.services.hermes-dashboard-caddy = {
-          description = "Caddy reverse proxy for Hermes dashboard";
-          wantedBy = ["multi-user.target"];
-          after =
-            ["hermes-dashboard.service"]
-            ++ lib.optional (cfg.bind.netbirdClient != null)
-            "netbird-${cfg.bind.netbirdClient}.service";
-          wants =
-            ["hermes-dashboard.service"]
-            ++ lib.optional (cfg.bind.netbirdClient != null)
-            "netbird-${cfg.bind.netbirdClient}.service";
-          bindsTo = ["hermes-dashboard.service"];
-          partOf = ["hermes-dashboard.service"];
+        systemd.services =
+          {
+            hermes-dashboard-caddy = {
+              description = "Caddy reverse proxy for Hermes dashboard";
+              wantedBy = ["multi-user.target"];
+              after =
+                [
+                  "hermes-dashboard.service"
+                  "network-online.target"
+                ]
+                ++ lib.optional (cfg.bind.netbirdClient != null)
+                "netbird-${cfg.bind.netbirdClient}.service";
+              wants =
+                [
+                  "hermes-dashboard.service"
+                  "network-online.target"
+                ]
+                ++ lib.optional (cfg.bind.netbirdClient != null)
+                "netbird-${cfg.bind.netbirdClient}.service";
+              bindsTo = ["hermes-dashboard.service"];
+              partOf = ["hermes-dashboard.service"];
 
-          unitConfig = {
-            ConditionPathExists = "/sys/class/net/${cfg.bind.interface}";
-            StartLimitIntervalSec = 0;
-          };
+              unitConfig.StartLimitIntervalSec = 0;
 
-          serviceConfig = {
-            Type = "simple";
-            Restart = "on-failure";
-            RestartSec = "5s";
-            DynamicUser = true;
-            StateDirectory = "hermes-dashboard-caddy";
-            WorkingDirectory = "/var/lib/hermes-dashboard-caddy";
-            Environment = ["HOME=/var/lib/hermes-dashboard-caddy"];
-            NoNewPrivileges = true;
-            ProtectSystem = "strict";
-            PrivateTmp = true;
-            ExecStart = caddyScript;
+              serviceConfig = {
+                Type = "simple";
+                Restart = "on-failure";
+                RestartSec = "5s";
+                DynamicUser = true;
+                StateDirectory = "hermes-dashboard-caddy";
+                WorkingDirectory = "/var/lib/hermes-dashboard-caddy";
+                Environment = ["HOME=/var/lib/hermes-dashboard-caddy"];
+                NoNewPrivileges = true;
+                ProtectSystem = "strict";
+                PrivateTmp = true;
+                ExecStart = caddyScript;
+              };
+            };
+          }
+          # Login / daemon start can happen minutes after boot. `start` is a
+          # no-op if Caddy is already up; it recovers a unit that was waiting
+          # or failed before nb-wt0 existed. Avoid path-unit try-restart loops.
+          // lib.optionalAttrs (cfg.bind.netbirdClient != null) {
+            "netbird-${cfg.bind.netbirdClient}" = {
+              serviceConfig.ExecStartPost = lib.mkAfter [
+                "+${pkgs.systemd}/bin/systemctl --no-block start hermes-dashboard-caddy.service"
+              ];
+            };
+          }
+          // lib.optionalAttrs (cfg.bind.netbirdClient != null && config.netbird.enable && config.netbird.setupKeyFile != null) {
+            "netbird-${cfg.bind.netbirdClient}-login" = {
+              serviceConfig.ExecStartPost = lib.mkAfter [
+                "+${pkgs.systemd}/bin/systemctl --no-block start hermes-dashboard-caddy.service"
+              ];
+            };
           };
-        };
 
         httpServices.${cfg.expose.key} = {
           port = cfg.bind.port;
