@@ -6,8 +6,96 @@
     ...
   }: let
     cfg = config.pihole;
+    ftl = config.services.pihole-ftl;
     # NetBird NixOS client exposes WireGuard as nb-<clientName>.
     netbirdInterface = "nb-wt0";
+    pihole = lib.getExe ftl.piholePackage;
+    jq = lib.getExe pkgs.jq;
+    kill = lib.getExe' pkgs.procps "kill";
+    gravityDb = "${ftl.stateDirectory}/gravity.db";
+    listsStamp = "${ftl.stateDirectory}/nixos-lists.sha256";
+    desiredLists = builtins.toJSON (map (list: {
+        address = list.url;
+        inherit (list) type enabled;
+        comment = list.description;
+      })
+      ftl.lists);
+    # Mirrors the sandbox of the upstream setup unit.
+    hardening = {
+      User = ftl.user;
+      Group = ftl.group;
+      NoNewPrivileges = true;
+      PrivateTmp = true;
+      PrivateDevices = true;
+      DevicePolicy = "closed";
+      ProtectSystem = "strict";
+      ProtectHome = "read-only";
+      ProtectControlGroups = true;
+      ProtectKernelModules = true;
+      ProtectKernelTunables = true;
+      ReadWritePaths = [ftl.configDirectory ftl.stateDirectory ftl.logDirectory];
+      RestrictAddressFamilies = "AF_UNIX AF_INET AF_INET6 AF_NETLINK";
+      RestrictNamespaces = true;
+      RestrictRealtime = true;
+      RestrictSUIDSGID = true;
+      MemoryDenyWriteExecute = true;
+      LockPersonality = true;
+    };
+    setupScript = ''
+      set -eo pipefail
+      # shellcheck disable=SC1091
+      source ${ftl.piholePackage}/share/pihole/advanced/Scripts/api.sh
+      # shellcheck disable=SC1091
+      source ${ftl.piholePackage}/share/pihole/advanced/Scripts/utils.sh
+
+      # The unit is ordered after pihole-ftl.service, but FTL answers its API
+      # only a moment after it starts. TestAPIAvailability exits on failure,
+      # hence the subshell.
+      ready=0
+      for _ in $(seq 60); do
+        if (TestAPIAvailability) >/dev/null 2>&1; then
+          ready=1
+          break
+        fi
+        sleep 1
+      done
+      if [ "$ready" != 1 ]; then
+        echo "pihole-ftl-setup: FTL API not reachable after 60s; leaving lists as they are" >&2
+        exit 0
+      fi
+
+      # First start: gravity.sh creates the database, then FTL is told to open it.
+      if [ ! -s ${lib.escapeShellArg gravityDb} ]; then
+        ${pihole} -g
+        ${kill} -s SIGRTMIN "$(systemctl show --property MainPID --value pihole-ftl.service)"
+      fi
+
+      LoginAPI
+
+      want=${lib.escapeShellArg desiredLists}
+      have=$(GetFTLData "lists" | ${jq} -c '[.lists[]?.address]')
+      changed=0
+      while IFS= read -r entry; do
+        address=$(${jq} -r '.address' <<<"$entry")
+        if ${jq} -e --arg address "$address" 'index($address) != null' <<<"$have" >/dev/null; then
+          continue
+        fi
+        echo "pihole-ftl-setup: adding list $address"
+        PostFTLData "lists?type=$(${jq} -r '.type' <<<"$entry")" "$entry" >/dev/null
+        changed=1
+      done < <(${jq} -c '.[]' <<<"$want")
+
+      # Rebuild gravity only when the declared lists changed; the weekly timer
+      # refreshes the list contents.
+      digest=$(printf '%s' "$want" | sha256sum | cut -d ' ' -f 1)
+      if [ "$changed" = 1 ] || [ "$(cat ${lib.escapeShellArg listsStamp} 2>/dev/null)" != "$digest" ]; then
+        if ${pihole} -g; then
+          printf '%s\n' "$digest" >${lib.escapeShellArg listsStamp}
+        else
+          echo "pihole-ftl-setup: gravity update failed; the weekly timer will retry" >&2
+        fi
+      fi
+    '';
   in {
     options.pihole = {
       enable = lib.mkEnableOption "Pi-hole DNS for NetBird mesh peers";
@@ -35,15 +123,22 @@
         ];
         settings = {
           dns = {
-            # BIND to NetBird only. ALL races systemd-resolved / leftover sockets
-            # ("Address already in use") and leaves DNS dead while FTL stays up.
+            # Shown in the web UI; listening is configured below.
             interface = netbirdInterface;
-            listeningMode = "BIND";
+            listeningMode = "NONE";
             upstreams = [
               "1.1.1.1"
               "9.9.9.9"
             ];
           };
+          # Bind the NetBird addresses individually and follow the interface as
+          # it comes and goes. BIND (bind-interfaces) refuses to start without
+          # the interface, and ALL binds the wildcard, which collides with the
+          # systemd-resolved stub listener.
+          misc.dnsmasq_lines = [
+            "interface=${netbirdInterface}"
+            "bind-dynamic"
+          ];
           # NixOS already syncs time via systemd-timesyncd; FTL's NTP client
           # often can't set the clock and just spam "No valid NTP replies".
           ntp = {
@@ -92,35 +187,32 @@
         ];
       };
 
-      # pihole-ftl-setup exits 1 when blocklists are already present; treat as success.
+      # Soft ordering only: FTL no longer needs the interface to exist at start.
+      systemd.services.pihole-ftl.after = ["netbird-wt0.service"];
+
+      # Idempotent setup: waits for the API, adds only missing lists, rebuilds
+      # gravity only when the declared lists changed, and never fails activation
+      # on transient conditions.
       systemd.services.pihole-ftl-setup = {
-        serviceConfig.SuccessExitStatus = "0 1";
+        after = ["pihole-ftl.service"];
+        script = lib.mkForce setupScript;
       };
 
-      # BIND needs nb-wt0; wait for it (netbird-wt0.service can be active before
-      # the iface exists). Avoid PathExists→restart loops during nixos-rebuild:
-      # the iface is already present, so a path unit thrashing try-restart hits
-      # start-limit and leaves FTL dead mid-switch.
-      systemd.services.pihole-ftl = {
-        after = ["netbird-wt0.service" "network-online.target"];
-        wants = ["netbird-wt0.service"];
-        wantedBy = ["multi-user.target"];
-        unitConfig.StartLimitIntervalSec = 0;
-        serviceConfig = {
-          ExecStartPre = lib.mkBefore [
-            "+${pkgs.bash}/bin/bash -c 'i=0; while [[ $i -lt 90 ]]; do [[ -d /sys/class/net/${netbirdInterface} ]] && exit 0; i=$((i+1)); ${pkgs.coreutils}/bin/sleep 1; done; echo \"pihole-ftl: ${netbirdInterface} missing after 90s\" >&2; exit 1'"
-          ];
-          Restart = lib.mkForce "on-failure";
-          RestartSec = lib.mkForce "5s";
-          TimeoutStopSec = "20s";
+      # Refresh list contents weekly, independent of boot and activation.
+      systemd.services.pihole-gravity = {
+        description = "Pi-hole gravity refresh";
+        after = ["pihole-ftl.service" "network-online.target"];
+        wants = ["network-online.target"];
+        serviceConfig = hardening // {Type = "oneshot";};
+        script = "${pihole} -g";
+      };
+      systemd.timers.pihole-gravity = {
+        wantedBy = ["timers.target"];
+        timerConfig = {
+          OnCalendar = "Sun 03:30";
+          Persistent = true;
+          RandomizedDelaySec = "1h";
         };
-      };
-
-      # After login brings the iface up, ensure Pi-hole binds.
-      systemd.services.netbird-wt0-login = lib.mkIf (config.netbird.enable && config.netbird.setupKeyFile != null) {
-        serviceConfig.ExecStartPost = [
-          "+${pkgs.systemd}/bin/systemctl --no-block try-restart pihole-ftl.service"
-        ];
       };
     };
   };
