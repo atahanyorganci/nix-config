@@ -220,21 +220,14 @@ export default HomeInfra.make(
 			return yield* Effect.die('NetBird peer "mars" is required for exit routes and Pi-hole DNS');
 		}
 		const exitGroups = Output.all(adminGroup.groupId, usersGroup.groupId).pipe(Output.map(ids => [...ids]));
+		// One IPv4 default route defines the exit node. NetBird's network map
+		// derives the ::/0 companion (network id "mars-exit-v6") for every
+		// IPv6-capable peer, so an explicit ::/0 route only duplicates it.
+		// The logical id and description are kept so the live route is adopted.
 		yield* NetBird.Route("MarsExitV4", {
 			description: "mars-exit-ipv4",
 			networkId: "mars-exit",
 			network: "0.0.0.0/0",
-			peer: marsPeer.peerId,
-			groups: exitGroups,
-			accessControlGroups: exitGroups,
-			masquerade: true,
-			metric: 100,
-			keepRoute: false,
-		});
-		yield* NetBird.Route("MarsExitV6", {
-			description: "mars-exit-ipv6",
-			networkId: "mars-exit",
-			network: "::/0",
 			peer: marsPeer.peerId,
 			groups: exitGroups,
 			accessControlGroups: exitGroups,
