@@ -35,6 +35,8 @@
         ];
         settings = {
           dns = {
+            # BIND to NetBird only. ALL races systemd-resolved / leftover sockets
+            # ("Address already in use") and leaves DNS dead while FTL stays up.
             interface = netbirdInterface;
             listeningMode = "BIND";
             upstreams = [
@@ -93,34 +95,29 @@
         serviceConfig.SuccessExitStatus = "0 1";
       };
 
-      # Skip start until the NetBird iface exists (avoids hanging nixos-rebuild).
-      # Do not use ConditionPathExists: if the path unit triggers before the
-      # iface is ready, systemd skips the service and PathExists will not
-      # re-fire until nb-wt0 is removed/recreated — leaving Pi-hole dead.
+      # BIND needs nb-wt0; wait for it (netbird-wt0.service can be active before
+      # the iface exists). Avoid PathExists→restart loops during nixos-rebuild:
+      # the iface is already present, so a path unit thrashing try-restart hits
+      # start-limit and leaves FTL dead mid-switch.
       systemd.services.pihole-ftl = {
-        after = ["netbird-wt0.service"];
+        after = ["netbird-wt0.service" "network-online.target"];
         wants = ["netbird-wt0.service"];
         wantedBy = ["multi-user.target"];
         unitConfig.StartLimitIntervalSec = 0;
         serviceConfig = {
+          ExecStartPre = lib.mkBefore [
+            "+${pkgs.bash}/bin/bash -c 'i=0; while [[ $i -lt 90 ]]; do [[ -d /sys/class/net/${netbirdInterface} ]] && exit 0; i=$((i+1)); ${pkgs.coreutils}/bin/sleep 1; done; echo \"pihole-ftl: ${netbirdInterface} missing after 90s\" >&2; exit 1'"
+          ];
           Restart = lib.mkForce "on-failure";
           RestartSec = lib.mkForce "5s";
-        };
-      };
-
-      # Start Pi-hole when the NetBird interface appears (boot race / reconnect).
-      systemd.paths.pihole-ftl-on-wt0 = {
-        wantedBy = ["multi-user.target"];
-        pathConfig = {
-          PathExists = "/sys/class/net/${netbirdInterface}";
-          Unit = "pihole-ftl.service";
+          TimeoutStopSec = "20s";
         };
       };
 
       # After login brings the iface up, ensure Pi-hole binds.
       systemd.services.netbird-wt0-login = lib.mkIf (config.netbird.enable && config.netbird.setupKeyFile != null) {
         serviceConfig.ExecStartPost = [
-          "+${pkgs.systemd}/bin/systemctl --no-block start pihole-ftl.service"
+          "+${pkgs.systemd}/bin/systemctl --no-block try-restart pihole-ftl.service"
         ];
       };
     };
