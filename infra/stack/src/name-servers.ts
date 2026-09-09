@@ -1,5 +1,4 @@
 import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
@@ -45,16 +44,22 @@ export const NameServerPlansFromNameServers = NameServers.pipe(
 					>) {
 						if (cfg.primary && cfg.domains.length > 0) {
 							return yield* Effect.fail(
-								new SchemaIssue.InvalidValue(Option.some({ hostKey, nameserverKey }), {
-									message: `nameserver "${nameserverKey}" on ${hostKey}: primary=true requires empty domains`,
-								}),
+								new SchemaIssue.InvalidValue(
+									{
+										message: `nameserver "${nameserverKey}" on ${hostKey}: primary=true requires empty domains`,
+									},
+									{ hostKey, nameserverKey },
+								),
 							);
 						}
 						if (cfg.searchDomainsEnabled && cfg.domains.length === 0) {
 							return yield* Effect.fail(
-								new SchemaIssue.InvalidValue(Option.some({ hostKey, nameserverKey }), {
-									message: `nameserver "${nameserverKey}" on ${hostKey}: searchDomainsEnabled requires non-empty domains`,
-								}),
+								new SchemaIssue.InvalidValue(
+									{
+										message: `nameserver "${nameserverKey}" on ${hostKey}: searchDomainsEnabled requires non-empty domains`,
+									},
+									{ hostKey, nameserverKey },
+								),
 							);
 						}
 						plans.push({ hostKey, nameserverKey, cfg });
