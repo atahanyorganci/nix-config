@@ -1,26 +1,25 @@
 import * as Alchemy from "alchemy";
-import type { Output } from "alchemy/Output";
 
 export interface HomeInfraPeerOutput {
-	hostname: string | Output<string>;
-	peerId: string | Output<string>;
+	hostname: string;
+	peerId: string;
 }
 
 export interface HomeInfraGroupOutput {
-	groupId: string | Output<string>;
-	name: string | Output<string>;
+	groupId: string;
+	name: string;
 }
 
 export interface HomeInfraNameserverOutput {
-	nameserverGroupId: string | Output<string>;
+	nameserverGroupId: string;
 	host: string;
-	ip: string | Output<string>;
+	ip: string;
 }
 
 export interface HomeInfraOwnerOutput {
-	userId: string | Output<string>;
-	email: string | Output<string>;
-	autoGroups: ReadonlyArray<string | Output<string>>;
+	userId: string;
+	email: string;
+	autoGroups: ReadonlyArray<string>;
 }
 
 export interface HomeInfraOutputs {

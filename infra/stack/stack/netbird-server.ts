@@ -133,7 +133,7 @@ export default NetbirdServerStack.make(
 			location: "nbg1",
 			image: "ubuntu-24.04",
 			serverType: "cx23",
-			sshKey: sshKey.name,
+			sshKey,
 		});
 		const marsBootstrap = yield* Command.Exec("MarsNixosBootstrap", {
 			command: Output.map(

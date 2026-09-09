@@ -1,6 +1,8 @@
-import { hostNetBirdGroup, type Inventory, type NetBirdGroupName, type PolicySourceGroupName } from "./inventory.ts";
+import { hostNetBirdGroup, type Inventory } from "./inventory.ts";
 import type { AccessMatrixEntry } from "./access-matrix.ts";
 import type { PolicyRule } from "@yorganci/netbird-alchemy";
+
+export const ALL_GROUP_NAME = "All";
 
 export const policyNameForRule = (ruleName: string) => `allow-${ruleName}`;
 
@@ -11,7 +13,13 @@ export const allowPolicyLogicalId = (ruleName: string) =>
 		.map(part => part[0]!.toUpperCase() + part.slice(1))
 		.join("")}`;
 
-export const adminAllowAllRules = (adminGroupId: string, allGroupId: string): ReadonlyArray<PolicyRule> => [
+/** Plan-time rule with group names; IDs are bound via `bindPolicyRule` inside `Output.map`. */
+export type PolicyRuleSpec = Omit<PolicyRule, "sources" | "destinations"> & {
+	sourceGroups: ReadonlyArray<string>;
+	destinationGroups: ReadonlyArray<string>;
+};
+
+export const adminAllowAllRules = (): ReadonlyArray<PolicyRuleSpec> => [
 	{
 		name: "admin-tcp",
 		description: "Admins may reach all peers over TCP",
@@ -25,8 +33,8 @@ export const adminAllowAllRules = (adminGroupId: string, allGroupId: string): Re
 			{ start: 1, end: 21 },
 			{ start: 23, end: 65535 },
 		],
-		sources: [adminGroupId],
-		destinations: [allGroupId],
+		sourceGroups: ["Admin"],
+		destinationGroups: [ALL_GROUP_NAME],
 	},
 	{
 		name: "admin-udp",
@@ -35,8 +43,8 @@ export const adminAllowAllRules = (adminGroupId: string, allGroupId: string): Re
 		action: "accept",
 		bidirectional: false,
 		protocol: "udp",
-		sources: [adminGroupId],
-		destinations: [allGroupId],
+		sourceGroups: ["Admin"],
+		destinationGroups: [ALL_GROUP_NAME],
 	},
 	{
 		name: "admin-icmp",
@@ -45,12 +53,12 @@ export const adminAllowAllRules = (adminGroupId: string, allGroupId: string): Re
 		action: "accept",
 		bidirectional: false,
 		protocol: "icmp",
-		sources: [adminGroupId],
-		destinations: [allGroupId],
+		sourceGroups: ["Admin"],
+		destinationGroups: [ALL_GROUP_NAME],
 	},
 ];
 
-export const adminSshRules = (adminGroupId: string, allGroupId: string): ReadonlyArray<PolicyRule> => [
+export const adminSshRules = (): ReadonlyArray<PolicyRuleSpec> => [
 	{
 		name: "admin-ssh",
 		description: "Admins may SSH to all hosts over OpenSSH",
@@ -59,12 +67,12 @@ export const adminSshRules = (adminGroupId: string, allGroupId: string): Readonl
 		bidirectional: false,
 		protocol: "tcp",
 		ports: ["22"],
-		sources: [adminGroupId],
-		destinations: [allGroupId],
+		sourceGroups: ["Admin"],
+		destinationGroups: [ALL_GROUP_NAME],
 	},
 ];
 
-export const serverSshRules = (serversGroupId: string, agentsGroupId: string): ReadonlyArray<PolicyRule> => [
+export const serverSshRules = (): ReadonlyArray<PolicyRuleSpec> => [
 	{
 		name: "servers-ssh",
 		description: "Servers may SSH to servers and agents over OpenSSH",
@@ -73,8 +81,8 @@ export const serverSshRules = (serversGroupId: string, agentsGroupId: string): R
 		bidirectional: false,
 		protocol: "tcp",
 		ports: ["22"],
-		sources: [serversGroupId],
-		destinations: [serversGroupId, agentsGroupId],
+		sourceGroups: ["Servers"],
+		destinationGroups: ["Servers", "Agents"],
 	},
 ];
 
@@ -84,9 +92,8 @@ const ruleName = (entry: AccessMatrixEntry) => `${entry.host}-${entry.service}-$
 export const allowRulesFromMatrix = (
 	matrix: ReadonlyArray<AccessMatrixEntry>,
 	inventory: Inventory,
-	resolveGroupId: (name: NetBirdGroupName | PolicySourceGroupName) => string,
-): ReadonlyArray<PolicyRule> => {
-	const rules: Array<PolicyRule> = [];
+): ReadonlyArray<PolicyRuleSpec> => {
+	const rules: Array<PolicyRuleSpec> = [];
 
 	for (const entry of matrix) {
 		const destinationGroup = hostNetBirdGroup(inventory, entry.host);
@@ -94,15 +101,15 @@ export const allowRulesFromMatrix = (
 			continue;
 		}
 
-		const rule: PolicyRule = {
+		const rule: PolicyRuleSpec = {
 			name: ruleName(entry),
 			description: `${entry.allowedSourceGroups.join(",")} -> ${entry.host}:${entry.port}/${entry.protocol}`,
 			enabled: true,
 			action: "accept",
 			bidirectional: false,
 			protocol: entry.protocol,
-			sources: entry.allowedSourceGroups.map(resolveGroupId),
-			destinations: [resolveGroupId(destinationGroup)],
+			sourceGroups: [...entry.allowedSourceGroups],
+			destinationGroups: [destinationGroup],
 		};
 
 		if (entry.protocol === "tcp" || entry.protocol === "udp") {
@@ -113,4 +120,28 @@ export const allowRulesFromMatrix = (
 	}
 
 	return rules;
+};
+
+export const bindPolicyRule = (spec: PolicyRuleSpec, groupIds: Record<string, string>): PolicyRule => {
+	const lookup = (groupName: string) => {
+		const id = groupIds[groupName];
+		if (!id) {
+			throw new Error(`NetBird group "${groupName}" has no id for policy "${spec.name}"`);
+		}
+		return id;
+	};
+
+	return {
+		name: spec.name,
+		...(spec.description !== undefined ? { description: spec.description } : {}),
+		enabled: spec.enabled,
+		action: spec.action,
+		bidirectional: spec.bidirectional,
+		protocol: spec.protocol,
+		...(spec.ports !== undefined ? { ports: spec.ports } : {}),
+		...(spec.portRanges !== undefined ? { portRanges: spec.portRanges } : {}),
+		...(spec.authorizedGroups !== undefined ? { authorizedGroups: spec.authorizedGroups } : {}),
+		sources: spec.sourceGroups.map(lookup),
+		destinations: spec.destinationGroups.map(lookup),
+	};
 };

@@ -21,11 +21,9 @@ test.provider.skipIf(!isDockerReady)("create and delete a reverse-proxy domain w
 			return;
 		}
 
-		const targetCluster = clusters[0]!.address;
 		const domain = yield* stack.deploy(
 			NetBird.ReverseProxyDomain("BasicDomain", {
 				domain: DOMAIN_NAME,
-				targetCluster,
 			}),
 		);
 

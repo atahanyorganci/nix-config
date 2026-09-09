@@ -1,3 +1,4 @@
+import { reverseProxiesClustersGet } from "@yorganci/netbird-api/reverseProxiesClustersGet";
 import { reverseProxiesDomainsDomainIdDelete } from "@yorganci/netbird-api/reverseProxiesDomainsDomainIdDelete";
 import { reverseProxiesDomainsGet } from "@yorganci/netbird-api/reverseProxiesDomainsGet";
 import { reverseProxiesDomainsPost } from "@yorganci/netbird-api/reverseProxiesDomainsPost";
@@ -15,8 +16,10 @@ export interface ReverseProxyDomainProps {
 	domain: string;
 	/**
 	 * Target reverse-proxy cluster address (from `GET /api/reverse-proxies/clusters`).
+	 * When omitted, reconcile picks an online cluster (then any cluster) at create
+	 * time and leaves an adopted domain's cluster unchanged.
 	 */
-	targetCluster: string;
+	targetCluster?: string;
 }
 
 export interface ReverseProxyDomainAttributes {
@@ -47,7 +50,14 @@ export type ReverseProxyDomain = Resource<
  * @product Reverse Proxy
  * @category NetBird
  * @section Creating a Domain
- * @example Custom domain on an account cluster
+ * @example Custom domain (provider picks an online cluster)
+ * ```typescript
+ * const domain = yield* NetBird.ReverseProxyDomain("AppDomain", {
+ *   domain: "app.example.com",
+ * });
+ * ```
+ *
+ * @example Pin a cluster address
  * ```typescript
  * const domain = yield* NetBird.ReverseProxyDomain("AppDomain", {
  *   domain: "app.example.com",
@@ -74,7 +84,7 @@ export const ReverseProxyDomainProvider = () =>
 		diff: ({ news, olds }) =>
 			Effect.sync(() => {
 				if (!isResolved(news) || !olds) return undefined;
-				if (news.targetCluster !== olds.targetCluster) {
+				if (news.targetCluster !== undefined && news.targetCluster !== olds.targetCluster) {
 					return { action: "replace" } as const;
 				}
 			}),
@@ -96,7 +106,6 @@ export const ReverseProxyDomainProvider = () =>
 		reconcile: Effect.fn(function* ({ news, output }) {
 			const props = news ?? ({} as ReverseProxyDomainProps);
 			const domain = props.domain;
-			const targetCluster = props.targetCluster;
 
 			let observed: ApiDomain | undefined;
 			if (output?.domainId) {
@@ -107,6 +116,12 @@ export const ReverseProxyDomainProvider = () =>
 			}
 
 			if (!observed) {
+				const targetCluster = props.targetCluster ?? (yield* pickTargetCluster());
+				if (!targetCluster) {
+					return yield* Effect.die(
+						new Error(`NetBird.ReverseProxyDomain "${domain}" has no proxy cluster — is the reverse proxy online?`),
+					);
+				}
 				// Domains POST is typed as Service in the OpenAPI (spec quirk).
 				// Re-list after create to capture the real Domain record.
 				yield* reverseProxiesDomainsPost({
@@ -144,6 +159,11 @@ const findDomainById = (domainId: string) =>
 
 const findDomainByName = (domain: string) =>
 	listDomains().pipe(Effect.map(domains => domains.find(d => d.domain === domain)));
+
+const pickTargetCluster = () =>
+	reverseProxiesClustersGet({}).pipe(
+		Effect.map(clusters => clusters.find(cluster => cluster.online)?.address ?? clusters[0]?.address),
+	);
 
 const toAttributes = (domain: ApiDomain): ReverseProxyDomainAttributes => ({
 	domainId: domain.id,
