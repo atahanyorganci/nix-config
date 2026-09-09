@@ -312,7 +312,7 @@ export default HomeInfra.make(
 
 		const serversGroupId = groupResources.Servers!.groupId;
 		const agentsGroupId = groupResources.Agents!.groupId;
-		const resolveGroupId = (groupName: Inventory.PolicySourceGroupName) =>
+		const resolveGroupId = (groupName: Inventory.NetBirdGroupName | Inventory.PolicySourceGroupName) =>
 			groupIdsByName[groupName]! as unknown as string;
 
 		const allowRules = [

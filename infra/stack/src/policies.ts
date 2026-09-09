@@ -1,4 +1,4 @@
-import { hostNetBirdGroup, type Inventory, type PolicySourceGroupName } from "./inventory.ts";
+import { hostNetBirdGroup, type Inventory, type NetBirdGroupName, type PolicySourceGroupName } from "./inventory.ts";
 import type { AccessMatrixEntry } from "./access-matrix.ts";
 import type { PolicyRule } from "@yorganci/netbird-alchemy";
 
@@ -84,7 +84,7 @@ const ruleName = (entry: AccessMatrixEntry) => `${entry.host}-${entry.service}-$
 export const allowRulesFromMatrix = (
 	matrix: ReadonlyArray<AccessMatrixEntry>,
 	inventory: Inventory,
-	resolveGroupId: (name: PolicySourceGroupName) => string,
+	resolveGroupId: (name: NetBirdGroupName | PolicySourceGroupName) => string,
 ): ReadonlyArray<PolicyRule> => {
 	const rules: Array<PolicyRule> = [];
 
