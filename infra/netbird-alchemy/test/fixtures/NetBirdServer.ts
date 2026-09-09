@@ -14,6 +14,13 @@ import { findAvailablePort } from "./Runtime.ts";
 export const NETBIRD_SERVER_IMAGE = "netbirdio/netbird-server";
 export const NETBIRD_SERVER_TAG = "0.75.0";
 
+const FIXTURE_ENVIRONMENT = {
+	NB_SETUP_PAT_ENABLED: "true",
+	NB_DISABLE_GEOLITE_UPDATE: "true",
+	// Skip GeoLite download so management HTTP starts immediately.
+	NB_DISABLE_GEOLOCATION: "true",
+};
+
 export class NetBirdBootstrapError extends Data.TaggedError("NetBirdBootstrapError")<{
 	readonly message: string;
 }> {}
@@ -105,6 +112,12 @@ export const deployNetBirdServerResources = Effect.gen(function* () {
 		alwaysPull: false,
 	});
 	const data = yield* Docker.Volume("NetBirdData", {});
+	// Alchemy 2.0.0-beta.66 runs `docker container create --env KEY` without a
+	// value, so Docker copies each value from the CLI's own environment. Export
+	// them there, or the server boots without them and `/api/setup` returns no PAT.
+	for (const [key, value] of Object.entries(FIXTURE_ENVIRONMENT)) {
+		process.env[key] = value;
+	}
 	yield* Docker.Container("NetBirdServer", {
 		image,
 		start: true,
@@ -120,12 +133,7 @@ export const deployNetBirdServerResources = Effect.gen(function* () {
 				readOnly: true,
 			},
 		],
-		environment: {
-			NB_SETUP_PAT_ENABLED: "true",
-			NB_DISABLE_GEOLITE_UPDATE: "true",
-			// Skip GeoLite download so management HTTP starts immediately.
-			NB_DISABLE_GEOLOCATION: "true",
-		},
+		environment: FIXTURE_ENVIRONMENT,
 		command: ["--config", "/etc/netbird/config.yaml"],
 	});
 
