@@ -178,29 +178,64 @@ in {
         };
       };
       # Skip login (don't fail activation) until the setup key file exists.
+      #
+      # This must be `script`, not `serviceConfig.script`: the latter is emitted
+      # as a `script=` key in `[Service]`, which systemd ignores with "Unknown
+      # key", so the override silently never runs.
       systemd.services.netbird-wt0-login = lib.mkIf (cfg.setupKeyFile != null) {
         unitConfig.ConditionPathExists = cfg.setupKeyFile;
-        serviceConfig.script = let
+        # `script` is a `lines` option: without mkForce this is appended to
+        # upstream's login script instead of replacing it, so upstream's wait
+        # loop still spins forever when the control plane is unreachable.
+        script = lib.mkForce (let
           nb = lib.getExe config.services.netbird.clients.wt0.wrapper;
         in ''
-          set -x
-
-          get_status() {
+          # Upstream only logs in when the daemon reports NeedsLogin, and the
+          # daemon only persists a management URL when a login carries one. A
+          # changed `managementUrl` would therefore leave the peer talking to
+          # the old control plane forever, because an unreachable one reports
+          # Disconnected rather than NeedsLogin. Log in whenever the daemon is
+          # not already connected to the configured host.
+          status() {
             ${nb} status 2>&1 || :
           }
 
-          main() {
-            until get_status | grep --quiet ': Connected\|NeedsLogin'; do
-              sleep 1
-            done
-
-            if get_status | grep --quiet 'NeedsLogin'; then
-              ${nb} up --network-monitor=true
-            fi
+          # `netbird status` prints `Management: Connected to <url>` including
+          # the port, so match the host alone.
+          connected_here() {
+            status | grep --quiet 'Management: Connected to .*${controlPlaneHost}'
           }
 
-          main "$@"
-        '';
+          connected_elsewhere() {
+            status | grep 'Management: Connected to ' | grep --quiet --invert-match ${lib.escapeShellArg controlPlaneHost}
+          }
+
+          needs_login() {
+            status | grep --quiet NeedsLogin
+          }
+
+          # Give the daemon a moment to settle before deciding, so an ordinary
+          # restart does not trigger a needless re-login.
+          waited=0
+          while :; do
+            if connected_here; then
+              exit 0
+            fi
+            if needs_login || connected_elsewhere || [ "$waited" -ge 30 ]; then
+              break
+            fi
+            waited=$((waited + 1))
+            sleep 1
+          done
+
+          # Carries the desired URL so the daemon persists it and reconnects as
+          # the same peer; the setup key in $NB_SETUP_KEY_FILE is picked up
+          # automatically when a login is really required. A failure here must
+          # never fail activation.
+          if ! ${nb} up --management-url ${lib.escapeShellArg cfg.managementUrl}; then
+            echo "netbird-wt0-login: could not log in to ${cfg.managementUrl}; retrying on the next start" >&2
+          fi
+        '');
       };
     };
   };
