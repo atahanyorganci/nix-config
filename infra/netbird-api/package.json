@@ -4,22 +4,25 @@
 	"private": true,
 	"type": "module",
 	"exports": {
+		".": "./src/index.ts",
 		"./spec": "./spec/netbird.api.json",
 		"./Credentials": "./src/credentials.ts",
-		"./Client": "./src/client.ts",
 		"./Errors": "./src/errors.ts",
-		"./Traits": "./src/traits.ts",
+		"./Protocol": "./src/protocol.ts",
 		"./Retry": "./src/retry.ts",
-		"./Category": "./src/category.ts",
-		"./Sensitive": "./src/sensitive.ts",
-		"./*": "./src/operations/*.ts"
+		"./Traits": "./src/traits.ts",
+		"./Services": "./src/services/index.ts",
+		"./*": "./src/services/*.ts"
 	},
 	"scripts": {
+		"check": "tsc --noEmit",
+		"convert": "bun scripts/convert.ts",
 		"format": "oxfmt --check .",
 		"format:fix": "oxfmt --write .",
-		"generate": "bun run scripts/generate.ts && bun run format:fix && bun run lint:fix",
+		"generate": "bun scripts/convert.ts && bun scripts/generate.ts && bun run lint:fix && bun run format:fix",
 		"lint": "oxlint .",
-		"lint:fix": "oxlint --fix ."
+		"lint:fix": "oxlint --fix .",
+		"spec:download": "bun scripts/download.ts"
 	},
 	"dependencies": {
 		"@distilled.cloud/core": "catalog:",
