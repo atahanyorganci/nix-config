@@ -23,8 +23,12 @@
           };
           groups = lib.mkOption {
             type = lib.types.listOf lib.types.str;
-            default = ["All"];
-            description = "NetBird distribution group *names* (resolved to IDs at deploy time).";
+            default = ["Admin" "Users" "Servers"];
+            description = ''
+              NetBird distribution group names (Admin, Users, Servers), resolved to IDs at
+              deploy time. The stack allows exactly these groups to reach the resolver, so
+              Agents and All are rejected: Agents peers are isolated.
+            '';
           };
           domains = lib.mkOption {
             type = lib.types.listOf lib.types.str;

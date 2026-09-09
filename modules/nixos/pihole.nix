@@ -76,7 +76,9 @@
         primary = true;
         enabled = true;
         port = 53;
-        groups = ["All"];
+        # Agents peers (jupiter) are isolated and keep their provider resolver;
+        # the reverse-proxy peer needs no Pi-hole either.
+        groups = ["Admin" "Users" "Servers"];
         domains = [];
         searchDomainsEnabled = false;
       };
