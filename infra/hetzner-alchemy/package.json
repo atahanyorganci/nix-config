@@ -16,7 +16,7 @@
 		"test": "vitest run"
 	},
 	"dependencies": {
-		"@yorganci/hetzner-api": "workspace:*",
+		"@distilled.cloud/hetzner": "catalog:",
 		"alchemy": "catalog:",
 		"effect": "catalog:"
 	},

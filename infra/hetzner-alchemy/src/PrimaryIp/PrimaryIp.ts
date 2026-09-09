@@ -1,8 +1,10 @@
-import { primaryIpsGet } from "@yorganci/hetzner-api/primaryIpsGet";
-import { primaryIpsIdDelete } from "@yorganci/hetzner-api/primaryIpsIdDelete";
-import { primaryIpsIdGet } from "@yorganci/hetzner-api/primaryIpsIdGet";
-import { primaryIpsIdPut } from "@yorganci/hetzner-api/primaryIpsIdPut";
-import { primaryIpsPost } from "@yorganci/hetzner-api/primaryIpsPost";
+import {
+	createPrimaryIp,
+	deletePrimaryIp,
+	getPrimaryIp,
+	listPrimaryIps,
+	updatePrimaryIp,
+} from "@distilled.cloud/hetzner/primary_ips";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";
@@ -11,6 +13,7 @@ import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 import { waitForActions } from "../actions.ts";
 import { catchNotFound } from "../errors.ts";
+import { compactLabels, labelsEqual, type LabelMap } from "../labels.ts";
 
 export type PrimaryIpType = "ipv4" | "ipv6";
 
@@ -92,7 +95,7 @@ export const PrimaryIpProvider = () =>
 			}),
 		read: Effect.fn(function* ({ id, output, olds }) {
 			if (output?.primaryIpId != null) {
-				const direct = yield* catchNotFound(primaryIpsIdGet({ id: output.primaryIpId }));
+				const direct = yield* catchNotFound(getPrimaryIp({ id: output.primaryIpId }));
 				if (direct) return toAttributes(direct.primary_ip);
 			}
 			const name = yield* resolveName(id, olds?.name ?? output?.name);
@@ -101,7 +104,7 @@ export const PrimaryIpProvider = () =>
 			return toAttributes(existing);
 		}),
 		list: Effect.fn(function* () {
-			const all = yield* primaryIpsGet({});
+			const all = yield* listPrimaryIps({});
 			return all.primary_ips.map(toAttributes);
 		}),
 		reconcile: Effect.fn(function* ({ id, news, output }) {
@@ -114,7 +117,7 @@ export const PrimaryIpProvider = () =>
 
 			let observed: PrimaryIpApi | undefined;
 			if (output?.primaryIpId != null) {
-				const direct = yield* catchNotFound(primaryIpsIdGet({ id: output.primaryIpId }));
+				const direct = yield* catchNotFound(getPrimaryIp({ id: output.primaryIpId }));
 				if (direct) observed = direct.primary_ip;
 			}
 			if (!observed) {
@@ -122,7 +125,7 @@ export const PrimaryIpProvider = () =>
 			}
 
 			if (!observed) {
-				const created = yield* primaryIpsPost({
+				const created = yield* createPrimaryIp({
 					name,
 					type,
 					location,
@@ -142,7 +145,7 @@ export const PrimaryIpProvider = () =>
 			}
 
 			if (observed.name !== name || !labelsEqual(observed.labels, labels) || observed.auto_delete !== autoDelete) {
-				const updated = yield* primaryIpsIdPut({
+				const updated = yield* updatePrimaryIp({
 					id: observed.id,
 					name,
 					labels,
@@ -154,14 +157,14 @@ export const PrimaryIpProvider = () =>
 			return toAttributes(observed);
 		}),
 		delete: Effect.fn(function* ({ output }) {
-			yield* catchNotFound(primaryIpsIdDelete({ id: output.primaryIpId }));
+			yield* catchNotFound(deletePrimaryIp({ id: output.primaryIpId }));
 		}),
 	});
 
 type PrimaryIpApi = {
 	id: number;
 	name: string;
-	labels: Record<string, string>;
+	labels: LabelMap;
 	location: { name: string };
 	ip: string;
 	type: PrimaryIpType;
@@ -175,7 +178,7 @@ const resolveName = (id: string, name: string | undefined) =>
 	});
 
 const findPrimaryIpByName = (name: string) =>
-	primaryIpsGet({ name }).pipe(
+	listPrimaryIps({ name }).pipe(
 		Effect.map(res => res.primary_ips.find(ip => ip.name === name)),
 		Effect.catch(() => Effect.succeed(undefined)),
 	);
@@ -186,13 +189,6 @@ const toAttributes = (ip: PrimaryIpApi): PrimaryIpAttributes => ({
 	type: ip.type,
 	ip: ip.ip,
 	location: ip.location.name,
-	labels: ip.labels,
+	labels: compactLabels(ip.labels),
 	autoDelete: ip.auto_delete,
 });
-
-const labelsEqual = (a: Record<string, string>, b: Record<string, string>) => {
-	const aKeys = Object.keys(a).sort();
-	const bKeys = Object.keys(b).sort();
-	if (aKeys.length !== bKeys.length) return false;
-	return aKeys.every((k, i) => k === bKeys[i] && a[k] === b[k]);
-};

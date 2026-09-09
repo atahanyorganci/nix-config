@@ -1,4 +1,4 @@
-import { actionsIdGet } from "@yorganci/hetzner-api/actionsIdGet";
+import { getAction } from "@distilled.cloud/hetzner/actions";
 import * as Effect from "effect/Effect";
 
 export type HetznerAction = {
@@ -11,7 +11,7 @@ export type HetznerAction = {
 export const waitForAction = (actionId: number) =>
 	Effect.gen(function* () {
 		for (;;) {
-			const { action } = yield* actionsIdGet({ id: actionId });
+			const { action } = yield* getAction({ id: actionId });
 			if (action.status === "success") return action;
 			if (action.status === "error") {
 				const detail = action.error ? `${action.error.code}: ${action.error.message}` : "unknown error";

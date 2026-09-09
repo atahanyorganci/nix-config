@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
-import type { NotFound } from "@yorganci/hetzner-api/Errors";
+import type { NotFound } from "@distilled.cloud/hetzner/Errors";
 
 export const isNotFound = (error: unknown): error is InstanceType<typeof NotFound> =>
 	Predicate.hasProperty(error, "_tag") && error._tag === "NotFound";

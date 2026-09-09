@@ -1,6 +1,6 @@
 # `@yorganci/hetzner-alchemy`
 
-Alchemy provider for Hetzner Cloud resources, built on `@yorganci/hetzner-api`.
+Alchemy provider for Hetzner Cloud resources, built on the `@distilled.cloud/hetzner` client.
 
 ## Resources
 
