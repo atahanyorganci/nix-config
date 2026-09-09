@@ -147,7 +147,7 @@ const ReverseProxyAuthFromAuth = Auth.pipe(
 				}
 			}),
 		),
-		encode: encodeForbidden("ReverseProxyAuth → Auth encoding is not supported"),
+		encode: encodeForbidden("ReverseProxyAuth -> Auth encoding is not supported"),
 	}),
 );
 
@@ -187,7 +187,7 @@ export const ServicePlansFromHttpServices = Schema.Struct({
 
 			return Effect.succeed(plans);
 		}),
-		encode: encodeForbidden("ServicePlan[] → HttpServices encoding is not supported"),
+		encode: encodeForbidden("ServicePlan[] -> HttpServices encoding is not supported"),
 	}),
 );
 
@@ -247,6 +247,6 @@ export const ReverseProxyServicePropsFromPlan = ReverseProxyServicePropsInput.pi
 				return props;
 			}),
 		),
-		encode: encodeForbidden("ReverseProxyServiceInput → plan encoding is not supported"),
+		encode: encodeForbidden("ReverseProxyServiceInput -> plan encoding is not supported"),
 	}),
 );

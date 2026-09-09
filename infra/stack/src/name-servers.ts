@@ -63,6 +63,6 @@ export const NameServerPlansFromNameServers = NameServers.pipe(
 				return plans;
 			}),
 		),
-		encode: encodeForbidden("NameServerPlan[] → NameServers encoding is not supported"),
+		encode: encodeForbidden("NameServerPlan[] -> NameServers encoding is not supported"),
 	}),
 );
