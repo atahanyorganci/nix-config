@@ -141,7 +141,7 @@ export const UserProvider = () =>
 		reconcile: Effect.fn(function* ({ id, news, output }) {
 			const props = news ?? ({} as UserProps);
 			const name = yield* resolveName(id, props.name);
-			const role = props.role ?? "user";
+			const requestedRole = props.role;
 			const autoGroups = props.autoGroups ?? [];
 			const isServiceUser = props.isServiceUser ?? true;
 			const isBlocked = props.isBlocked ?? false;
@@ -162,7 +162,7 @@ export const UserProvider = () =>
 				const created = yield* usersPost({
 					...(email !== undefined ? { email } : {}),
 					name,
-					role,
+					role: requestedRole ?? "user",
 					auto_groups: autoGroups,
 					is_service_user: isServiceUser,
 				}).pipe(
@@ -177,14 +177,19 @@ export const UserProvider = () =>
 				return toAttributes(created);
 			}
 
+			// NetBird rejects role mutations on owner/admin accounts, including
+			// no-op changes. Preserve privileged roles and only sync groups/block.
+			const privileged = observed.role === "admin" || observed.role === "owner";
+			const effectiveRole = privileged ? observed.role : (requestedRole ?? observed.role);
 			const groupsChanged =
 				autoGroups.length !== observed.auto_groups.length || autoGroups.some(g => !observed.auto_groups.includes(g));
-			const needsUpdate = observed.role !== role || observed.is_blocked !== isBlocked || groupsChanged;
+			const roleChanged = !privileged && requestedRole !== undefined && observed.role !== requestedRole;
+			const needsUpdate = roleChanged || observed.is_blocked !== isBlocked || groupsChanged;
 
 			if (needsUpdate) {
 				const updated = yield* usersUserIdPut({
 					userId: observed.id,
-					role,
+					role: effectiveRole,
 					auto_groups: autoGroups,
 					is_blocked: isBlocked,
 				});
