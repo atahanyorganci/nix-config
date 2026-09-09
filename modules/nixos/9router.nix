@@ -1,4 +1,6 @@
-{
+{config, ...}: let
+  infra = config.flake.infra;
+in {
   flake.modules.nixos."9router" = {
     lib,
     config,
@@ -137,6 +139,27 @@
           issued API keys so neither is invalidated by a state reset.
         '';
       };
+
+      expose = {
+        enable = lib.mkEnableOption "publishing the gateway through the NetBird reverse proxy";
+
+        key = lib.mkOption {
+          type = lib.types.str;
+          default = "9router";
+          example = "ai";
+          description = "httpServices key, which becomes `https://<key>.${infra.domain}`.";
+        };
+
+        accessGroups = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [];
+          example = ["Admin"];
+          description = ''
+            NetBird groups allowed to reach the gateway. Empty falls back to
+            the stack default for a private service, which is Admin.
+          '';
+        };
+      };
     };
 
     config = lib.mkIf cfg.enable {
@@ -149,14 +172,28 @@
             put a reverse proxy in front of it.
           '';
         }
+        {
+          assertion = !cfg.expose.enable || !isLoopback;
+          message = ''
+            9router.expose.enable needs a listener the reverse proxy can dial,
+            but 9router.host = "${cfg.host}" is loopback. Bind the mesh
+            interface (or "0.0.0.0" plus 9router.interfaces) instead.
+          '';
+        }
       ];
 
-      warnings = lib.optional (!isLoopback && cfg.environmentFile == null) ''
-        9router.host = "${cfg.host}" serves the dashboard beyond this host while
-        the login password is still the built-in default ("123456"). Set
-        9router.environmentFile with INITIAL_PASSWORD=..., or change the
-        password from the dashboard before the port becomes reachable.
-      '';
+      warnings =
+        lib.optional (!isLoopback && cfg.environmentFile == null) ''
+          9router.host = "${cfg.host}" serves the dashboard beyond this host while
+          the login password is still the built-in default ("123456"). Set
+          9router.environmentFile with INITIAL_PASSWORD=..., or change the
+          password from the dashboard before the port becomes reachable.
+        ''
+        ++ lib.optional (cfg.expose.enable && cfg.interfaces == []) ''
+          9router.expose.enable publishes ${cfg.expose.key}.${infra.domain}, but
+          9router.interfaces is empty, so the firewall drops the reverse proxy's
+          connection to port ${toString cfg.port}. Add the mesh interface.
+        '';
 
       systemd.services."9router" = {
         description = "9router LLM gateway";
@@ -255,6 +292,22 @@
       networking.firewall.interfaces = lib.genAttrs cfg.interfaces (_: {
         allowedTCPPorts = [cfg.port];
       });
+
+      # Always private: the gateway holds long-lived provider credentials and
+      # its only login is a password, so it belongs behind NetBird's identity
+      # layer rather than on the public internet. The proxy adds no auth of its
+      # own — reaching the domain at all is the authorisation.
+      httpServices = lib.mkIf cfg.expose.enable {
+        ${cfg.expose.key} = {
+          inherit (cfg) port;
+          expose = {
+            enable = true;
+            private = true;
+            inherit (cfg.expose) accessGroups;
+          };
+          auth.type = "none";
+        };
+      };
     };
   };
 }
