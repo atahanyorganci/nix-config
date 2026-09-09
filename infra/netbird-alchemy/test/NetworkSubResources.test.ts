@@ -1,7 +1,6 @@
-import { networksNetworkIdResourcesGet } from "@yorganci/netbird-api/networksNetworkIdResourcesGet";
-import { networksNetworkIdRoutersGet } from "@yorganci/netbird-api/networksNetworkIdRoutersGet";
-import { peersGet } from "@yorganci/netbird-api/peersGet";
-import { routesRouteIdGet } from "@yorganci/netbird-api/routesRouteIdGet";
+import { networksNetworkIdResourcesGet, networksNetworkIdRoutersGet } from "@yorganci/netbird-api/networks";
+import { peersGet } from "@yorganci/netbird-api/peers";
+import { routesRouteIdGet } from "@yorganci/netbird-api/routes";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import { catchNotFound } from "../src/errors.ts";

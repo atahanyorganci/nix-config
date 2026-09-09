@@ -1,5 +1,4 @@
-import { peersGet } from "@yorganci/netbird-api/peersGet";
-import { peersPeerIdGet } from "@yorganci/netbird-api/peersPeerIdGet";
+import { peersGet, peersPeerIdGet } from "@yorganci/netbird-api/peers";
 import * as Effect from "effect/Effect";
 import { expect, test as vitest } from "vitest";
 import * as NetBird from "../src/index.ts";

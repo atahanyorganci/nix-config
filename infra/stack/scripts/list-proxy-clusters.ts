@@ -1,7 +1,7 @@
 import { BunRuntime } from "@effect/platform-bun";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
-import { reverseProxiesClustersGet } from "@yorganci/netbird-api/reverseProxiesClustersGet";
+import { reverseProxiesClustersGet } from "@yorganci/netbird-api/services";
 import { AlchemyContextLive } from "alchemy/AlchemyContext";
 import { ArtifactStore, createArtifactStore } from "alchemy/Artifacts";
 import { AuthProviders } from "alchemy/Auth/AuthProvider";

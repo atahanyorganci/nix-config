@@ -1,16 +1,18 @@
-import { reverseProxiesServicesGet } from "@yorganci/netbird-api/reverseProxiesServicesGet";
-import { reverseProxiesServicesPost } from "@yorganci/netbird-api/reverseProxiesServicesPost";
-import { reverseProxiesServicesServiceIdDelete } from "@yorganci/netbird-api/reverseProxiesServicesServiceIdDelete";
-import { reverseProxiesServicesServiceIdGet } from "@yorganci/netbird-api/reverseProxiesServicesServiceIdGet";
-import { reverseProxiesServicesServiceIdPut } from "@yorganci/netbird-api/reverseProxiesServicesServiceIdPut";
+import {
+	reverseProxiesServicesGet,
+	reverseProxiesServicesPost,
+	reverseProxiesServicesServiceIdDelete,
+	reverseProxiesServicesServiceIdGet,
+	reverseProxiesServicesServiceIdPut,
+} from "@yorganci/netbird-api/services";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
+import * as Redacted from "effect/Redacted";
 import { catchNotFound } from "../errors.ts";
-import type * as Redacted from "effect/Redacted";
 
 export type ProxyMode = "http" | "tcp" | "udp" | "tls";
 export type TargetType = "peer" | "host" | "domain" | "subnet" | "cluster";
@@ -202,7 +204,7 @@ type ApiTarget = {
 };
 
 type ApiAuth = {
-	password_auth?: { enabled: boolean; password: Redacted.Redacted<string> };
+	password_auth?: { enabled: boolean; password: string | Redacted.Redacted<string> };
 	pin_auth?: { enabled: boolean; pin: string };
 	bearer_auth?: { enabled: boolean; distribution_groups?: ReadonlyArray<string> | null };
 	link_auth?: { enabled: boolean };
@@ -448,7 +450,7 @@ const fromApiAuth = (auth: ApiAuth | undefined, previous?: ReverseProxyAuth): Re
 	if (auth.password_auth) {
 		result.passwordAuth = {
 			enabled: auth.password_auth.enabled,
-			password: previous?.passwordAuth?.password ?? auth.password_auth.password,
+			password: previous?.passwordAuth?.password ?? asRedacted(auth.password_auth.password),
 		};
 	}
 	if (auth.pin_auth) {
@@ -470,6 +472,10 @@ const fromApiAuth = (auth: ApiAuth | undefined, previous?: ReverseProxyAuth): Re
 	if (Object.keys(result).length === 0) return previous;
 	return result;
 };
+
+/** Sensitive values decode as `Redacted`; keep plain strings redacted too. */
+const asRedacted = (value: string | Redacted.Redacted<string>): Redacted.Redacted<string> =>
+	Redacted.isRedacted(value) ? value : Redacted.make(value);
 
 const toAttributes = (service: ApiService, previousAuth?: ReverseProxyAuth): ReverseProxyServiceAttributes => ({
 	serviceId: service.id,

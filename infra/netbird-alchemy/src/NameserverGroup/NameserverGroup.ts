@@ -1,8 +1,10 @@
-import { dnsNameserversGet } from "@yorganci/netbird-api/dnsNameserversGet";
-import { dnsNameserversNsgroupIdDelete } from "@yorganci/netbird-api/dnsNameserversNsgroupIdDelete";
-import { dnsNameserversNsgroupIdGet } from "@yorganci/netbird-api/dnsNameserversNsgroupIdGet";
-import { dnsNameserversNsgroupIdPut } from "@yorganci/netbird-api/dnsNameserversNsgroupIdPut";
-import { dnsNameserversPost } from "@yorganci/netbird-api/dnsNameserversPost";
+import {
+	dnsNameserversGet,
+	dnsNameserversNsgroupIdDelete,
+	dnsNameserversNsgroupIdGet,
+	dnsNameserversNsgroupIdPut,
+	dnsNameserversPost,
+} from "@yorganci/netbird-api/dns";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";

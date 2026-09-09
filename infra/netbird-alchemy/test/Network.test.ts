@@ -1,4 +1,4 @@
-import { networksNetworkIdGet } from "@yorganci/netbird-api/networksNetworkIdGet";
+import { networksNetworkIdGet } from "@yorganci/netbird-api/networks";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import { catchNotFound } from "../src/errors.ts";

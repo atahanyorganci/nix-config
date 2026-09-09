@@ -1,4 +1,4 @@
-import { usersUserIdTokensTokenIdGet } from "@yorganci/netbird-api/usersUserIdTokensTokenIdGet";
+import { usersUserIdTokensTokenIdGet } from "@yorganci/netbird-api/tokens";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { expect } from "vitest";

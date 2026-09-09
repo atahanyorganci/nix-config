@@ -1,8 +1,10 @@
-import { groupsGet } from "@yorganci/netbird-api/groupsGet";
-import { groupsGroupIdDelete } from "@yorganci/netbird-api/groupsGroupIdDelete";
-import { groupsGroupIdGet } from "@yorganci/netbird-api/groupsGroupIdGet";
-import { groupsGroupIdPut } from "@yorganci/netbird-api/groupsGroupIdPut";
-import { groupsPost } from "@yorganci/netbird-api/groupsPost";
+import {
+	groupsGet,
+	groupsGroupIdDelete,
+	groupsGroupIdGet,
+	groupsGroupIdPut,
+	groupsPost,
+} from "@yorganci/netbird-api/groups";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";

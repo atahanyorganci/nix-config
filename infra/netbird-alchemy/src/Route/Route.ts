@@ -1,8 +1,10 @@
-import { routesGet } from "@yorganci/netbird-api/routesGet";
-import { routesPost } from "@yorganci/netbird-api/routesPost";
-import { routesRouteIdDelete } from "@yorganci/netbird-api/routesRouteIdDelete";
-import { routesRouteIdGet } from "@yorganci/netbird-api/routesRouteIdGet";
-import { routesRouteIdPut } from "@yorganci/netbird-api/routesRouteIdPut";
+import {
+	routesGet,
+	routesPost,
+	routesRouteIdDelete,
+	routesRouteIdGet,
+	routesRouteIdPut,
+} from "@yorganci/netbird-api/routes";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";

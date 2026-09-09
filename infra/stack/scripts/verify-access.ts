@@ -1,12 +1,12 @@
 import { BunRuntime } from "@effect/platform-bun";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
-import { dnsNameserversGet } from "@yorganci/netbird-api/dnsNameserversGet";
-import { groupsGet } from "@yorganci/netbird-api/groupsGet";
-import { peersGet } from "@yorganci/netbird-api/peersGet";
-import { policiesGet } from "@yorganci/netbird-api/policiesGet";
-import { routesGet } from "@yorganci/netbird-api/routesGet";
-import { usersGet } from "@yorganci/netbird-api/usersGet";
+import { dnsNameserversGet } from "@yorganci/netbird-api/dns";
+import { groupsGet } from "@yorganci/netbird-api/groups";
+import { peersGet } from "@yorganci/netbird-api/peers";
+import { policiesGet } from "@yorganci/netbird-api/policies";
+import { routesGet } from "@yorganci/netbird-api/routes";
+import { usersGet } from "@yorganci/netbird-api/users";
 import { AlchemyContextLive } from "alchemy/AlchemyContext";
 import { ArtifactStore, createArtifactStore } from "alchemy/Artifacts";
 import { AuthProviders } from "alchemy/Auth/AuthProvider";

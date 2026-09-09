@@ -1,8 +1,10 @@
-import { policiesGet } from "@yorganci/netbird-api/policiesGet";
-import { policiesPolicyIdDelete } from "@yorganci/netbird-api/policiesPolicyIdDelete";
-import { policiesPolicyIdGet } from "@yorganci/netbird-api/policiesPolicyIdGet";
-import { policiesPolicyIdPut } from "@yorganci/netbird-api/policiesPolicyIdPut";
-import { policiesPost } from "@yorganci/netbird-api/policiesPost";
+import {
+	policiesGet,
+	policiesPolicyIdDelete,
+	policiesPolicyIdGet,
+	policiesPolicyIdPut,
+	policiesPost,
+} from "@yorganci/netbird-api/policies";
 import { isResolved } from "alchemy/Diff";
 import { createPhysicalName } from "alchemy/PhysicalName";
 import * as Provider from "alchemy/Provider";

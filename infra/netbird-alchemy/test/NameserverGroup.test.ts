@@ -1,5 +1,5 @@
-import { dnsNameserversNsgroupIdGet } from "@yorganci/netbird-api/dnsNameserversNsgroupIdGet";
-import { groupsGet } from "@yorganci/netbird-api/groupsGet";
+import { dnsNameserversNsgroupIdGet } from "@yorganci/netbird-api/dns";
+import { groupsGet } from "@yorganci/netbird-api/groups";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import { catchNotFound } from "../src/errors.ts";

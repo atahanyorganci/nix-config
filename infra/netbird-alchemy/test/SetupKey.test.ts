@@ -1,4 +1,4 @@
-import { setupKeysKeyIdGet } from "@yorganci/netbird-api/setupKeysKeyIdGet";
+import { setupKeysKeyIdGet } from "@yorganci/netbird-api/setup_keys";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { expect } from "vitest";

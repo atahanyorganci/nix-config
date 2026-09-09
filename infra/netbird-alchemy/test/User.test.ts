@@ -1,4 +1,4 @@
-import { usersGet } from "@yorganci/netbird-api/usersGet";
+import { usersGet } from "@yorganci/netbird-api/users";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import * as NetBird from "../src/index.ts";
