@@ -112,12 +112,6 @@ export const deployNetBirdServerResources = Effect.gen(function* () {
 		alwaysPull: false,
 	});
 	const data = yield* Docker.Volume("NetBirdData", {});
-	// Alchemy 2.0.0-beta.66 runs `docker container create --env KEY` without a
-	// value, so Docker copies each value from the CLI's own environment. Export
-	// them there, or the server boots without them and `/api/setup` returns no PAT.
-	for (const [key, value] of Object.entries(FIXTURE_ENVIRONMENT)) {
-		process.env[key] = value;
-	}
 	yield* Docker.Container("NetBirdServer", {
 		image,
 		start: true,
