@@ -41,4 +41,16 @@
     enable = true;
     hostName = "${networking.hostName}.netbird.selfhosted";
   };
+  "9router" = {
+    enable = true;
+    # The reverse proxy dials mars's mesh address, so the listener has to exist
+    # off loopback; the firewall below keeps it off the public NIC.
+    host = "0.0.0.0";
+    interfaces = ["nb-wt0"];
+    expose = {
+      enable = true;
+      key = "ai";
+      accessGroups = ["Admin"];
+    };
+  };
 }
