@@ -1,4 +1,5 @@
 import { groupsGroupIdGet } from "@yorganci/netbird-api/groupsGroupIdGet";
+import { peersGet } from "@yorganci/netbird-api/peersGet";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import { catchNotFound } from "../src/errors.ts";
@@ -10,6 +11,7 @@ const { test, fixture, isDockerReady } = createHarness("NetBirdFixture-Group");
 
 const NAME_BASIC = "alchemy-test-group-basic";
 const NAME_UPDATE = "alchemy-test-group-update";
+const NAME_PRESERVE = "alchemy-test-group-preserve";
 
 test.provider.skipIf(!isDockerReady)("create, update, and delete a group", stack =>
 	Effect.gen(function* () {
@@ -57,6 +59,41 @@ test.provider.skipIf(!isDockerReady)("update group name in place", stack =>
 
 		const live = yield* groupsGroupIdGet({ groupId: renamed.groupId });
 		expect(live.name).toEqual(`${NAME_UPDATE}-renamed`);
+
+		yield* stack.destroy();
+	}).pipe(withLogLevel),
+);
+
+test.provider.skipIf(!isDockerReady)("omitting peers leaves existing members alone", stack =>
+	Effect.gen(function* () {
+		yield* fixture;
+		yield* stack.destroy();
+
+		// The Docker fixture has no enrolled peers; membership can only be observed
+		// against a server with at least one (same guard as the route test).
+		const peers = yield* peersGet({});
+		if (peers.length === 0) return;
+		const peerId = peers[0]!.id;
+
+		const group = yield* stack.deploy(
+			NetBird.Group("PreserveMembers", {
+				name: NAME_PRESERVE,
+				peers: [peerId],
+			}),
+		);
+
+		const withMembers = yield* groupsGroupIdGet({ groupId: group.groupId });
+		expect((withMembers.peers ?? []).map(peer => peer.id)).toContain(peerId);
+
+		const preserved = yield* stack.deploy(
+			NetBird.Group("PreserveMembers", {
+				name: NAME_PRESERVE,
+			}),
+		);
+		expect(preserved.groupId).toEqual(group.groupId);
+
+		const live = yield* groupsGroupIdGet({ groupId: preserved.groupId });
+		expect((live.peers ?? []).map(peer => peer.id)).toContain(peerId);
 
 		yield* stack.destroy();
 	}).pipe(withLogLevel),

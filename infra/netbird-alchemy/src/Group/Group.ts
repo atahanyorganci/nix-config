@@ -24,7 +24,10 @@ export interface GroupProps {
 	/**
 	 * Peer IDs that should be members of this group.
 	 *
-	 * @default []
+	 * When set (including `[]`), membership is replaced on reconcile.
+	 * When omitted (`undefined`), the provider creates an empty group if
+	 * needed but does not rewrite existing members — use this for
+	 * user-role groups populated via NetBird user `auto_groups`.
 	 */
 	peers?: ReadonlyArray<string>;
 }
@@ -93,6 +96,7 @@ export const GroupProvider = () =>
 		reconcile: Effect.fn(function* ({ id, news, output }) {
 			const props = news ?? ({} as GroupProps);
 			const name = yield* resolveName(id, props.name);
+			const managePeers = props.peers !== undefined;
 			const peers = props.peers ?? [];
 
 			let observed: { id: string; name: string; peers: ReadonlyArray<{ id: string }> } | undefined;
@@ -118,7 +122,7 @@ export const GroupProvider = () =>
 			}
 
 			if (!observed) {
-				const created = yield* groupsPost({ name, peers }).pipe(
+				const created = yield* groupsPost({ name, peers: managePeers ? peers : [] }).pipe(
 					Effect.catch(err =>
 						Effect.gen(function* () {
 							const existing = yield* findGroupByName(name);
@@ -128,6 +132,17 @@ export const GroupProvider = () =>
 					),
 				);
 				return { groupId: created.id, name: created.name };
+			}
+
+			if (!managePeers) {
+				if (observed.name !== name) {
+					const updated = yield* groupsGroupIdPut({
+						groupId: observed.id,
+						name,
+					});
+					return { groupId: updated.id, name: updated.name };
+				}
+				return { groupId: observed.id, name: observed.name };
 			}
 
 			const peerIds = observed.peers.map(p => p.id);
