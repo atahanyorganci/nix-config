@@ -36,7 +36,7 @@ const sourceGroups = (
 	if (unknown.length > 0) {
 		return Effect.fail(
 			new SchemaIssue.InvalidValue(Option.some(groups), {
-				message: `${label}: unknown NetBird group name(s) ${unknown.join(", ")} — expected Admin, Users, Servers, Agents, Proxy or All`,
+				message: `${label}: group(s) ${unknown.join(", ")} cannot be granted access — expected Admin, Users, Servers or Proxy (Agents peers are isolated, and All would include them)`,
 			}),
 		);
 	}

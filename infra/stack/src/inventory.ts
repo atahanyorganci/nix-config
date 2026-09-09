@@ -24,12 +24,16 @@ export const isNetBirdGroupName = (value: string): value is NetBirdGroupName =>
  */
 export const PROXY_GROUP_NAME = "Proxy";
 
-/** Group names accepted as policy sources: the zero-trust groups, Proxy, and NetBird's built-in All group. */
-export const PolicySourceGroupName = Schema.Literals(["Admin", "Users", "Servers", "Agents", "Proxy", "All"]);
+/**
+ * Group names accepted as policy sources. Agents peers are isolated and are
+ * never a source; NetBird's built-in All group is rejected because it would
+ * include them.
+ */
+export const PolicySourceGroupName = Schema.Literals(["Admin", "Users", "Servers", "Proxy"]);
 export type PolicySourceGroupName = typeof PolicySourceGroupName.Type;
 
 export const isPolicySourceGroupName = (value: string): value is PolicySourceGroupName =>
-	value === "All" || value === PROXY_GROUP_NAME || isNetBirdGroupName(value);
+	value === PROXY_GROUP_NAME || (isNetBirdGroupName(value) && value !== "Agents");
 
 export const InventoryHost = Schema.Struct({
 	name: Schema.String,
