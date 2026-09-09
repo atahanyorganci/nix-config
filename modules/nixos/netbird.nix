@@ -196,12 +196,14 @@ in {
           # the old control plane forever, because an unreachable one reports
           # Disconnected rather than NeedsLogin. Log in whenever the daemon is
           # not already connected to the configured host.
+          # The URL is only printed with --detail; plain `status` just says
+          # `Management: Connected`, which would never match below.
           status() {
-            ${nb} status 2>&1 || :
+            ${nb} status --detail 2>&1 || :
           }
 
-          # `netbird status` prints `Management: Connected to <url>` including
-          # the port, so match the host alone.
+          # `netbird status --detail` prints `Management: Connected to <url>`
+          # including the port, so match the host alone.
           connected_here() {
             status | grep --quiet 'Management: Connected to .*${controlPlaneHost}'
           }
@@ -228,13 +230,28 @@ in {
             sleep 1
           done
 
+          # `netbird up` returns early with "Already connected" and ignores the
+          # new URL while the daemon still holds a session, so drop it first.
+          # Only when it is connected somewhere else: after a timeout the daemon
+          # has no session, and tearing one down we failed to re-establish would
+          # leave the peer offline.
+          if connected_elsewhere; then
+            ${nb} down || :
+          fi
+
           # Carries the desired URL so the daemon persists it and reconnects as
           # the same peer; the setup key in $NB_SETUP_KEY_FILE is picked up
           # automatically when a login is really required. A failure here must
           # never fail activation.
-          if ! ${nb} up --management-url ${lib.escapeShellArg cfg.managementUrl}; then
-            echo "netbird-wt0-login: could not log in to ${cfg.managementUrl}; retrying on the next start" >&2
-          fi
+          attempt=0
+          until ${nb} up --management-url ${lib.escapeShellArg cfg.managementUrl}; do
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge 3 ]; then
+              echo "netbird-wt0-login: could not log in to ${cfg.managementUrl}; retrying on the next start" >&2
+              break
+            fi
+            sleep 5
+          done
         '');
       };
     };
