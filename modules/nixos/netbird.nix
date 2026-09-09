@@ -124,6 +124,11 @@ in {
     config = lib.mkIf cfg.enable {
       # NetBird DNS resolution uses systemd-resolved.
       services.resolved.enable = true;
+      # The upstream module runs the hardened client as its own user and ships a
+      # polkit rule granting it the systemd-resolved actions, but that rule only
+      # takes effect when polkit itself runs; without it every DNS update fails
+      # with "Permission denied".
+      security.polkit.enable = true;
       services.netbird.package = cfg.package;
       # Client routes (exit nodes, network resources) and server routes (routing
       # peers) need loose rp_filter and IP forwarding respectively.
