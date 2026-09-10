@@ -6,10 +6,11 @@ import { peersGet } from "@yorganci/netbird-api/peers";
 import { AlchemyContextLive } from "alchemy/AlchemyContext";
 import { ArtifactStore, createArtifactStore } from "alchemy/Artifacts";
 import { AuthProviders } from "alchemy/Auth/AuthProvider";
-import { withProfileOverride } from "alchemy/Auth/Profile";
+import { ProfileLive, withProfileOverride } from "alchemy/Auth/Profile";
 import { Stage } from "alchemy/Stage";
 import * as State from "alchemy/State";
 import { loadConfigProvider } from "alchemy/Util/ConfigProvider";
+import { PlatformServices } from "alchemy/Util/PlatformServices";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Console from "effect/Console";
@@ -82,7 +83,8 @@ const withAlchemyState = <A, E>(
 		}
 
 		const services = Layer.mergeAll(
-			AlchemyContextLive,
+			Layer.provideMerge(AlchemyContextLive, PlatformServices),
+			Layer.provide(ProfileLive, PlatformServices),
 			Layer.succeed(ArtifactStore, createArtifactStore()),
 			Layer.succeed(AuthProviders, {}),
 			ConfigProvider.layer(withProfileOverride(yield* loadConfigProvider(options.envFile), options.profile)),

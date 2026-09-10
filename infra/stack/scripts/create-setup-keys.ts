@@ -5,10 +5,11 @@ import { setupKeysPost } from "@yorganci/netbird-api/setup_keys";
 import { AlchemyContextLive } from "alchemy/AlchemyContext";
 import { ArtifactStore, createArtifactStore } from "alchemy/Artifacts";
 import { AuthProviders } from "alchemy/Auth/AuthProvider";
-import { withProfileOverride } from "alchemy/Auth/Profile";
+import { ProfileLive, withProfileOverride } from "alchemy/Auth/Profile";
 import { Stage } from "alchemy/Stage";
 import * as State from "alchemy/State";
 import { loadConfigProvider } from "alchemy/Util/ConfigProvider";
+import { PlatformServices } from "alchemy/Util/PlatformServices";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Console from "effect/Console";
@@ -27,7 +28,7 @@ import { readNetbirdCredentials } from "../src/netbird-credentials.ts";
 import netbirdServerStack from "../stack/netbird-server.ts";
 
 const SETUP_KEY_EXPIRES_IN_SECONDS = 86_400;
-const REPO_ROOT = `${import.meta.dir}/../..`;
+const REPO_ROOT = `${import.meta.dir}/../../..`;
 
 const evalInventory = Effect.tryPromise({
 	try: async () => {
@@ -108,7 +109,8 @@ const withAlchemyState = <A, E>(
 		}
 
 		const services = Layer.mergeAll(
-			AlchemyContextLive,
+			Layer.provideMerge(AlchemyContextLive, PlatformServices),
+			Layer.provide(ProfileLive, PlatformServices),
 			Layer.succeed(ArtifactStore, createArtifactStore()),
 			Layer.succeed(AuthProviders, {}),
 			ConfigProvider.layer(withProfileOverride(yield* loadConfigProvider(options.envFile), options.profile)),
