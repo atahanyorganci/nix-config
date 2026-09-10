@@ -6,6 +6,12 @@ import * as HttpApiError from "effect/unstable/httpapi/HttpApiError";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
 import {
+	InvalidUrlError,
+	NoImageReaderError,
+	PngDecodeError,
+	RenderError,
+} from "../thermal-printer.ts";
+import {
 	ClaimFailed,
 	DeviceNotFound,
 	NoBulkOutEndpoint,
@@ -15,6 +21,7 @@ import {
 	UsbNativeError,
 } from "../usb/errors.ts";
 import { hello } from "./templates/hello.tsx";
+import { imageProps } from "./templates/image.tsx";
 
 const HealthOk = Schema.Struct({ ok: Schema.Literal(true) });
 
@@ -22,6 +29,13 @@ const HealthOk = Schema.Struct({ ok: Schema.Literal(true) });
 const MaxBase64Bytes = 256 * 1024;
 /** Max decoded ESC/POS payload size (192 KiB). */
 const MaxPayloadBytes = 192 * 1024;
+/** Max raw PNG upload size (4 MiB). */
+const MaxPngBytes = 4 * 1024 * 1024;
+
+const PngPayload = Schema.Uint8Array.check(
+	Schema.isNonEmpty({ message: "PNG body must not be empty" }),
+	Schema.isMaxLength(MaxPngBytes, { message: `PNG body exceeds ${MaxPngBytes} bytes` }),
+);
 
 const PrintPayload = Schema.String.check(
 	Schema.isNonEmpty({ message: "print body must not be empty" }),
@@ -75,6 +89,45 @@ export const Api = HttpApi.make("EscposDigest").add(
 			success: HttpApiSchema.NoContent,
 			error: [
 				HttpApiError.BadRequest,
+				InvalidUrlError,
+				PngDecodeError,
+				RenderError,
+				NoImageReaderError,
+				DeviceNotFound,
+				PrinterNotFound,
+				NoBulkOutEndpoint,
+				OpenFailed,
+				ClaimFailed,
+				TransferFailed,
+				UsbNativeError,
+			],
+		}),
+		HttpApiEndpoint.post("templateImage", "/template/image", {
+			payload: imageProps,
+			success: HttpApiSchema.NoContent,
+			error: [
+				HttpApiError.BadRequest,
+				InvalidUrlError,
+				PngDecodeError,
+				RenderError,
+				NoImageReaderError,
+				DeviceNotFound,
+				PrinterNotFound,
+				NoBulkOutEndpoint,
+				OpenFailed,
+				ClaimFailed,
+				TransferFailed,
+				UsbNativeError,
+			],
+		}),
+		HttpApiEndpoint.post("templateImageRaw", "/template/image/raw", {
+			payload: PngPayload.pipe(HttpApiSchema.asUint8Array({ contentType: "image/png" })),
+			success: HttpApiSchema.NoContent,
+			error: [
+				HttpApiError.BadRequest,
+				PngDecodeError,
+				RenderError,
+				NoImageReaderError,
 				DeviceNotFound,
 				PrinterNotFound,
 				NoBulkOutEndpoint,

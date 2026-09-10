@@ -15,6 +15,7 @@ import * as Flag from "effect/unstable/cli/Flag";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import * as Http from "./http/index.ts";
+import * as Paper from "./paper.ts";
 import * as UsbPrinter from "./usb/print.ts";
 
 const UsbIdFromString = Schema.String.pipe(
@@ -56,13 +57,15 @@ const serve = Command.make(
 	{
 		hostname: Flag.string("hostname").pipe(Flag.withDefault("127.0.0.1")),
 		port: Flag.integer("port").pipe(Flag.withDefault(8080)),
+		paperWidth: Flag.integer("paper-width").pipe(Flag.withDefault(Paper.DEFAULT_PAPER_WIDTH_PX)),
 		vendorId: usbIdFlag("vendor-id"),
 		productId: usbIdFlag("product-id"),
 	},
-	({ hostname, port, vendorId, productId }) =>
+	({ hostname, port, paperWidth, vendorId, productId }) =>
 		Layer.launch(
 			HttpRouter.serve(HttpApiBuilder.layer(Http.Api)).pipe(
 				Layer.provide(Http.live),
+				Layer.provide(Paper.layer(paperWidth)),
 				Layer.provide(UsbPrinter.fromConfig({ vendorId, productId })),
 				Layer.provide(BunHttpServer.layer({ hostname, port })),
 			),

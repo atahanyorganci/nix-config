@@ -3,6 +3,7 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { UsbPrinter } from "../usb/print.ts";
 import { Api } from "./api.ts";
 import { hello } from "./templates/hello.tsx";
+import { renderFromPngBytes, renderFromSrc } from "./templates/image.tsx";
 
 /** ESC/POS GS V 0 — full cut. */
 const CutCommand = new Uint8Array([0x1d, 0x56, 0x00]);
@@ -24,7 +25,21 @@ export const live = HttpApiBuilder.group(Api, "api", handlers =>
 		)
 		.handle("templateHello", ({ payload: { name } }) =>
 			Effect.gen(function* () {
-				const data = yield* hello.render({ name }).pipe(Effect.orDie);
+				const data = yield* hello.render({ name });
+				const printer = yield* UsbPrinter;
+				yield* printer.print(data);
+			}),
+		)
+		.handle("templateImage", ({ payload: { src } }) =>
+			Effect.gen(function* () {
+				const data = yield* renderFromSrc(src);
+				const printer = yield* UsbPrinter;
+				yield* printer.print(data);
+			}),
+		)
+		.handle("templateImageRaw", ({ payload }) =>
+			Effect.gen(function* () {
+				const data = yield* renderFromPngBytes(payload);
 				const printer = yield* UsbPrinter;
 				yield* printer.print(data);
 			}),
