@@ -229,6 +229,22 @@ export default HomeInfra.make(
 			keepRoute: false,
 		});
 
+		const saturnPeer = peers.saturn;
+		if (!saturnPeer) {
+			return yield* Effect.die('NetBird peer "saturn" is required for the US exit route');
+		}
+		yield* NetBird.Route("SaturnExitV4", {
+			description: "saturn-exit-ipv4",
+			networkId: "saturn-exit",
+			network: "0.0.0.0/0",
+			peer: saturnPeer.peerId,
+			groups: exitGroups,
+			masquerade: true,
+			metric: 200,
+			skipAutoApply: true,
+			keepRoute: false,
+		});
+
 		const services: Record<string, string> = {};
 		for (const plan of plans) {
 			const peer = peers[plan.hostKey]!;

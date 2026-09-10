@@ -233,10 +233,7 @@ const parseNetbirdClientStatus = (): Effect.Effect<ClientStatus> =>
 		try: async () => {
 			// Summary output has "Relays: N/N Available"; detail (-d) lists per-peer
 			// proxy status and does not include those summary ratios.
-			const [summary, detail] = await Promise.all([
-				readNetbirdStdout(["status"]),
-				readNetbirdStdout(["status", "-d"]),
-			]);
+			const [summary, detail] = await Promise.all([readNetbirdStdout(["status"]), readNetbirdStdout(["status", "-d"])]);
 
 			const managementConnected = /Management:\s*Connected/i.test(summary);
 			const signalConnected = /Signal:\s*Connected/i.test(summary);
@@ -342,7 +339,9 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 			checks.push({
 				name: "client-signal",
 				ok: client.available && client.signalConnected,
-				detail: client.available ? `signal=${client.signalConnected ? "Connected" : "down"}` : "netbird CLI unavailable",
+				detail: client.available
+					? `signal=${client.signalConnected ? "Connected" : "down"}`
+					: "netbird CLI unavailable",
 			});
 			checks.push({
 				name: "client-relays",
@@ -419,8 +418,7 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 					checks.push({
 						name: "default-policy-disabled",
 						ok: defaultPolicy?.enabled === false,
-						detail:
-							defaultPolicy === undefined ? "Default policy missing" : `enabled=${defaultPolicy.enabled}`,
+						detail: defaultPolicy === undefined ? "Default policy missing" : `enabled=${defaultPolicy.enabled}`,
 					});
 
 					for (const policyName of REQUIRED_POLICIES) {
@@ -432,20 +430,34 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 						});
 					}
 
-					const exitRoute = routes.find(
-						route => route.network === "0.0.0.0/0" || (route.description ?? "").includes("mars-exit"),
+					const marsExit = routes.find(
+						route => route.network_id === "mars-exit" || (route.description ?? "").includes("mars-exit"),
 					);
-					const accessControl = exitRoute?.access_control_groups ?? null;
+					const marsAccessControl = marsExit?.access_control_groups ?? null;
 					checks.push({
 						name: "exit-route",
 						ok:
-							exitRoute?.enabled === true &&
-							exitRoute.network === "0.0.0.0/0" &&
-							(accessControl === null || accessControl.length === 0),
+							marsExit?.enabled === true &&
+							marsExit.network === "0.0.0.0/0" &&
+							(marsAccessControl === null || marsAccessControl.length === 0),
 						detail:
-							exitRoute === undefined
+							marsExit === undefined
 								? "mars exit route missing"
-								: `enabled=${exitRoute.enabled} network=${exitRoute.network} access_control_groups=${JSON.stringify(accessControl)}`,
+								: `enabled=${marsExit.enabled} network=${marsExit.network} access_control_groups=${JSON.stringify(marsAccessControl)}`,
+					});
+
+					const saturnExit = routes.find(
+						route => route.network_id === "saturn-exit" || (route.description ?? "").includes("saturn-exit"),
+					);
+					checks.push({
+						name: "saturn-exit-route",
+						ok:
+							saturnExit?.enabled === true && saturnExit.network === "0.0.0.0/0" && saturnExit.skip_auto_apply === true,
+						soft: true,
+						detail:
+							saturnExit === undefined
+								? "saturn exit route missing (enroll saturn, then deploy HomeInfra)"
+								: `enabled=${saturnExit.enabled} network=${saturnExit.network} skip_auto_apply=${saturnExit.skip_auto_apply} metric=${saturnExit.metric}`,
 					});
 
 					const primaryNs = nameservers.find(entry => entry.primary && entry.enabled);
