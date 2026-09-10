@@ -8,6 +8,12 @@ in {
     ...
   }: let
     cfg = config.netbird;
+    controlPlaneHost = let
+      match = builtins.match "^[^:]+://([^/:]+)(:[0-9]+)?(/.*)?$" cfg.managementUrl;
+    in
+      if match == null
+      then throw "netbird.managementUrl must contain an HTTP(S) hostname"
+      else builtins.elemAt match 0;
   in {
     options.netbird = {
       enable = lib.mkEnableOption "NetBird client (connect to self-hosted management)";
@@ -75,9 +81,24 @@ in {
             exit 1
           fi
 
-          # Already joined: succeed so KeepAlive stops restarting.
-          if "$netbird" status 2>/dev/null | grep -qiE 'Management:[[:space:]]+Connected'; then
+          # The management URL is only printed with --detail; plain `status`
+          # just says `Connected`, which would accept the wrong control plane.
+          status_detail() {
+            "$netbird" status --detail 2>/dev/null || :
+          }
+
+          # Already on the configured control plane: succeed so KeepAlive stops
+          # restarting. Match the host alone, since the printed URL carries the
+          # port.
+          if status_detail | grep -q "Management: Connected to .*${controlPlaneHost}"; then
             exit 0
+          fi
+
+          # `netbird up` returns early with "Already connected" and ignores the
+          # new URL while the daemon still holds a session, so drop it when the
+          # client is connected to a different control plane.
+          if status_detail | grep 'Management: Connected to ' | grep -qv ${lib.escapeShellArg controlPlaneHost}; then
+            "$netbird" down || :
           fi
 
           exec "$netbird" up \
