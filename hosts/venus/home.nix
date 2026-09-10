@@ -1,4 +1,5 @@
 {user, ...}: {
+  agents.enable = true;
   # Public keys + gpg CLI; no local agent (use forwarded YubiKey from sol).
   gpg.enable = true;
   gpg.agent.enable = false;
@@ -11,6 +12,7 @@
     };
   };
   gum.enable = true;
+  node.enable = true;
   python.enable = true;
   shell = {
     bash.enable = true;

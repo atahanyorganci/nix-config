@@ -57,11 +57,4 @@
     enable = true;
     setupKeyFile = "/var/lib/netbird-client/setup.key";
   };
-  services.omlx = {
-    enable = true;
-    settings = {
-      ssd-cache-max-size = "22GB";
-      skip-api-key-verification = true;
-    };
-  };
 }
