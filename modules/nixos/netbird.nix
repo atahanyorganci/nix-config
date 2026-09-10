@@ -15,12 +15,58 @@ in {
     cut = lib.getExe' pkgs.coreutils "cut";
     sort = lib.getExe' pkgs.coreutils "sort";
     sleep = lib.getExe' pkgs.coreutils "sleep";
-    controlPlaneHost = let
-      match = builtins.match "^[^:]+://([^/:]+)(:[0-9]+)?(/.*)?$" cfg.managementUrl;
+    controlPlane = let
+      match = builtins.match "^([a-z]+)://([^/:]+)(:([0-9]+))?(/.*)?$" cfg.managementUrl;
     in
       if match == null
       then throw "netbird.managementUrl must contain an HTTP(S) hostname"
-      else builtins.elemAt match 0;
+      else let
+        scheme = builtins.elemAt match 0;
+        port = builtins.elemAt match 3;
+      in {
+        inherit scheme;
+        host = builtins.elemAt match 1;
+        port =
+          if port != null
+          then port
+          else if scheme == "https"
+          then "443"
+          else "80";
+      };
+    controlPlaneHost = controlPlane.host;
+    # The daemon reads its control plane from the on-disk config and only ever
+    # rewrites it during a login, which cannot be driven reliably from a unit
+    # (the CLI needs a writable profile directory it does not have here). Pin it
+    # before the daemon starts instead: the peer's private key is untouched, so
+    # it reconnects to the same account as the same peer.
+    repointConfig = pkgs.writeShellScript "netbird-wt0-repoint" ''
+      set -u
+
+      config=${lib.escapeShellArg "${client.dir.state}/config.json"}
+      desired=${lib.escapeShellArg "${controlPlane.host}:${controlPlane.port}"}
+
+      # Nothing to do before the first login writes a config.
+      [ -f "$config" ] || exit 0
+
+      current=$(${lib.getExe pkgs.jq} -r '.ManagementURL.Host // empty' "$config" 2>/dev/null || :)
+      [ "$current" = "$desired" ] && exit 0
+
+      echo "netbird-wt0: repointing from ''${current:-unset} to $desired" >&2
+      tmp=$(${lib.getExe' pkgs.coreutils "mktemp"}) || exit 0
+      if ${lib.getExe pkgs.jq} \
+        --arg scheme ${lib.escapeShellArg controlPlane.scheme} \
+        --arg host "$desired" \
+        '.ManagementURL.Scheme = $scheme
+         | .ManagementURL.Host = $host
+         | if .AdminURL then .AdminURL.Scheme = $scheme | .AdminURL.Host = $host else . end' \
+        "$config" >"$tmp"; then
+        # Redirect rather than move, so ownership and mode are preserved.
+        ${lib.getExe' pkgs.coreutils "cat"} "$tmp" >"$config"
+      else
+        echo "netbird-wt0: could not rewrite $config; leaving it alone" >&2
+      fi
+      ${lib.getExe' pkgs.coreutils "rm"} -f "$tmp"
+    '';
     controlPlaneRouting = pkgs.writeShellScript "netbird-wt0-control-plane-routing" ''
       set -u
 
@@ -173,7 +219,7 @@ in {
         # Keep the resolved control endpoint in the main table so its unmarked
         # sockets cannot be captured by an exit-node default route.
         serviceConfig = {
-          ExecStartPre = lib.mkBefore ["+${controlPlaneRouting} add"];
+          ExecStartPre = lib.mkBefore ["+${repointConfig}" "+${controlPlaneRouting} add"];
           ExecStopPost = lib.mkAfter ["+${controlPlaneRouting} remove"];
         };
       };
@@ -243,8 +289,11 @@ in {
           # the same peer; the setup key in $NB_SETUP_KEY_FILE is picked up
           # automatically when a login is really required. A failure here must
           # never fail activation.
+          # Bounded: a bare `netbird up` blocks indefinitely when it cannot
+          # reach the control plane, which stalls the whole activation and with
+          # it any deploy that is switching this host.
           attempt=0
-          until ${nb} up --management-url ${lib.escapeShellArg cfg.managementUrl}; do
+          until ${lib.getExe' pkgs.coreutils "timeout"} 60 ${nb} up --management-url ${lib.escapeShellArg cfg.managementUrl}; do
             attempt=$((attempt + 1))
             if [ "$attempt" -ge 3 ]; then
               echo "netbird-wt0-login: could not log in to ${cfg.managementUrl}; retrying on the next start" >&2
