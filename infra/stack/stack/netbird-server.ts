@@ -10,7 +10,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
-import { Hetzner, NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
+import { Aws, Hetzner, NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
 
 const FlakeMe = Schema.Struct({
 	name: Schema.String,
@@ -109,6 +109,7 @@ export default NetbirdServerStack.make(
 		providers: Layer.mergeAll(
 			Cloudflare.providers(),
 			Hetzner.providers(),
+			Aws.providers(),
 			NetBird.providers(NetBird.CredentialsFromRef(netbirdCredentials)),
 			NixExpr.NixExprProvider(),
 		),
@@ -201,6 +202,28 @@ export default NetbirdServerStack.make(
 			memo: NIX_MEMO,
 		});
 
+		const saturn = yield* Aws.exitNode({
+			name: "saturn",
+			publicKey: deployKey,
+			instanceType: "t4g.medium",
+		});
+		const saturnBootstrap = yield* Command.Exec("SaturnNixosBootstrap", {
+			command: Output.map(
+				Output.all(saturn.grown, saturn.associated, saturn.publicIp),
+				([, , host]) => `nix run .#nixos-bootstrap -- root@${host} .#saturn`,
+			),
+			cwd: REPO_ROOT,
+			memo: BOOTSTRAP_MEMO,
+		});
+		yield* Command.Exec("SaturnNixos", {
+			command: Output.map(
+				Output.all(saturnBootstrap.hash, saturn.publicIp),
+				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#saturn`,
+			),
+			cwd: REPO_ROOT,
+			memo: NIX_MEMO,
+		});
+
 		const zone = yield* Cloudflare.Zone.Zone("Domain", {
 			name: infra.domain,
 		});
@@ -262,6 +285,10 @@ export default NetbirdServerStack.make(
 			jupiter: {
 				ip: jupiterIpv4.ip,
 				serverId: jupiter.serverId,
+			},
+			saturn: {
+				ip: saturn.publicIp,
+				instanceId: saturn.instance.instanceId,
 			},
 			apiBaseUrl: netbirdApiBaseUrl,
 			admin: {

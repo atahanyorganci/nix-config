@@ -6,6 +6,8 @@ ALCHEMY_PROFILE := "personal"
 ALCHEMY_NO_TUI := "1"
 ALCHEMY_PLAIN := "1"
 
+AWS_REGION := "us-east-2"
+
 bun := require("bun")
 bunx := require("bunx")
 
