@@ -70,6 +70,7 @@
         ./hosts/moon
         ./hosts/mars
         ./hosts/jupiter
+        ./hosts/saturn
         ./hosts/pluto
       ];
     };

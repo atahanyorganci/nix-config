@@ -10,6 +10,7 @@ Nix flake for managing system and home configuration for various host machines.
 | [`moon`][moon]       | `aarch64-linux`    | OrbStack VM for development    |
 | [`mars`][mars]       | `x86_64-linux`     | Netbird server                 |
 | [`jupiter`][jupiter] | `x86_64-linux`     | Hermes Agent server            |
+| [`saturn`][saturn]   | `aarch64-linux`    | US NetBird exit node (EC2)     |
 | [`pluto`][pluto]     | `x86_64-linux`     | Base Hetzner VPS configuration |
 
 [mercury]: ./hosts/mercury/default.nix
@@ -18,4 +19,5 @@ Nix flake for managing system and home configuration for various host machines.
 [moon]: ./hosts/moon/default.nix
 [mars]: ./hosts/mars/default.nix
 [jupiter]: ./hosts/jupiter/default.nix
+[saturn]: ./hosts/saturn/default.nix
 [pluto]: ./hosts/pluto/default.nix
