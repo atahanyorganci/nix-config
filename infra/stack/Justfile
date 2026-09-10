@@ -22,13 +22,8 @@ destroy *args:
 verify *args:
     {{ bun }} scripts/verify-access.ts {{ args }}
 
-# Deploy home-infra with NetBird's dashboard Default policy disabled (default deny).
-cutover *args:
-    NETBIRD_DISABLE_DEFAULT_POLICY=1 {{ bunx }} alchemy deploy --yes --log-level all stack/home-infra.ts {{ args }}
-
-# Undo cutover: deploy home-infra with the Default policy enabled again.
-rollback *args:
-    NETBIRD_DISABLE_DEFAULT_POLICY=0 {{ bunx }} alchemy deploy --yes --log-level all stack/home-infra.ts {{ args }}
+test *args:
+    {{ bun }} scripts/test-netbird-network.ts {{ args }}
 
 bootstrap:
     {{ bunx }} alchemy cloudflare bootstrap

@@ -72,6 +72,27 @@ export const adminSshRules = (): ReadonlyArray<PolicyRuleSpec> => [
 	},
 ];
 
+/**
+ * Private reverse-proxy domains resolve to embedded proxy peers, which sit
+ * outside `All`. NetBird synthesises AccessGroups→proxy-peer ACLs in memory,
+ * but once Default is disabled the durable `Proxy` group still needs an
+ * explicit allow so dashboard membership and persisted policy stay aligned
+ * with that path (TCP 80/443 match the synthesised private-access ports).
+ */
+export const adminProxyRules = (): ReadonlyArray<PolicyRuleSpec> => [
+	{
+		name: "admin-proxy-tcp",
+		description: "Admins may reach reverse-proxy peers for private services",
+		enabled: true,
+		action: "accept",
+		bidirectional: false,
+		protocol: "tcp",
+		ports: ["80", "443"],
+		sourceGroups: ["Admin"],
+		destinationGroups: ["Proxy"],
+	},
+];
+
 export const serverSshRules = (): ReadonlyArray<PolicyRuleSpec> => [
 	{
 		name: "servers-ssh",

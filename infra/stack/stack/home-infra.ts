@@ -24,13 +24,6 @@ const Me = Schema.Struct({
 });
 
 const REPO_ROOT = "../..";
-/**
- * Cut-over switch for NetBird's dashboard "Default" All->All policy. Leave it
- * unset for a first deploy so only the allow rules are added, verify access
- * from every group, then redeploy with NETBIRD_DISABLE_DEFAULT_POLICY=1.
- * Unsetting it again (or destroying the stack) re-enables Default.
- */
-const DISABLE_DEFAULT_POLICY = Bun.env.NETBIRD_DISABLE_DEFAULT_POLICY === "1";
 
 const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({});
 
@@ -166,10 +159,11 @@ export default HomeInfra.make(
 			Alchemy.RemovalPolicy.retain(),
 		);
 
-		// The reverse proxy joins the mesh as an embedded peer that is not in the
-		// flake inventory, so add it to this group once in the dashboard. Every
-		// exposed service allows the group; without it, disabling Default would
-		// cut the proxy off from its targets.
+		// The reverse proxy joins the mesh as embedded peers that are not in the
+		// flake inventory and are omitted from /api/peers. Add those peers to this
+		// group once in the dashboard (Peers → proxy-* → Groups). Without that,
+		// allow-admin-proxy-tcp has an empty destination after Default is disabled,
+		// and matrix rules that list Proxy as a source never match a peer.
 		const proxyGroup = yield* NetBird.Group("Proxy", { name: Inventory.PROXY_GROUP_NAME });
 		groupOutputs[Inventory.PROXY_GROUP_NAME] = {
 			groupId: proxyGroup.groupId,
@@ -230,7 +224,6 @@ export default HomeInfra.make(
 			network: "0.0.0.0/0",
 			peer: marsPeer.peerId,
 			groups: exitGroups,
-			accessControlGroups: exitGroups,
 			masquerade: true,
 			metric: 100,
 			keepRoute: false,
@@ -310,6 +303,7 @@ export default HomeInfra.make(
 		const allowRules = [
 			...Policies.adminAllowAllRules(),
 			...Policies.adminSshRules(),
+			...Policies.adminProxyRules(),
 			...Policies.serverSshRules(),
 			...Policies.allowRulesFromMatrix(accessMatrix, inventory),
 		];
@@ -326,12 +320,13 @@ export default HomeInfra.make(
 			});
 		}
 
-		// The dashboard All->All policy is adopted, never deleted, and only
-		// disabled once the cut-over switch is set.
-		yield* NetBird.Policy("LegacyDefault", {
+		// Adopt the dashboard All→All policy, keep it disabled (default deny),
+		// and retain it so destroy never deletes the built-in rule.
+		yield* NetBird.Policy("DisableDefault", {
 			name: NetBird.DEFAULT_POLICY_NAME,
-			enabled: !DISABLE_DEFAULT_POLICY,
-		});
+			description: "Retained built-in All→All policy — kept disabled for zero-trust default deny",
+			enabled: false,
+		}).pipe(Alchemy.RemovalPolicy.retain());
 
 		return {
 			peers: peerOutputs,
@@ -341,7 +336,6 @@ export default HomeInfra.make(
 			owner: ownerOutput,
 			policies: {
 				allowRuleCount: allowRules.length,
-				legacyDefaultDisabled: DISABLE_DEFAULT_POLICY,
 			},
 		};
 	}).pipe(Effect.orDie),
