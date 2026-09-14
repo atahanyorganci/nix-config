@@ -710,6 +710,7 @@
         "nixpkgs": "nixpkgs",
         "nixpkgs-vscode-server": "nixpkgs-vscode-server",
         "stylix": "stylix",
+        "t3code": "t3code",
         "treefmt-nix": "treefmt-nix_2",
         "vscode-server": "vscode-server"
       }
@@ -781,6 +782,35 @@
         "owner": "nix-systems",
         "ref": "future-26.11",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "t3code": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "import-tree": [
+          "import-tree"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "treefmt-nix": [
+          "treefmt-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1789372485,
+        "narHash": "sha256-avkWiCIYkmt/17aBuJcc6mGLVliw7dQ1JFDd/h0GGV4=",
+        "owner": "atahanyorganci",
+        "repo": "t3code",
+        "rev": "695746889f0e70eff8ea7ed07fc9aca3ed19f421",
+        "type": "github"
+      },
+      "original": {
+        "owner": "atahanyorganci",
+        "repo": "t3code",
         "type": "github"
       }
     },

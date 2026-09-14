@@ -104,7 +104,7 @@
           enable = true;
           package =
             if pkgs.stdenv.isDarwin
-            then inputs.nix-casks.packages.${system}.t3-code
+            then inputs.t3code.packages.${system}.default
             else pkgs.t3code;
           # Fonts and light/dark polarity are client-local settings, unlike
           # the theme file above. Wire those up to the shared Stylix config
