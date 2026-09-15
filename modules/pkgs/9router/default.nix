@@ -2,13 +2,13 @@
   flake.overlays."9router" = final: _prev: {
     "9router" = final.buildNpmPackage rec {
       pname = "9router";
-      version = "0.5.35";
+      version = "0.5.75";
 
       src = final.fetchFromGitHub {
         owner = "decolua";
         repo = "9router";
         tag = "v${version}";
-        hash = "sha256-KlVaZ47BU6RZpfzAW02K328RIkFxo8UPbAe3vCUHOXU=";
+        hash = "sha256-BBfMQbXHDCbq0PBN4XM2mKIkNEjrmb5wYo50QkpaFQ8=";
       };
 
       # Upstream ships no package-lock.json and the CLI (`cli/`) isn't wired up
@@ -33,7 +33,7 @@
             'const inter = {variable: ""};'
       '';
 
-      npmDepsHash = "sha256-Vj8sigFeKSWzBYJ4MPQrzPqpsyV0jhVaJt9Hk/wPZq4=";
+      npmDepsHash = "sha256-T4rW9gbiBc0i+fk98mA9mLZhaUwlrWKLUAHefU61Uiw=";
       # Needed for npm workspaces support (see nixpkgs `buildNpmPackage` docs).
       npmDepsFetcherVersion = 2;
 
