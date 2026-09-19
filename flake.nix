@@ -71,14 +71,6 @@
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [
         (inputs.import-tree ./modules)
-        ./hosts/mercury
-        ./hosts/venus
-        ./hosts/sol
-        ./hosts/moon
-        ./hosts/mars
-        ./hosts/jupiter
-        ./hosts/saturn
-        ./hosts/pluto
       ];
     };
 }

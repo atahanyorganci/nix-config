@@ -7,7 +7,7 @@
 			"outputs": []
 		},
 		"//#format:root": {
-			"inputs": ["$TURBO_DEFAULT$", "!infra/**", "!hosts/**", "!modules/**"]
+			"inputs": ["$TURBO_DEFAULT$", "!infra/**", "!modules/**"]
 		},
 		"format:fix": {
 			"cache": false,

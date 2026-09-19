@@ -13,11 +13,11 @@ Nix flake for managing system and home configuration for various host machines.
 | [`saturn`][saturn]   | `aarch64-linux`    | US NetBird exit node (EC2)     |
 | [`pluto`][pluto]     | `x86_64-linux`     | Base Hetzner VPS configuration |
 
-[mercury]: ./hosts/mercury/default.nix
-[venus]: ./hosts/venus/default.nix
-[sol]: ./hosts/sol/default.nix
-[moon]: ./hosts/moon/default.nix
-[mars]: ./hosts/mars/default.nix
-[jupiter]: ./hosts/jupiter/default.nix
-[saturn]: ./hosts/saturn/default.nix
-[pluto]: ./hosts/pluto/default.nix
+[mercury]: ./modules/hosts/mercury.nix
+[venus]: ./modules/hosts/venus.nix
+[sol]: ./modules/hosts/sol.nix
+[moon]: ./modules/hosts/moon.nix
+[mars]: ./modules/hosts/mars.nix
+[jupiter]: ./modules/hosts/jupiter.nix
+[saturn]: ./modules/hosts/saturn.nix
+[pluto]: ./modules/hosts/pluto.nix

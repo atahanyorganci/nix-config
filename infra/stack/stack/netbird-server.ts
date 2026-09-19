@@ -91,7 +91,7 @@ const AdminPassword = Action.Action(
 
 // A NixOS deploy re-runs whenever the flake or a host configuration changes.
 const NIX_MEMO = {
-	include: ["flake.nix", "flake.lock", "modules/**/*", "hosts/**/*"],
+	include: ["flake.nix", "flake.lock", "modules/**/*"],
 };
 
 // Bootstrapping installs NixOS once per server, so its memo tracks no
