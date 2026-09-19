@@ -90,7 +90,7 @@
         enableExtraSocket = true;
         enableBashIntegration = config.shell.bash.enable;
         enableFishIntegration = config.shell.fish.enable;
-        enableNushellIntegration = config.shell.fish.enable;
+        enableNushellIntegration = config.shell.nushell.enable;
         enableZshIntegration = config.shell.zsh.enable;
       };
     };
