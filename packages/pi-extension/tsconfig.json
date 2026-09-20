@@ -1,0 +1,9 @@
+{
+	"$schema": "https://json.schemastore.org/tsconfig",
+	"extends": "../config/tsconfig.base.json",
+	"compilerOptions": {
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext"
+	},
+	"include": ["./src/**/*.ts", "./oxfmt.config.ts", "./oxlint.config.ts"]
+}
