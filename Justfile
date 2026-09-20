@@ -9,7 +9,7 @@ update *args: is-clean
 # Root of the pi package the Nix options are generated from. Taken from the
 # flake so the options always match the pi that actually gets installed.
 pi_expr := "let f = builtins.getFlake (toString ./.); p = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in p.pi-coding-agent"
-pi_out := "modules/home/pi/_generated"
+pi_out := "modules/home/pi/generated"
 
 # Regenerate the programs.pi option declarations from pi's type definitions.
 pi-options *args:

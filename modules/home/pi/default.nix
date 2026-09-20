@@ -9,9 +9,6 @@
 
     jsonFormat = pkgs.formats.json {};
 
-    generatedSettingsOptions = import ./_generated/settings-options.nix {inherit lib;};
-    generatedKeybindingOptions = import ./_generated/keybinding-options.nix {inherit lib;};
-
     # Every generated option defaults to null, meaning "not configured". Pi
     # layers project settings over global ones and applies its own defaults for
     # absent keys, so a null must produce an absent key rather than a JSON
@@ -133,8 +130,11 @@
         '';
       };
 
+      # The typed sub-options are declared by the generated modules alongside
+      # this file; option declarations for the same path merge, so this
+      # declaration only carries the prose and the default.
       settings = lib.mkOption {
-        type = lib.types.submodule {options = generatedSettingsOptions;};
+        type = lib.types.submodule {options = {};};
         default = {};
         example = lib.literalExpression ''
           {
@@ -170,7 +170,7 @@
       };
 
       keybindings = lib.mkOption {
-        type = lib.types.submodule {options = generatedKeybindingOptions;};
+        type = lib.types.submodule {options = {};};
         default = {};
         example = lib.literalExpression ''
           {

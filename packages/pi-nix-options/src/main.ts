@@ -25,6 +25,8 @@ interface Args {
 	outDir: string;
 	check: boolean;
 	formatter: string | undefined;
+	moduleName: string;
+	optionPath: string;
 }
 
 /**
@@ -49,6 +51,8 @@ const parseArgs = (argv: string[]): Args => {
 	let piRoot: string | undefined;
 	let outDir: string | undefined;
 	let formatter: string | undefined;
+	let moduleName = "pi";
+	let optionPath = "programs.pi";
 	let check = false;
 	for (let index = 0; index < argv.length; index += 1) {
 		const arg = argv[index];
@@ -58,14 +62,23 @@ const parseArgs = (argv: string[]): Args => {
 			outDir = argv[++index];
 		} else if (arg === "--formatter") {
 			formatter = argv[++index];
+		} else if (arg === "--module-name") {
+			moduleName = argv[++index] ?? moduleName;
+		} else if (arg === "--option-path") {
+			optionPath = argv[++index] ?? optionPath;
 		} else if (arg === "--check") {
 			check = true;
 		} else if (arg === "--help" || arg === "-h") {
 			console.log(
-				"usage: pi-nix-options --pi-root <dir> --out-dir <dir> [--formatter <cmd>] [--check]\n\n" +
-					"  --formatter  command reading Nix on stdin and writing it to stdout,\n" +
-					"               e.g. 'alejandra -q -'. Keeps generation idempotent under\n" +
-					"               a repository formatter.",
+				"usage: pi-nix-options --pi-root <dir> --out-dir <dir> [options]\n\n" +
+					"  --formatter    command reading Nix on stdin, writing it to stdout,\n" +
+					"                 e.g. 'alejandra -q -'. Keeps generation idempotent\n" +
+					"                 under a repository formatter.\n" +
+					"  --module-name  name under flake.modules.homeManager to extend\n" +
+					"                 (default: pi)\n" +
+					"  --option-path  option path the sub-options attach to\n" +
+					"                 (default: programs.pi)\n" +
+					"  --check        fail if emitted files differ from those on disk",
 			);
 			process.exit(0);
 		}
@@ -73,7 +86,7 @@ const parseArgs = (argv: string[]): Args => {
 	if (piRoot === undefined || outDir === undefined) {
 		throw new Error("both --pi-root and --out-dir are required (see --help)");
 	}
-	return { piRoot, outDir, check, formatter };
+	return { piRoot, outDir, check, formatter, moduleName, optionPath };
 };
 
 /** Attach docs prose to the extracted option tree, in place. */
@@ -130,6 +143,8 @@ const main = (): void => {
 		piVersion: pi.version,
 		generator: REGENERATE_HINT,
 		skipped: extractor.skipped,
+		moduleName: args.moduleName,
+		optionPath: args.optionPath,
 	};
 
 	const files: Record<string, string> = {

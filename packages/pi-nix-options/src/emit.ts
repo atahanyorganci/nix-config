@@ -98,7 +98,37 @@ export interface EmitMeta {
 	piVersion: string;
 	generator: string;
 	skipped: { path: string; reason: string; note: string }[];
+	/** Name under `flake.modules.homeManager` that the emitted modules extend. */
+	moduleName: string;
+	/** Option path the generated sub-options are attached to. */
+	optionPath: string;
 }
+
+/**
+ * Wrap generated option declarations in a flake-parts module.
+ *
+ * The declarations are emitted as a module contributing to
+ * `flake.modules.homeManager.<name>` rather than as a `{ lib }:` data file, so
+ * import-tree picks them up like any other module in the tree. Option
+ * declarations for the same path merge across modules, so these files can
+ * declare the typed sub-options while the hand-written module declares the
+ * same option's description, default and surrounding behaviour.
+ */
+const wrapModule = (meta: EmitMeta, optionPath: string, body: string): string =>
+	`{
+  flake.modules.homeManager.${meta.moduleName} = {lib, ...}: let
+    inherit (lib) mkOption types;
+  in {
+    options.${optionPath} = mkOption {
+      type = types.submodule {
+        options = {
+${body}
+        };
+      };
+    };
+  };
+}
+`;
 
 /** Emit the full generated options file. */
 export const emitOptionsFile = (options: OptionNode[], meta: EmitMeta): string => {
@@ -121,17 +151,10 @@ export const emitOptionsFile = (options: OptionNode[], meta: EmitMeta): string =
 		}
 	}
 
-	const body = options.map(option => renderOption(option, 1)).join("\n");
+	const body = options.map(option => renderOption(option, 5)).join("\n");
 
 	return `${header.join("\n")}
-{ lib }:
-let
-  inherit (lib) mkOption types;
-in
-{
-${body}
-}
-`;
+${wrapModule(meta, `${meta.optionPath}.settings`, body)}`;
 };
 
 /** Emit the keybindings option: a fixed set of known action ids. */
@@ -152,12 +175,13 @@ export const emitKeybindingsFile = (
 						? entry.description
 						: `${entry.description}.`;
 			const description = entry?.default === undefined ? prose : `${prose} Pi's default binding: ${entry.default}.`;
+			const pad = indent(5);
 			return [
-				`    ${nixAttrName(id)} = mkOption {`,
-				`      type = types.nullOr (types.either types.str (types.listOf types.str));`,
-				`      default = null;`,
-				`      description = ${nixString(description)};`,
-				`    };`,
+				`${pad}${nixAttrName(id)} = mkOption {`,
+				`${pad}  type = types.nullOr (types.either types.str (types.listOf types.str));`,
+				`${pad}  default = null;`,
+				`${pad}  description = ${nixString(description)};`,
+				`${pad}};`,
 			].join("\n");
 		})
 		.join("\n");
@@ -171,12 +195,5 @@ export const emitKeybindingsFile = (
 #
 # ${ids.length} action ids. A value may be a single key ("ctrl+p") or a list of
 # keys. Unset actions keep pi's default binding.
-{ lib }:
-let
-  inherit (lib) mkOption types;
-in
-{
-${options}
-}
-`;
+${wrapModule(meta, `${meta.optionPath}.keybindings`, options)}`;
 };

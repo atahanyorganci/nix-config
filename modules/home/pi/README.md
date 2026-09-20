@@ -63,17 +63,17 @@ Add the flake that provides this module as an input and import
 
 ## Options
 
-| Option | Description |
-| --- | --- |
-| `enable` | Install pi and manage its configuration. |
-| `package` | The pi package. Set to `null` to manage config without installing pi. |
-| `extraPackages` | Extra programs on the wrapped `pi` binary's PATH (pi shells out to `npm`, and some packages need `bun` or `git`). |
-| `configDir` | Where pi's configuration lives. Defaults to `~/.pi/agent`; `PI_CODING_AGENT_DIR` is exported automatically when changed. |
-| `settings` | Typed settings written to `settings.json`. |
-| `extraSettings` | Free-form settings merged over `settings`, for keys a newer pi supports. |
-| `keybindings` | Typed keybindings written to `keybindings.json`. |
-| `models` | Free-form custom providers and models written to `models.json`. |
-| `context` | Global agent context written to `AGENTS.md`; inline text or a path. |
+| Option          | Description                                                                                                              |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `enable`        | Install pi and manage its configuration.                                                                                 |
+| `package`       | The pi package. Set to `null` to manage config without installing pi.                                                    |
+| `extraPackages` | Extra programs on the wrapped `pi` binary's PATH (pi shells out to `npm`, and some packages need `bun` or `git`).        |
+| `configDir`     | Where pi's configuration lives. Defaults to `~/.pi/agent`; `PI_CODING_AGENT_DIR` is exported automatically when changed. |
+| `settings`      | Typed settings written to `settings.json`.                                                                               |
+| `extraSettings` | Free-form settings merged over `settings`, for keys a newer pi supports.                                                 |
+| `keybindings`   | Typed keybindings written to `keybindings.json`.                                                                         |
+| `models`        | Free-form custom providers and models written to `models.json`.                                                          |
+| `context`       | Global agent context written to `AGENTS.md`; inline text or a path.                                                      |
 
 Unset options are omitted from the generated files entirely, so pi applies its
 own defaults and project-level `.pi/settings.json` overrides still work. Each
@@ -87,7 +87,14 @@ Both come from pi's own `.d.ts` files, so they track the packaged version
 exactly. Run `just pi-options` to regenerate them after bumping pi, and
 `just pi-options-check` to assert the committed files still match.
 
-`models` is deliberately *not* generated: it carries API keys and pi resolves
+The files under `generated/` are themselves flake-parts modules contributing to
+`flake.modules.homeManager.pi`, so they are discovered by the same auto-import
+as every other module in the tree. Option declarations for one path merge
+across modules, which lets the generated files declare the typed sub-options of
+`settings` and `keybindings` while `default.nix` declares those same options'
+descriptions and defaults, and everything else the module does.
+
+`models` is deliberately _not_ generated: it carries API keys and pi resolves
 `$VAR` and `!command` indirections in it at request time, so a pinned schema
 would break as upstream adds provider shapes.
 
@@ -100,7 +107,7 @@ into the read-only Nix store makes those writes fail with `EACCES`, and pi
 collects the error rather than surfacing it, so saves appear to succeed and
 silently do nothing.
 
-This module therefore *copies* managed files into `configDir` during
+This module therefore _copies_ managed files into `configDir` during
 activation. Because a copy can also be edited outside Nix, each managed file
 gets a sidecar checksum under `configDir/.hm-state` recording what Nix last
 wrote:
