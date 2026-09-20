@@ -40,6 +40,8 @@
       lib.optional hasSettings {
         name = "settings.json";
         source = settingsFile;
+        # Pi maintains these itself; they must not count as user edits.
+        ignoreKeys = builtins.toJSON cfg.runtimeStateKeys;
       }
       ++ lib.optional hasKeybindings {
         name = "keybindings.json";
@@ -56,18 +58,33 @@
     # every activation.
     installScript = let
       install = file: ''
-        piInstallManagedFile ${lib.escapeShellArg file.name} ${file.source}
+        piInstallManagedFile ${lib.escapeShellArg file.name} ${file.source} ${lib.escapeShellArg (file.ignoreKeys or "")}
       '';
     in ''
       piConfigDir=${lib.escapeShellArg cfg.configDir}
       piStateDir="$piConfigDir/.hm-state"
 
+      # Hash a managed file ignoring the keys pi maintains itself. Pi merges
+      # into settings.json rather than replacing it, so it adds keys like
+      # lastChangelogVersion on the first run after an upgrade. Comparing raw
+      # bytes would read that as a user edit and refuse every later update.
+      piDigest() {
+        local file="$1" ignore="$2"
+        if [ -z "$ignore" ]; then
+          ${lib.getExe' pkgs.coreutils "sha256sum"} "$file" | ${lib.getExe' pkgs.coreutils "cut"} -d' ' -f1
+          return
+        fi
+        ${lib.getExe pkgs.jq} -S --argjson drop "$ignore" \
+          'if type == "object" then delpaths($drop | map([.])) else . end' "$file" 2>/dev/null \
+          | ${lib.getExe' pkgs.coreutils "sha256sum"} | ${lib.getExe' pkgs.coreutils "cut"} -d' ' -f1
+      }
+
       piInstallManagedFile() {
-        local name="$1" src="$2"
+        local name="$1" src="$2" ignore="$3"
         local dest="$piConfigDir/$name"
         local stamp="$piStateDir/$name.sha256"
         local newSum
-        newSum="$(${lib.getExe' pkgs.coreutils "sha256sum"} "$src" | ${lib.getExe' pkgs.coreutils "cut"} -d' ' -f1)"
+        newSum="$(piDigest "$src" "$ignore")"
 
         if [ -e "$dest" ] && [ ! -f "$dest" ]; then
           ${lib.getExe' pkgs.coreutils "echo"} "pi: refusing to replace non-regular file $dest" >&2
@@ -76,7 +93,7 @@
 
         if [ -f "$dest" ] && [ -f "$stamp" ]; then
           local currentSum previousSum
-          currentSum="$(${lib.getExe' pkgs.coreutils "sha256sum"} "$dest" | ${lib.getExe' pkgs.coreutils "cut"} -d' ' -f1)"
+          currentSum="$(piDigest "$dest" "$ignore")"
           previousSum="$(${lib.getExe' pkgs.coreutils "cat"} "$stamp")"
           if [ "$currentSum" = "$newSum" ]; then
             return 0

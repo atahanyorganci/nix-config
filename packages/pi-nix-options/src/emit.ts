@@ -114,7 +114,7 @@ export interface EmitMeta {
  * declare the typed sub-options while the hand-written module declares the
  * same option's description, default and surrounding behaviour.
  */
-const wrapModule = (meta: EmitMeta, optionPath: string, body: string): string =>
+const wrapModule = (meta: EmitMeta, optionPath: string, body: string, extra = ""): string =>
 	`{
   flake.modules.homeManager.${meta.moduleName} = {lib, ...}: let
     inherit (lib) mkOption types;
@@ -126,7 +126,7 @@ ${body}
         };
       };
     };
-  };
+${extra}  };
 }
 `;
 
@@ -153,8 +153,23 @@ export const emitOptionsFile = (options: OptionNode[], meta: EmitMeta): string =
 
 	const body = options.map(option => renderOption(option, 5)).join("\n");
 
+	// The omitted keys are exactly the ones pi writes to settings.json itself.
+	// The module needs them at activation time to tell a pi bookkeeping write
+	// apart from a real user edit, so emit them rather than making the module
+	// repeat the denylist by hand.
+	const runtimeKeys = meta.skipped.map(entry => nixString(entry.path)).join(" ");
+	const extra = `
+    options.${meta.optionPath}.runtimeStateKeys = mkOption {
+      type = types.listOf types.str;
+      internal = true;
+      readOnly = true;
+      default = [${runtimeKeys}];
+      description = "Settings keys pi writes to settings.json itself.";
+    };
+`;
+
 	return `${header.join("\n")}
-${wrapModule(meta, `${meta.optionPath}.settings`, body)}`;
+${wrapModule(meta, `${meta.optionPath}.settings`, body, extra)}`;
 };
 
 /** Emit the keybindings option: a fixed set of known action ids. */

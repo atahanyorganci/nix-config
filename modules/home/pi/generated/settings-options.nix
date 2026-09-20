@@ -433,5 +433,13 @@
         };
       };
     };
+
+    options.programs.pi.runtimeStateKeys = mkOption {
+      type = types.listOf types.str;
+      internal = true;
+      readOnly = true;
+      default = ["lastChangelogVersion" "trackingId"];
+      description = "Settings keys pi writes to settings.json itself.";
+    };
   };
 }
