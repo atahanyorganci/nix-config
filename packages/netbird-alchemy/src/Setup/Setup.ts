@@ -34,12 +34,6 @@ export interface SetupProps {
 	 */
 	password: Redacted.Redacted<string>;
 	/**
-	 * PAT lifetime in **days** when `create_pat` is requested.
-	 *
-	 * @default 365
-	 */
-	patExpireIn?: number;
-	/**
 	 * Optional dependency edge (e.g. NixOS `Command.Exec` hash). Ignored by
 	 * the provider; include any upstream Output so Setup waits for it.
 	 */
@@ -53,8 +47,6 @@ export interface SetupAttributes {
 	email: string;
 	/** Admin password (persisted from props; never re-fetched). */
 	password: Redacted.Redacted<string>;
-	/** Personal access token minted at setup (`create_pat: true`). */
-	personalAccessToken: Redacted.Redacted<string>;
 	/** API base URL used for setup. */
 	apiBaseUrl: string;
 }
@@ -64,15 +56,16 @@ export type Setup = Resource<"NetBird.Setup", SetupProps, SetupAttributes>;
 /**
  * First-time NetBird management bootstrap via unauthenticated `POST /api/setup`.
  *
- * Requires the management server to run with `NB_SETUP_PAT_ENABLED=true` so a
- * PAT is returned. Secrets are persisted in Alchemy state and reused when
- * setup is already complete (`setup_required: false`).
+ * Creates the owner account only. API credentials are supplied out of band via
+ * `NETBIRD_API_TOKEN` (mint a token from the dashboard), so no PAT is
+ * requested here. The admin password is persisted in Alchemy state and reused
+ * when setup is already complete (`setup_required: false`).
  *
  * @resource
  * @product Setup
  * @category NetBird
  * @section Bootstrapping Management
- * @example Admin + PAT
+ * @example Admin account
  * ```typescript
  * const password = yield* Alchemy.Random("AdminPassword", { bytes: 24 });
  * const setup = yield* NetBird.Setup("Admin", {
@@ -95,7 +88,6 @@ const InstanceResponse = Schema.Struct({
 const SetupResponse = Schema.Struct({
 	user_id: Schema.String,
 	email: Schema.String,
-	personal_access_token: Schema.optional(Schema.String),
 });
 
 export const SetupProvider = () =>
@@ -111,7 +103,6 @@ export const SetupProvider = () =>
 		reconcile: Effect.fn(function* ({ news, output }) {
 			const props = news ?? ({} as SetupProps);
 			const apiBaseUrl = props.apiBaseUrl.replace(/\/$/, "");
-			const patExpireIn = props.patExpireIn ?? 365;
 			const password = props.password;
 			const email = props.email;
 			const name = props.name;
@@ -138,20 +129,19 @@ export const SetupProvider = () =>
 			);
 
 			if (!instance.setup_required) {
-				if (output?.personalAccessToken && output.password) {
+				if (output?.password) {
 					return {
 						userId: output.userId,
 						email: output.email,
 						password: output.password,
-						personalAccessToken: output.personalAccessToken,
 						apiBaseUrl,
 					} satisfies SetupAttributes;
 				}
 				return yield* Effect.fail(
 					new NetBirdSetupError({
 						message:
-							"NetBird setup is already complete but Alchemy has no stored admin password/PAT. " +
-							"Set NETBIRD_API_TOKEN or destroy management state and redeploy.",
+							"NetBird setup is already complete but Alchemy has no stored admin password. " +
+							"Destroy management state and redeploy, or recover the password out of band.",
 					}),
 				);
 			}
@@ -161,8 +151,6 @@ export const SetupProvider = () =>
 					email,
 					name,
 					password: Redacted.value(password),
-					create_pat: true,
-					pat_expire_in: patExpireIn,
 				}),
 			);
 
@@ -177,21 +165,10 @@ export const SetupProvider = () =>
 				),
 			);
 
-			if (!created.personal_access_token) {
-				return yield* Effect.fail(
-					new NetBirdSetupError({
-						message:
-							"POST /api/setup succeeded without personal_access_token. " +
-							"Ensure NB_SETUP_PAT_ENABLED=true on netbird-server.",
-					}),
-				);
-			}
-
 			return {
 				userId: created.user_id,
 				email: created.email,
 				password,
-				personalAccessToken: Redacted.make(created.personal_access_token),
 				apiBaseUrl,
 			} satisfies SetupAttributes;
 		}),

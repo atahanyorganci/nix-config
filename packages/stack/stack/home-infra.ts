@@ -2,15 +2,11 @@ import * as NetBird from "@yorganci/netbird-alchemy";
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Output from "alchemy/Output";
-import { Stage } from "alchemy/Stage";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Redacted from "effect/Redacted";
-import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import { AccessMatrix, HomeInfra, Inventory, NameServers, NixExpr, Policies, ReverseProxy } from "../src/index.ts";
-import { readNetbirdCredentials } from "../src/netbird-credentials.ts";
 
 const Infra = Schema.Struct({
 	domain: Schema.String,
@@ -25,30 +21,14 @@ const Me = Schema.Struct({
 
 const REPO_ROOT = "../..";
 
-const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({});
-
 const peerLogicalId = (hostKey: string) => hostKey[0]!.toUpperCase() + hostKey.slice(1);
 
 export default HomeInfra.make(
 	{
-		providers: Layer.mergeAll(
-			NetBird.providers(NetBird.CredentialsFromRef(netbirdCredentials)),
-			NixExpr.NixExprProvider(),
-		),
+		providers: Layer.mergeAll(NetBird.providers(), NixExpr.NixExprProvider()),
 		state: Cloudflare.state(),
 	},
 	Effect.gen(function* () {
-		const stage = yield* Stage;
-		const { apiBaseUrl, apiToken } = yield* readNetbirdCredentials(stage);
-		const token = Redacted.value(apiToken);
-		if (!token) {
-			return yield* Effect.die("NetBird AdminApiKey token is empty in NetbirdServer stack state");
-		}
-		yield* Ref.set(netbirdCredentials, {
-			NETBIRD_API_TOKEN: token,
-			NETBIRD_API_BASE_URL: apiBaseUrl,
-		});
-
 		const infraExpr = yield* NixExpr.NixExpr("Infra", {
 			cwd: REPO_ROOT,
 			expression: ".#infra",

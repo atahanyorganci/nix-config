@@ -1,5 +1,4 @@
 import * as NetBird from "@yorganci/netbird-alchemy";
-import * as Alchemy from "alchemy";
 import * as Action from "alchemy/Action";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Command from "alchemy/Command";
@@ -8,7 +7,6 @@ import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
-import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import { Aws, Hetzner, NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
 
@@ -50,32 +48,6 @@ const infraExpr = Effect.gen(function* () {
  */
 const REPO_ROOT = "../..";
 
-// Actions hydrate the PAT during the first deploy. Subsequent deploys and
-// destroys still need the current management endpoint before that action runs.
-const netbirdCredentials = Ref.makeUnsafe<Record<string, string>>({});
-
-const UpdateNetBirdCredentialsRef = Alchemy.Action(
-	"UpdateNetBirdCredentialsRef",
-	Effect.succeed(
-		Effect.fn(function* (input: NetBird.CredentialsConfig) {
-			const apiToken = Redacted.value(input.apiToken);
-			if (!apiToken) {
-				return yield* Effect.die("NetBird PAT is empty after Setup");
-			}
-
-			yield* Ref.set(netbirdCredentials, {
-				NETBIRD_API_TOKEN: apiToken,
-				NETBIRD_API_BASE_URL: input.apiBaseUrl,
-			});
-
-			return {
-				apiToken,
-				apiBaseUrl: input.apiBaseUrl,
-			};
-		}),
-	),
-);
-
 const AdminPassword = Action.Action(
 	"AdminPassword",
 	Effect.fn(function* ({ length }: { length: number }) {
@@ -99,28 +71,19 @@ const NIX_MEMO = {
 // replacement changes the command (new host) and runs it again.
 const BOOTSTRAP_MEMO = { include: [] as string[] };
 
-const preferProvisionedApiToken = (
-	provisioned: Redacted.Redacted<string>,
-	fallback: Redacted.Redacted<string>,
-): Redacted.Redacted<string> => (Redacted.value(provisioned).length > 0 ? provisioned : fallback);
-
 export default NetbirdServerStack.make(
 	{
 		providers: Layer.mergeAll(
 			Cloudflare.providers(),
 			Hetzner.providers(),
 			Aws.providers(),
-			NetBird.providers(NetBird.CredentialsFromRef(netbirdCredentials)),
+			NetBird.providers(),
 			NixExpr.NixExprProvider(),
 		),
 		state: Cloudflare.state(),
 	},
 	Effect.gen(function* () {
 		const [me, infra] = yield* Effect.all([meExpr, infraExpr]);
-
-		yield* Ref.set(netbirdCredentials, {
-			NETBIRD_API_BASE_URL: `https://${infra.netbirdManagementDomain}`,
-		});
 
 		const deployKey = me.authorizedKeys[0];
 		if (!deployKey) {
@@ -251,29 +214,8 @@ export default NetbirdServerStack.make(
 			email: me.email,
 			name: me.name,
 			password: adminPassword,
-			patExpireIn: 365,
 			// Wait for NixOS install/rebuild before hitting the management API.
 			ready: Output.map(marsNixos.hash, hash => hash.input ?? "pending"),
-		});
-
-		// Bootstrap credentials so NetBird API resources can authenticate.
-		const credentialsReady = yield* UpdateNetBirdCredentialsRef({
-			apiBaseUrl: setup.apiBaseUrl,
-			apiToken: setup.personalAccessToken,
-		});
-
-		const adminApiKey = yield* NetBird.ApiKey("AdminApiKey", {
-			userId: setup.userId,
-			name: "admin-full-access",
-			expiresIn: 365,
-			ready: Output.map(credentialsReady, () => true),
-		}).pipe(Alchemy.RemovalPolicy.retain());
-
-		yield* UpdateNetBirdCredentialsRef({
-			apiBaseUrl: setup.apiBaseUrl,
-			apiToken: Output.map(Output.all(adminApiKey.token, setup.personalAccessToken), ([provisioned, fallback]) =>
-				preferProvisionedApiToken(provisioned, fallback),
-			),
 		});
 
 		return {
