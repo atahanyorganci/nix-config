@@ -11,11 +11,9 @@
 # Intentionally omitted (pi writes these itself at runtime):
 #   - lastChangelogVersion (runtime-state): written by pi after showing the changelog; pinning it suppresses or repeats the changelog
 #   - trackingId (machine-specific): analytics identifier generated on first opt-in; must stay per-machine
-{ lib }:
-let
+{lib}: let
   inherit (lib) mkOption types;
-in
-{
+in {
   defaultProvider = mkOption {
     type = types.nullOr (types.str);
     default = null;
@@ -27,27 +25,27 @@ in
     description = "Startup model ID (saved with Ctrl+S in /model, or edited manually).";
   };
   defaultThinkingLevel = mkOption {
-    type = types.nullOr (types.enum [ "off" "minimal" "low" "medium" "high" "xhigh" "max" ]);
+    type = types.nullOr (types.enum ["off" "minimal" "low" "medium" "high" "xhigh" "max"]);
     default = null;
     description = "Startup thinking level (saved with Ctrl+S in /thinking, or edited manually): \"off\", \"minimal\", \"low\", \"medium\", \"high\", \"xhigh\", \"max\".";
   };
   modelThinkingLevels = mkOption {
-    type = types.nullOr (types.attrsOf (types.enum [ "off" "minimal" "low" "medium" "high" "xhigh" "max" ]));
+    type = types.nullOr (types.attrsOf (types.enum ["off" "minimal" "low" "medium" "high" "xhigh" "max"]));
     default = null;
     description = "Per-model startup thinking levels keyed by \"provider/modelId\"; configure from /settings → Default thinking level per model or edit manually.";
   };
   transport = mkOption {
-    type = types.nullOr (types.enum [ "sse" "websocket" "websocket-cached" "auto" ]);
+    type = types.nullOr (types.enum ["sse" "websocket" "websocket-cached" "auto"]);
     default = null;
     description = "Preferred transport for providers that support multiple transports: \"sse\", \"websocket\", \"websocket-cached\", or \"auto\". Pi's default when unset: \"auto\".";
   };
   steeringMode = mkOption {
-    type = types.nullOr (types.enum [ "all" "one-at-a-time" ]);
+    type = types.nullOr (types.enum ["all" "one-at-a-time"]);
     default = null;
     description = "How steering messages are sent: \"all\" or \"one-at-a-time\". Pi's default when unset: \"one-at-a-time\".";
   };
   followUpMode = mkOption {
-    type = types.nullOr (types.enum [ "all" "one-at-a-time" ]);
+    type = types.nullOr (types.enum ["all" "one-at-a-time"]);
     default = null;
     description = "How follow-up messages are sent: \"all\" or \"one-at-a-time\". Pi's default when unset: \"one-at-a-time\".";
   };
@@ -169,7 +167,7 @@ in
     description = "Hide startup header. Pi's default when unset: false.";
   };
   defaultProjectTrust = mkOption {
-    type = types.nullOr (types.enum [ "ask" "always" "never" ]);
+    type = types.nullOr (types.enum ["ask" "always" "never"]);
     default = null;
     description = "Fallback project trust behavior: \"ask\", \"always\", or \"never\". Global setting only. Pi's default when unset: \"ask\".";
   };
@@ -252,17 +250,17 @@ in
           description = "The `terminal.showTerminalProgress` setting. See pi's settings documentation.";
         };
         hyperlinks = mkOption {
-          type = types.nullOr (types.either (types.bool) (types.enum [ "auto" ]));
+          type = types.nullOr (types.either (types.bool) (types.enum ["auto"]));
           default = null;
           description = "Override OSC 8 hyperlink support (advanced, JSON-only). Pi's default when unset: \"auto\".";
         };
         images = mkOption {
-          type = types.nullOr (types.either (types.bool) (types.enum [ "auto" "kitty" "iterm2" ]));
+          type = types.nullOr (types.either (types.bool) (types.enum ["auto" "kitty" "iterm2"]));
           default = null;
           description = "Override image protocol support with \"kitty\", \"iterm2\", false, or \"auto\" (advanced, JSON-only). Pi's default when unset: \"auto\".";
         };
         trueColor = mkOption {
-          type = types.nullOr (types.either (types.bool) (types.enum [ "auto" ]));
+          type = types.nullOr (types.either (types.bool) (types.enum ["auto"]));
           default = null;
           description = "Override truecolor support (advanced, JSON-only). Pi's default when unset: \"auto\".";
         };
@@ -300,12 +298,12 @@ in
     description = "Built-in tools enabled initially. When omitted, Pi uses its standard defaults.";
   };
   doubleEscapeAction = mkOption {
-    type = types.nullOr (types.enum [ "fork" "tree" "none" ]);
+    type = types.nullOr (types.enum ["fork" "tree" "none"]);
     default = null;
     description = "Action for double-escape: \"tree\", \"fork\", or \"none\". Pi's default when unset: \"tree\".";
   };
   treeFilterMode = mkOption {
-    type = types.nullOr (types.enum [ "all" "default" "no-tools" "user-only" "labeled-only" ]);
+    type = types.nullOr (types.enum ["all" "default" "no-tools" "user-only" "labeled-only"]);
     default = null;
     description = "Default filter for /tree: \"default\", \"no-tools\", \"user-only\", \"labeled-only\", \"all\". Pi's default when unset: \"default\".";
   };
@@ -366,7 +364,7 @@ in
           description = "Indentation for code blocks. Pi's default when unset: \"  \".";
         };
         mermaid = mkOption {
-          type = types.nullOr (types.enum [ "off" "final" "streaming" ]);
+          type = types.nullOr (types.enum ["off" "final" "streaming"]);
           default = null;
           description = "Mermaid rendering mode: \"off\", \"final\", or \"streaming\". Pi's default when unset: \"streaming\".";
         };
@@ -409,17 +407,17 @@ in
     description = "WebSocket connect/open handshake timeout in milliseconds for providers that support WebSocket transports. Set to 0 to disable. Pi's default when unset: 15000.";
   };
   tuiMode = mkOption {
-    type = types.nullOr (types.enum [ "regular" "fullscreen" ]);
+    type = types.nullOr (types.enum ["regular" "fullscreen"]);
     default = null;
     description = "Interactive TUI mode: \"regular\" or experimental \"fullscreen\". Changes from /settings apply immediately; --tui-mode overrides this setting at startup. Pi's default when unset: \"regular\".";
   };
   fullscreenExitOutput = mkOption {
-    type = types.nullOr (types.enum [ "transcript" "resume-hint" ]);
+    type = types.nullOr (types.enum ["transcript" "resume-hint"]);
     default = null;
     description = "Fullscreen exit output: \"transcript\" prints the final transcript and resume hint, while \"resume-hint\" restores the previous screen and prints only the resume hint. Has no effect in regular TUI mode. Pi's default when unset: \"transcript\".";
   };
   fullscreenScrollbar = mkOption {
-    type = types.nullOr (types.enum [ "auto" "always" "hidden" ]);
+    type = types.nullOr (types.enum ["auto" "always" "hidden"]);
     default = null;
     description = "Fullscreen transcript scrollbar: \"auto\" shows it temporarily while scrolling, \"always\" reserves the rightmost column and keeps it visible, and \"hidden\" hides it. Has no effect in regular TUI mode. Pi's default when unset: \"auto\".";
   };

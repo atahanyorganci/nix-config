@@ -55,6 +55,12 @@ Add the flake that provides this module as an input and import
 }
 ```
 
+> [!NOTE]
+> home-manager ships its own `programs.pi-coding-agent` module, which takes
+> free-form JSON and symlinks it into place. The two use separate option
+> namespaces and can be evaluated side by side, but both write the same files,
+> so enable only one.
+
 ## Options
 
 | Option | Description |

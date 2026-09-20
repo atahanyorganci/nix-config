@@ -8,6 +8,7 @@
  * `--check` regenerates in memory and exits non-zero if the result differs from
  * what is on disk, so CI can prove the committed files match the pinned pi.
  */
+import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as ts from "typescript-5";
@@ -23,11 +24,31 @@ interface Args {
 	piRoot: string;
 	outDir: string;
 	check: boolean;
+	formatter: string | undefined;
 }
+
+/**
+ * Run the emitted Nix through a formatter before comparing or writing.
+ *
+ * Without this the repository's own formatter would reformat the generated
+ * files on the next `nix fmt`, and `--check` would then report drift forever.
+ * Formatting here makes generation idempotent under that formatter.
+ */
+const formatNix = (source: string, formatter: string | undefined): string => {
+	if (formatter === undefined) {
+		return source;
+	}
+	const result = spawnSync(formatter, { input: source, encoding: "utf8", shell: true });
+	if (result.status !== 0) {
+		throw new Error(`formatter \`${formatter}\` failed: ${result.stderr || result.error?.message || "unknown error"}`);
+	}
+	return result.stdout;
+};
 
 const parseArgs = (argv: string[]): Args => {
 	let piRoot: string | undefined;
 	let outDir: string | undefined;
+	let formatter: string | undefined;
 	let check = false;
 	for (let index = 0; index < argv.length; index += 1) {
 		const arg = argv[index];
@@ -35,17 +56,24 @@ const parseArgs = (argv: string[]): Args => {
 			piRoot = argv[++index];
 		} else if (arg === "--out-dir") {
 			outDir = argv[++index];
+		} else if (arg === "--formatter") {
+			formatter = argv[++index];
 		} else if (arg === "--check") {
 			check = true;
 		} else if (arg === "--help" || arg === "-h") {
-			console.log("usage: pi-nix-options --pi-root <dir> --out-dir <dir> [--check]");
+			console.log(
+				"usage: pi-nix-options --pi-root <dir> --out-dir <dir> [--formatter <cmd>] [--check]\n\n" +
+					"  --formatter  command reading Nix on stdin and writing it to stdout,\n" +
+					"               e.g. 'alejandra -q -'. Keeps generation idempotent under\n" +
+					"               a repository formatter.",
+			);
 			process.exit(0);
 		}
 	}
 	if (piRoot === undefined || outDir === undefined) {
 		throw new Error("both --pi-root and --out-dir are required (see --help)");
 	}
-	return { piRoot, outDir, check };
+	return { piRoot, outDir, check, formatter };
 };
 
 /** Attach docs prose to the extracted option tree, in place. */
@@ -105,8 +133,8 @@ const main = (): void => {
 	};
 
 	const files: Record<string, string> = {
-		"settings-options.nix": emitOptionsFile(options, meta),
-		"keybinding-options.nix": emitKeybindingsFile(keybindingIds, keybindingDocs, meta),
+		"settings-options.nix": formatNix(emitOptionsFile(options, meta), args.formatter),
+		"keybinding-options.nix": formatNix(emitKeybindingsFile(keybindingIds, keybindingDocs, meta), args.formatter),
 	};
 
 	if (args.check) {

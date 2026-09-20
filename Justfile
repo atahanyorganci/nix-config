@@ -16,7 +16,14 @@ pi-options *args:
     #!/usr/bin/env bash
     set -euo pipefail
     root="$(nix build --no-link --impure --print-out-paths --expr '{{pi_expr}}')/lib/node_modules/pi-monorepo"
-    bun packages/pi-nix-options/src/main.ts --pi-root "$root" --out-dir {{pi_out}} {{args}}
+    # Formatted with the repo's own Nix formatter so `nix fmt` leaves the
+    # generated files alone and --check stays meaningful.
+    alejandra="$(nix build --no-link --impure --print-out-paths --expr 'let f = builtins.getFlake (toString ./.); p = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in p.alejandra')/bin/alejandra"
+    bun packages/pi-nix-options/src/main.ts \
+        --pi-root "$root" \
+        --out-dir {{pi_out}} \
+        --formatter "$alejandra -q -" \
+        {{args}}
 
 # Fail if the committed option declarations do not match the pinned pi.
 pi-options-check: (pi-options "--check")
