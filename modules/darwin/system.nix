@@ -18,7 +18,6 @@
         whatsapp
         iina
         raycast
-        claude
         notion
         responsively
       ];
