@@ -24,7 +24,7 @@ import * as Flag from "effect/unstable/cli/Flag";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import { readHomeInfraGroupId } from "../src/home-infra-state.ts";
 import * as Inventory from "../src/inventory.ts";
-import { readNetbirdCredentials } from "../src/netbird-credentials.ts";
+import { netbirdCredentialsFromConfig } from "../src/netbird-credentials.ts";
 import netbirdServerStack from "../stack/netbird-server.ts";
 
 const SETUP_KEY_EXPIRES_IN_SECONDS = 86_400;
@@ -92,9 +92,8 @@ const envFileFlag = Flag.file("env-file").pipe(
 	Flag.withDescription("Environment file to load (defaults to .env when present)"),
 );
 
-const readNetbirdCredentialsFromState = (state: State.StateService, stage: string) =>
-	readNetbirdCredentials(stage).pipe(Effect.provide(Layer.succeed(State.State, Effect.succeed(state))));
-
+// Unlike the other scripts, this one still needs Alchemy state: it resolves
+// HomeInfra group ids to populate each setup key's auto_groups.
 const withAlchemyState = <A, E>(
 	options: {
 		stage: string;
@@ -148,7 +147,7 @@ const createSetupKeys = Command.make("create-setup-keys", {
 			const inventory = yield* evalInventory;
 			yield* withAlchemyState({ stage, profile, envFile }, state =>
 				Effect.gen(function* () {
-					const credentials = yield* readNetbirdCredentialsFromState(state, stage);
+					const credentials = yield* netbirdCredentialsFromConfig;
 					const netbirdApi = Layer.mergeAll(CredentialsFromConfig(credentials), FetchHttpClient.layer);
 
 					for (const host of hosts) {

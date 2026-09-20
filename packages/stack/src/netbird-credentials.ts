@@ -1,74 +1,44 @@
-import { isResourceState } from "alchemy/State";
-import * as State from "alchemy/State";
-import { REDACTED_MARKER, reviveStateRecursive } from "alchemy/State/StateEncoding";
+import { DEFAULT_API_BASE_URL } from "@yorganci/netbird-api/Credentials";
+import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 
-export const ADMIN_API_KEY_FQN = "AdminApiKey";
-export const NETBIRD_SERVER_STACK = "NetbirdServer";
-
-export interface NetbirdCredentials {
+interface NetbirdCredentials {
 	apiBaseUrl: string;
 	apiToken: Redacted.Redacted<string>;
 }
 
-const readString = (value: unknown, label: string): Effect.Effect<string> =>
-	Effect.gen(function* () {
-		if (Redacted.isRedacted(value)) {
-			const token = Redacted.value(value);
-			if (typeof token === "string" && token.length > 0) {
-				return token;
-			}
-		}
+/**
+ * NetBird credentials for the CLI scripts.
+ *
+ * Read from the ambient Effect `ConfigProvider` rather than
+ * `CredentialsFromEnv`: the scripts accept `--env-file`, and those values are
+ * loaded into the ambient provider only. `ConfigProvider.fromEnv()` snapshots
+ * `process.env` and would silently miss them.
+ *
+ * An absent `NETBIRD_API_BASE_URL` falls back to the NetBird cloud API, which
+ * is never right for this self-hosted account, so it is required here.
+ */
+export const netbirdCredentialsFromConfig = Effect.gen(function* () {
+	const apiToken = yield* Config.redacted("NETBIRD_API_TOKEN").pipe(
+		Config.orElse(() => Config.succeed(Redacted.make(""))),
+	);
+	if (Redacted.value(apiToken).length === 0) {
+		return yield* Effect.die(
+			"NETBIRD_API_TOKEN is unset or empty — export it, set it in " +
+				"packages/stack/.env.local, or pass --env-file. Mint a token from the " +
+				"NetBird dashboard (Settings → Access Tokens).",
+		);
+	}
 
-		if (typeof value === "object" && value !== null && REDACTED_MARKER in value) {
-			const token = (value as Record<string, unknown>)[REDACTED_MARKER];
-			if (typeof token === "string" && token.length > 0) {
-				return token;
-			}
-		}
+	const apiBaseUrl = yield* Config.string("NETBIRD_API_BASE_URL").pipe(Config.orElse(() => Config.succeed("")));
+	if (apiBaseUrl.length === 0) {
+		return yield* Effect.die(
+			`NETBIRD_API_BASE_URL is unset — set it to this account's management API ` +
+				`(e.g. https://netbird.yorganci.dev). Leaving it unset would target ` +
+				`${DEFAULT_API_BASE_URL} (NetBird cloud) and leak the token to the wrong host.`,
+		);
+	}
 
-		const revived = reviveStateRecursive(value);
-		if (typeof revived === "string" && revived.length > 0) {
-			return revived;
-		}
-		if (Redacted.isRedacted(revived)) {
-			const token = Redacted.value(revived);
-			if (typeof token === "string" && token.length > 0) {
-				return token;
-			}
-		}
-
-		return yield* Effect.die(`${label} is missing or empty in NetbirdServer stack state`);
-	});
-
-export const readNetbirdCredentials = (stage: string) =>
-	Effect.gen(function* () {
-		const state = yield* yield* State.State;
-
-		const output = yield* state.getOutput({ stack: NETBIRD_SERVER_STACK, stage });
-		if (output == null) {
-			return yield* Effect.die(
-				`NetbirdServer stack has no output for stage "${stage}" — deploy stack/netbird-server.ts first`,
-			);
-		}
-
-		const apiBaseUrlValue =
-			typeof output === "object" && output !== null && "apiBaseUrl" in output ? output.apiBaseUrl : undefined;
-		const apiBaseUrl = yield* readString(apiBaseUrlValue, "apiBaseUrl");
-
-		const apiKeyState = yield* state.get({
-			stack: NETBIRD_SERVER_STACK,
-			stage,
-			fqn: ADMIN_API_KEY_FQN,
-		});
-		if (!isResourceState(apiKeyState) || apiKeyState.attr?.token === undefined) {
-			return yield* Effect.die(
-				`NetBird AdminApiKey resource not found in NetbirdServer/${stage} — deploy stack/netbird-server.ts first`,
-			);
-		}
-
-		const apiToken = yield* readString(apiKeyState.attr.token, "AdminApiKey token");
-
-		return { apiBaseUrl, apiToken: Redacted.make(apiToken) } satisfies NetbirdCredentials;
-	});
+	return { apiBaseUrl, apiToken } satisfies NetbirdCredentials;
+}).pipe(Effect.orDie);

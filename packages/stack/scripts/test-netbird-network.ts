@@ -7,13 +7,9 @@ import { peersGet } from "@yorganci/netbird-api/peers";
 import { policiesGet } from "@yorganci/netbird-api/policies";
 import { routesGet } from "@yorganci/netbird-api/routes";
 import { reverseProxiesClustersGet, reverseProxiesServicesGet } from "@yorganci/netbird-api/services";
-import { AlchemyContextLive } from "alchemy/AlchemyContext";
-import { ArtifactStore, createArtifactStore } from "alchemy/Artifacts";
-import { AuthProviders } from "alchemy/Auth/AuthProvider";
-import { withProfileOverride } from "alchemy/Auth/Profile";
-import { Stage } from "alchemy/Stage";
-import * as State from "alchemy/State";
+import { ProfileLive, withProfileOverride } from "alchemy/Auth/Profile";
 import { loadConfigProvider } from "alchemy/Util/ConfigProvider";
+import { PlatformServices } from "alchemy/Util/PlatformServices";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Console from "effect/Console";
@@ -26,8 +22,7 @@ import * as Flag from "effect/unstable/cli/Flag";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import { promises as dns } from "node:dns";
 import { isIPv4 } from "node:net";
-import { readNetbirdCredentials } from "../src/netbird-credentials.ts";
-import netbirdServerStack from "../stack/netbird-server.ts";
+import { netbirdCredentialsFromConfig } from "../src/netbird-credentials.ts";
 
 /** Inventory hosts that should normally be online on the mesh. */
 const REQUIRED_PEERS = ["mars", "mercury", "venus", "jupiter"] as const;
@@ -43,29 +38,6 @@ const REQUIRED_POLICIES = [
 	"allow-admin-ssh",
 	"allow-admin-proxy-tcp",
 ] as const;
-
-const USER = Config.string("USER").pipe(
-	Config.orElse(() => Config.string("USERNAME")),
-	Config.withDefault("unknown"),
-);
-
-const defaultStage = USER.pipe(
-	Effect.flatMap(user => Config.string("stage").pipe(Config.withDefault(`dev_${user}`))),
-	Effect.orDie,
-);
-
-const stageFlag = Flag.string("stage").pipe(
-	Flag.withDescription("Alchemy stage for the NetbirdServer stack (defaults to dev_${USER})"),
-	Flag.optional,
-	Flag.mapEffect(
-		Effect.fn(function* (stage) {
-			if (Option.isSome(stage)) {
-				return stage.value;
-			}
-			return yield* defaultStage;
-		}),
-	),
-);
 
 const profileFlag = Flag.string("profile").pipe(
 	Flag.withDescription("Alchemy auth profile (defaults to $ALCHEMY_PROFILE or 'default')"),
@@ -116,40 +88,31 @@ const domainsFlag = Flag.string("domain").pipe(
 	),
 );
 
-const readNetbirdCredentialsFromState = (state: State.StateService, stage: string) =>
-	readNetbirdCredentials(stage).pipe(Effect.provide(Layer.succeed(State.State, Effect.succeed(state))));
-
-const withAlchemyState = <A, E>(
+/**
+ * Credentials now come from configuration rather than NetbirdServer stack
+ * state, so this only needs the ambient ConfigProvider (which is what makes
+ * `--env-file` and the profile override work).
+ */
+const withScriptConfig = <A, E>(
 	options: {
-		stage: string;
 		profile: string;
 		envFile: Option.Option<string>;
 	},
-	body: (state: State.StateService) => Effect.Effect<A, E>,
+	body: Effect.Effect<A, E>,
 ) =>
 	Effect.gen(function* () {
-		if (!Effect.isEffect(netbirdServerStack)) {
-			return yield* Effect.die("stack/netbird-server.ts must default-export an Alchemy stack effect");
-		}
-
-		const services = Layer.mergeAll(
-			AlchemyContextLive,
-			Layer.succeed(ArtifactStore, createArtifactStore()),
-			Layer.succeed(AuthProviders, {}),
-			ConfigProvider.layer(withProfileOverride(yield* loadConfigProvider(options.envFile), options.profile)),
-			Logger.layer([], { mergeWithExisting: true }),
-			Layer.succeed(Stage, options.stage),
-			FetchHttpClient.layer,
+		const configProvider = withProfileOverride(yield* loadConfigProvider(options.envFile), options.profile);
+		return yield* body.pipe(
+			Effect.provide(
+				Layer.mergeAll(
+					ConfigProvider.layer(configProvider),
+					Layer.provide(ProfileLive, PlatformServices),
+					Logger.layer([], { mergeWithExisting: true }),
+					FetchHttpClient.layer,
+				),
+			),
 		);
-
-		return yield* Effect.gen(function* () {
-			const stack = yield* netbirdServerStack;
-			return yield* Effect.gen(function* () {
-				const state = yield* yield* State.State;
-				return yield* body(state);
-			}).pipe(Effect.provide(stack.services));
-		}).pipe(Effect.provide(services), Effect.scoped);
-	});
+	}).pipe(Effect.provide(PlatformServices), Effect.scoped);
 
 type Check = {
 	name: string;
@@ -315,7 +278,6 @@ const httpsOkForPrivate = (probe: { ok: boolean; status: number }) =>
 const httpsOkForPublic = (probe: { ok: boolean; status: number }) => probe.ok && probe.status > 0 && probe.status < 500;
 
 const testNetbirdNetwork = Command.make("test-netbird-network", {
-	stage: stageFlag,
 	profile: profileFlag,
 	envFile: envFileFlag,
 	timeoutMs: timeoutFlag,
@@ -325,7 +287,7 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 		"Smoke-test the NetBird mesh: client status, inventory peers, policies/routes/DNS, proxy cluster, and HTTPS to published services",
 	),
 	Command.withHandler(
-		Effect.fn(function* ({ stage, profile, envFile, timeoutMs, domains }) {
+		Effect.fn(function* ({ profile, envFile, timeoutMs, domains }) {
 			const checks: Array<Check> = [];
 
 			const client = yield* parseNetbirdClientStatus();
@@ -362,9 +324,10 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 					: "netbird CLI unavailable",
 			});
 
-			yield* withAlchemyState({ stage, profile, envFile }, state =>
+			yield* withScriptConfig(
+				{ profile, envFile },
 				Effect.gen(function* () {
-					const credentials = yield* readNetbirdCredentialsFromState(state, stage);
+					const credentials = yield* netbirdCredentialsFromConfig;
 					const netbirdApi = Layer.mergeAll(CredentialsFromConfig(credentials), FetchHttpClient.layer);
 					const [groups, policies, routes, services, peers, nameservers, clusters] = yield* Effect.all([
 						groupsGet({}),
