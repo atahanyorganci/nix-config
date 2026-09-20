@@ -1,0 +1,33 @@
+{
+	"name": "@yorganci/pi-nix-options",
+	"version": "0.0.0",
+	"private": true,
+	"bin": {
+		"pi-nix-options": "./src/main.ts"
+	},
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"check": "tsc --noEmit",
+		"format": "oxfmt --check .",
+		"format:fix": "oxfmt --write .",
+		"generate": "bun src/main.ts",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix .",
+		"test": "vitest --run"
+	},
+	"dependencies": {
+		"typescript-5": "npm:typescript@5.9.3"
+	},
+	"devDependencies": {
+		"@types/node": "^22.19.19",
+		"@yorganci/config": "workspace:*",
+		"oxfmt": "catalog:",
+		"oxlint": "catalog:",
+		"oxlint-tsgolint": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}
