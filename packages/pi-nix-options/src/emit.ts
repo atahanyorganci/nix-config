@@ -145,10 +145,13 @@ export const emitKeybindingsFile = (
 		.sort()
 		.map(id => {
 			const entry = docs.get(id);
-			const description =
-				entry === undefined
-					? `The \`${id}\` action.`
-					: `${entry.description}${entry.default === undefined ? "" : ` Pi's default binding: ${entry.default}.`}`;
+			const prose =
+				entry === undefined || entry.description === ""
+					? `The ${id} action.`
+					: /[.!?]$/.test(entry.description)
+						? entry.description
+						: `${entry.description}.`;
+			const description = entry?.default === undefined ? prose : `${prose} Pi's default binding: ${entry.default}.`;
 			return [
 				`    ${nixAttrName(id)} = mkOption {`,
 				`      type = types.nullOr (types.either types.str (types.listOf types.str));`,

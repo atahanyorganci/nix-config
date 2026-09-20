@@ -68,5 +68,42 @@ export const parseSettingsDocs = (markdown: string): Map<string, DocsEntry> => {
 	return entries;
 };
 
-/** Parse the keybindings table into id → default-keys prose. */
-export const parseKeybindingDocs = (markdown: string): Map<string, DocsEntry> => parseSettingsDocs(markdown);
+/**
+ * Parse the keybindings tables into id → default-keys prose.
+ *
+ * These tables have three columns (id | default | description) rather than the
+ * four of the settings tables, so they need their own parse.
+ */
+export const parseKeybindingDocs = (markdown: string): Map<string, DocsEntry> => {
+	const entries = new Map<string, DocsEntry>();
+	for (const line of markdown.split("\n")) {
+		const trimmed = line.trim();
+		if (!trimmed.startsWith("|")) {
+			continue;
+		}
+		const cells = trimmed
+			.slice(1, trimmed.endsWith("|") ? -1 : undefined)
+			.split("|")
+			.map(cell => cell.trim());
+		if (cells.length < 3) {
+			continue;
+		}
+		const [rawKey, rawDefault, ...rest] = cells;
+		if (rawKey === undefined || rawDefault === undefined) {
+			continue;
+		}
+		const keyMatch = /^`([a-z][A-Za-z0-9.]*)`$/.exec(rawKey);
+		if (keyMatch?.[1] === undefined) {
+			continue;
+		}
+		// "*(none)*" marks an action that ships with no default binding.
+		const defaultText = stripInlineMarkup(rawDefault);
+		entries.set(keyMatch[1], {
+			path: keyMatch[1],
+			type: "keys",
+			...(defaultText === "" || defaultText === "-" || defaultText === "(none)" ? {} : { default: defaultText }),
+			description: stripInlineMarkup(rest.join(" | ")),
+		});
+	}
+	return entries;
+};

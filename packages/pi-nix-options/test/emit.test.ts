@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSettingsDocs } from "../src/docs.ts";
+import { parseKeybindingDocs, parseSettingsDocs } from "../src/docs.ts";
 import { nixAttrName, nixString, renderOption, renderType } from "../src/emit.ts";
 
 describe("nixString", () => {
@@ -85,5 +85,29 @@ describe("parseSettingsDocs", () => {
 	it("treats a bare dash default as absent rather than the literal '-'", () => {
 		const entries = parseSettingsDocs(["| `defaultModel` | string | - | Startup model ID |"].join("\n"));
 		expect(entries.get("defaultModel")?.default).toBeUndefined();
+	});
+});
+
+describe("parseKeybindingDocs", () => {
+	// The keybinding tables have three columns, not the settings tables' four.
+	it("reads id, default binding and description from a three-column table", () => {
+		const entries = parseKeybindingDocs(
+			[
+				"| Keybinding id | Default | Description |",
+				"|--------|---------|-------------|",
+				"| `app.clear` | `ctrl+c` | Clear editor (first) / exit (second) |",
+				"| `tui.editor.cursorUp` | `up`, `ctrl+p` | Move cursor up |",
+			].join("\n"),
+		);
+		expect(entries.get("app.clear")).toMatchObject({
+			default: "ctrl+c",
+			description: "Clear editor (first) / exit (second)",
+		});
+		expect(entries.get("tui.editor.cursorUp")?.default).toBe("up, ctrl+p");
+	});
+
+	it("treats *(none)* as having no default binding", () => {
+		const entries = parseKeybindingDocs("| `tui.editor.historyPrevious` | *(none)* | Previous entry |");
+		expect(entries.get("tui.editor.historyPrevious")?.default).toBeUndefined();
 	});
 });
