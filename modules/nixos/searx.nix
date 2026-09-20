@@ -38,7 +38,10 @@
             limiter = false;
           };
           general.instance_name = "Search";
-          search.safe_search = 0;
+          search = {
+            safe_search = 0;
+            formats = ["html" "json"];
+          };
         };
       };
 
@@ -64,22 +67,14 @@
         '';
       };
 
-      # The reverse proxy performs NetBird OIDC SSO. SearXNG itself remains
-      # unauthenticated and has no limiter/Redis layer.
       httpServices.search = {
         port = cfg.port;
         expose = {
           enable = true;
-          # Bearer/OIDC auth and NetBird-only proxy mode are mutually exclusive.
-          # SSO is the ingress gate; the upstream is still reachable only over
-          # mars's mesh interface.
-          private = false;
+          private = true;
+          accessGroups = ["Admin" "Users"];
         };
-        auth = {
-          type = "bearer";
-          # Every interactive NetBird user is assigned to one of these roles.
-          distributionGroups = ["Admin" "Users"];
-        };
+        auth = {type = "none";};
       };
 
       networking.firewall.interfaces.${cfg.interface}.allowedTCPPorts = [cfg.port];
