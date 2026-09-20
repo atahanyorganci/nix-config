@@ -2,7 +2,7 @@
 	"name": "@yorganci/nix-config",
 	"private": true,
 	"workspaces": [
-		"infra/*"
+		"packages/*"
 	],
 	"type": "module",
 	"scripts": {
