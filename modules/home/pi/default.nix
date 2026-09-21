@@ -52,6 +52,28 @@
         source = modelsFile;
       };
 
+    # Extension sources are handed to pi as-is, minus the things a checked-out
+    # workspace carries that pi must not see:
+    #
+    #   - node_modules, whose entries are usually symlinks into a package
+    #     manager's store. Copied into /nix/store they dangle, and a dangling
+    #     node_modules/@scope/pkg shadows the copy pi resolves internally.
+    #   - build caches and tooling configs, which are pure closure bloat.
+    #
+    # A single file is passed straight through: there is nothing to prune, and
+    # copying it into a directory would change how pi resolves it.
+    cleanExtension = extension:
+      if !(lib.pathIsDirectory extension.src)
+      then extension.src
+      else
+        pkgs.runCommand "pi-extension-${lib.strings.sanitizeDerivationName extension.name}" {
+          src = extension.src;
+          preferLocalBuild = true;
+        } ''
+          cp -R "$src" "$out"
+          chmod -R u+w "$out"
+        '';
+
     # Each file is tracked by a sidecar checksum of the last content Nix wrote.
     # That distinguishes "unchanged since activation" from "edited by hand or
     # by pi", so local edits are preserved instead of being overwritten on
@@ -135,15 +157,35 @@
 
       configDir = lib.mkOption {
         type = lib.types.str;
-        default = "${config.home.homeDirectory}/.pi/agent";
-        defaultText = lib.literalExpression ''"''${config.home.homeDirectory}/.pi/agent"'';
-        example = lib.literalExpression ''"''${config.xdg.configHome}/pi/agent"'';
+        default = "${config.xdg.configHome}/pi/agent";
+        defaultText = lib.literalExpression ''"''${config.xdg.configHome}/pi/agent"'';
+        example = lib.literalExpression ''"''${config.home.homeDirectory}/.pi/agent"'';
         description = ''
           Directory holding pi's configuration.
 
-          Defaults to {file}`~/.pi/agent`, matching pi's own default. When set
-          to anything else, {env}`PI_CODING_AGENT_DIR` is exported so the CLI
-          reads from the same place.
+          Pi itself defaults to {file}`~/.pi/agent` and has no XDG support, so
+          this defaults to the XDG location instead and exports
+          {env}`PI_CODING_AGENT_DIR` to point the CLI at it.
+
+          Pi also keeps runtime state here that cannot be relocated on its own:
+          {file}`auth.json`, {file}`models-store.json` and {file}`trust.json`.
+          Only sessions have a separate override, see
+          {option}`programs.pi.sessionDir`.
+        '';
+      };
+
+      sessionDir = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = "${config.xdg.stateHome}/pi/sessions";
+        defaultText = lib.literalExpression ''"''${config.xdg.stateHome}/pi/sessions"'';
+        example = lib.literalExpression ''"''${config.xdg.dataHome}/pi/sessions"'';
+        description = ''
+          Directory holding recorded sessions, exported as
+          {env}`PI_CODING_AGENT_SESSION_DIR`.
+
+          Transcripts are regenerable history rather than configuration, so
+          they default to the XDG state directory instead of sitting in
+          {option}`programs.pi.configDir`. Set to `null` to leave them there.
         '';
       };
 
@@ -171,6 +213,66 @@
 
           Options left unset are omitted from the file entirely, leaving pi to
           apply its own default.
+        '';
+      };
+
+      extensions = lib.mkOption {
+        type = lib.types.listOf (lib.types.submodule {
+          options = {
+            name = lib.mkOption {
+              type = lib.types.str;
+              example = "context-budget";
+              description = ''
+                Name of the extension.
+
+                Becomes the entry's filename under
+                {file}`''${configDir}/extensions`, so it must be unique and
+                should carry a `.ts` suffix when {option}`src` is a single
+                file.
+              '';
+            };
+
+            src = lib.mkOption {
+              type = lib.types.path;
+              example = lib.literalExpression ''
+                pkgs.fetchFromGitHub {
+                  owner = "magoz";
+                  repo = "pi-context-budget";
+                  rev = "...";
+                  sha256 = "...";
+                }
+              '';
+              description = ''
+                Path to the extension.
+
+                A local path and a fetched derivation are both just paths, so
+                remote and in-tree extensions are declared the same way.
+
+                Pi loads a directory through its {file}`package.json` `pi`
+                manifest, or failing that an {file}`index.ts` beside it. A
+                directory holding neither is not loadable: point {option}`src`
+                at the file itself instead.
+              '';
+            };
+          };
+        });
+        default = [];
+        example = lib.literalExpression ''
+          [
+            {
+              name = "my-extension.ts";
+              src = ./my-extension.ts;
+            }
+          ]
+        '';
+        description = ''
+          Extensions linked into {file}`''${configDir}/extensions`, which pi
+          auto-discovers.
+
+          Preferred over listing paths in {option}`settings.packages`: that
+          would put store paths inside {file}`settings.json`, and every edit
+          to an extension would then change a file pi also writes to at
+          runtime.
         '';
       };
 
@@ -249,6 +351,18 @@
           assertion = cfg.package != null || cfg.extraPackages == [];
           message = "programs.pi.extraPackages requires programs.pi.package to be non-null; there is no binary to wrap.";
         }
+        {
+          # Names become filenames in one directory, so duplicates would have
+          # one extension silently shadow another.
+          assertion = let
+            names = map (extension: extension.name) cfg.extensions;
+          in
+            lib.length (lib.unique names) == lib.length names;
+          message = let
+            names = map (extension: extension.name) cfg.extensions;
+            duplicates = lib.unique (lib.filter (name: lib.count (other: other == name) names > 1) names);
+          in "programs.pi.extensions has duplicate names: ${lib.concatStringsSep ", " duplicates}.";
+        }
       ];
 
       home.packages = let
@@ -270,17 +384,29 @@
       in
         lib.optional (wrapped != null) wrapped;
 
-      home.sessionVariables = lib.mkIf (cfg.configDir != "${config.home.homeDirectory}/.pi/agent") {
-        PI_CODING_AGENT_DIR = cfg.configDir;
-      };
+      # Pi resolves its own directories from these, so they have to be set for
+      # the CLI to find anything Nix wrote.
+      home.sessionVariables =
+        lib.optionalAttrs (cfg.configDir != "${config.home.homeDirectory}/.pi/agent") {
+          PI_CODING_AGENT_DIR = cfg.configDir;
+        }
+        // lib.optionalAttrs (cfg.sessionDir != null) {
+          PI_CODING_AGENT_SESSION_DIR = cfg.sessionDir;
+        };
 
-      # AGENTS.md is never written by pi, so it can be a normal (symlinked)
-      # home file and stay strictly declarative.
-      home.file = lib.mkIf (cfg.context != "") (
-        if lib.isPath cfg.context
-        then {"${cfg.configDir}/AGENTS.md".source = cfg.context;}
-        else {"${cfg.configDir}/AGENTS.md".text = cfg.context;}
-      );
+      # Pi only ever reads these, so unlike the JSON files they can stay
+      # strictly declarative as symlinks into the store.
+      home.file =
+        lib.optionalAttrs (cfg.context != "") (
+          if lib.isPath cfg.context
+          then {"${cfg.configDir}/AGENTS.md".source = cfg.context;}
+          else {"${cfg.configDir}/AGENTS.md".text = cfg.context;}
+        )
+        // lib.listToAttrs (map (extension:
+          lib.nameValuePair "${cfg.configDir}/extensions/${extension.name}" {
+            source = cleanExtension extension;
+          })
+        cfg.extensions);
 
       home.activation.piConfig = lib.mkIf (managedFiles != []) (
         lib.hm.dag.entryAfter ["writeBoundary"] installScript

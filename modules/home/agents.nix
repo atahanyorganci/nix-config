@@ -2,6 +2,7 @@
   flake.modules.homeManager.agents = {
     lib,
     config,
+    pkgs,
     ...
   }: let
     # Every model behind the local gateway is reached over one
@@ -282,6 +283,25 @@
             then "light"
             else "dark";
         };
+
+        extensions = [
+          {
+            # Carries both the web_search tool and the usage widget; pi reads
+            # the entry points from the package's own `pi` manifest.
+            name = "yorganci";
+            src = ../../packages/pi-extension;
+          }
+          {
+            name = "context-budget";
+            src = pkgs.fetchFromGitHub {
+              owner = "magoz";
+              repo = "pi-context-budget";
+              rev = "b39f70e78217b25309439be22e603d8e4b9f5a01";
+              sha256 = "sha256-fqfVsL4iTWA/RYJxLIAq8ZsMHkaVv+QzxOsR89KkqPU=";
+            };
+          }
+        ];
+
         models.providers.llm-gateway = {
           baseUrl = "http://localhost:${toString gatewayPort}/v1";
           api = "openai-completions";

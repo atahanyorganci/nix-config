@@ -63,17 +63,74 @@ Add the flake that provides this module as an input and import
 
 ## Options
 
-| Option          | Description                                                                                                              |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `enable`        | Install pi and manage its configuration.                                                                                 |
-| `package`       | The pi package. Set to `null` to manage config without installing pi.                                                    |
-| `extraPackages` | Extra programs on the wrapped `pi` binary's PATH (pi shells out to `npm`, and some packages need `bun` or `git`).        |
-| `configDir`     | Where pi's configuration lives. Defaults to `~/.pi/agent`; `PI_CODING_AGENT_DIR` is exported automatically when changed. |
-| `settings`      | Typed settings written to `settings.json`.                                                                               |
-| `extraSettings` | Free-form settings merged over `settings`, for keys a newer pi supports.                                                 |
-| `keybindings`   | Typed keybindings written to `keybindings.json`.                                                                         |
-| `models`        | Free-form custom providers and models written to `models.json`.                                                          |
-| `context`       | Global agent context written to `AGENTS.md`; inline text or a path.                                                      |
+| Option          | Description                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `enable`        | Install pi and manage its configuration.                                                                             |
+| `package`       | The pi package. Set to `null` to manage config without installing pi.                                                |
+| `extraPackages` | Extra programs on the wrapped `pi` binary's PATH (pi shells out to `npm`, and some packages need `bun` or `git`).    |
+| `configDir`     | Where pi's configuration lives. Defaults to `$XDG_CONFIG_HOME/pi/agent`; `PI_CODING_AGENT_DIR` is exported to match. |
+| `sessionDir`    | Where session transcripts live. Defaults to `$XDG_STATE_HOME/pi/sessions`; `null` keeps them in `configDir`.         |
+| `settings`      | Typed settings written to `settings.json`.                                                                           |
+| `extraSettings` | Free-form settings merged over `settings`, for keys a newer pi supports.                                             |
+| `keybindings`   | Typed keybindings written to `keybindings.json`.                                                                     |
+| `models`        | Free-form custom providers and models written to `models.json`.                                                      |
+| `extensions`    | Extensions linked into `configDir/extensions`, each `{ name; src; }`.                                                |
+| `context`       | Global agent context written to `AGENTS.md`; inline text or a path.                                                  |
+
+## Extensions
+
+Each entry becomes a symlink at `configDir/extensions/<name>`, which pi
+auto-discovers. `src` is a path, so an in-tree directory and a
+`fetchFromGitHub` result are declared the same way:
+
+```nix
+programs.pi.extensions = [
+  {
+    name = "my-tools";
+    src = ../../packages/my-pi-extension;
+  }
+  {
+    name = "context-budget";
+    src = pkgs.fetchFromGitHub {
+      owner = "magoz";
+      repo = "pi-context-budget";
+      rev = "...";
+      sha256 = "...";
+    };
+  }
+];
+```
+
+Pi finds a directory's entry point through its `package.json` `pi` manifest, or
+failing that an `index.ts` beside it. A directory with neither is not loadable;
+point `src` at the file itself instead.
+
+When `src` is a directory it is copied without `node_modules`, build caches or
+tooling configs, so a workspace package can be pointed at directly. Dropping
+`node_modules` matters: its entries are typically symlinks into a package
+manager's store, and copying those into `/nix/store` leaves them dangling. Pi
+bundles `@earendil-works/*` and `typebox` for extensions and resolves them
+internally, so they belong in `peerDependencies` and must not be vendored.
+A single-file `src` is passed through untouched.
+
+## Directories
+
+Pi has no XDG support: it puts everything in `~/.pi/agent` and offers two
+environment overrides, `PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR`.
+This module defaults both to XDG locations and exports the variables, so pi and
+Nix agree on where files live.
+
+Sessions are split out because transcripts are regenerable history rather than
+configuration, and they grow without bound.
+
+Pi keeps some runtime state beside its configuration with no override of its
+own: `auth.json` (credentials), `models-store.json`, and `trust.json`. Those
+stay in `configDir` and are deliberately left unmanaged.
+
+> [!NOTE]
+> Changing `configDir` does not migrate an existing directory. Pi starts from
+> empty state at the new location, so copy `auth.json` (and `sessions/`, if the
+> history is worth keeping) across by hand before switching.
 
 Unset options are omitted from the generated files entirely, so pi applies its
 own defaults and project-level `.pi/settings.json` overrides still work. Each
