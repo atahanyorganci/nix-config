@@ -76,6 +76,7 @@ Add the flake that provides this module as an input and import
 | `models`        | Free-form custom providers and models written to `models.json`.                                                      |
 | `extensions`    | Extensions linked into `configDir/extensions`, each `{ name; src; }`.                                                |
 | `context`       | Global agent context written to `AGENTS.md`; inline text or a path.                                                  |
+| `modelProfiles` | Context budgets and fast-mode pairs for the `model-profile` extension, written to `model-profile.json`.              |
 
 ## Extensions
 
@@ -104,6 +105,40 @@ programs.pi.extensions = [
 Pi finds a directory's entry point through its `package.json` `pi` manifest, or
 failing that an `index.ts` beside it. A directory with neither is not loadable;
 point `src` at the file itself instead.
+
+### model-profile
+
+`modelProfiles` configures the in-tree `model-profile` extension, which adds
+switchable context budgets and a fast-mode model per model. It only writes the
+configuration; the extension still has to be listed in `extensions`:
+
+```nix
+programs.pi = {
+  extensions = [
+    {
+      name = "model-profile";
+      src = "${pkgs.yorganci-pi-extension}/model-profile";
+    }
+  ];
+
+  modelProfiles.models."llm-gateway/claude-opus-5" = {
+    context = {
+      short = 272000;
+      full = 1000000;
+    };
+    defaultContext = "short";
+    fast.model = "claude-sonnet-5";
+  };
+};
+```
+
+Models are keyed `"provider/modelId"`. Entries that end up empty are dropped, so
+a model may configure either axis alone. Unlike the other JSON files this one is
+symlinked rather than copied: it belongs to an extension that only ever reads
+it, so nothing rewrites it at runtime.
+
+See `packages/pi-extension/src/model-profile/README.md` for the extension's own
+behaviour and the file format it accepts.
 
 When `src` is a directory it is copied without `node_modules`, build caches or
 tooling configs, so a workspace package can be pointed at directly. Dropping

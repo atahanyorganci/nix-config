@@ -23,13 +23,28 @@
     settingsJson = lib.recursiveUpdate (stripNulls cfg.settings) cfg.extraSettings;
     keybindingsJson = stripNulls cfg.keybindings;
 
+    # The extension validates its own config and rejects a model entry that
+    # defines neither axis, so drop the empty `context` attrsets the option's
+    # defaults produce rather than writing a file pi would then reject.
+    modelProfilesJson = let
+      profiles = stripNulls cfg.modelProfiles;
+      prune = lib.filterAttrs (_: model: model != {});
+      models = prune (lib.mapAttrs (_: model: lib.filterAttrs (_: value: value != {}) model) (profiles.models or {}));
+    in
+      lib.optionalAttrs (profiles ? shortcuts && profiles.shortcuts != {}) {
+        inherit (profiles) shortcuts;
+      }
+      // lib.optionalAttrs (models != {}) {inherit models;};
+
     hasSettings = settingsJson != {};
     hasKeybindings = keybindingsJson != {};
     hasModels = cfg.models != {};
+    hasModelProfiles = (modelProfilesJson.models or {}) != {};
 
     settingsFile = jsonFormat.generate "pi-settings.json" settingsJson;
     keybindingsFile = jsonFormat.generate "pi-keybindings.json" keybindingsJson;
     modelsFile = jsonFormat.generate "pi-models.json" cfg.models;
+    modelProfilesFile = jsonFormat.generate "pi-model-profile.json" modelProfilesJson;
 
     # Files are copied into place, not symlinked. Pi rewrites settings.json at
     # runtime (`/model` Ctrl+S, `/settings`, and its own changelog/analytics
@@ -343,6 +358,115 @@
           Either inline text or a path to a file.
         '';
       };
+
+      modelProfiles = lib.mkOption {
+        type = lib.types.submodule {
+          options = {
+            shortcuts = lib.mkOption {
+              type = lib.types.submodule {
+                options = {
+                  context = lib.mkOption {
+                    type = lib.types.nullOr lib.types.str;
+                    default = null;
+                    example = "alt+shift+c";
+                    description = "Key cycling the active model's context profile.";
+                  };
+                  fast = lib.mkOption {
+                    type = lib.types.nullOr lib.types.str;
+                    default = null;
+                    example = "alt+shift+f";
+                    description = "Key toggling fast mode.";
+                  };
+                };
+              };
+              default = {};
+              description = "Keys bound by the extension. Unset keys keep its defaults.";
+            };
+
+            models = lib.mkOption {
+              type = lib.types.attrsOf (lib.types.submodule {
+                options = {
+                  defaultContext = lib.mkOption {
+                    type = lib.types.nullOr lib.types.str;
+                    default = null;
+                    description = ''
+                      Context profile new sessions start on. Defaults to the
+                      first entry of {option}`context`.
+                    '';
+                  };
+
+                  context = lib.mkOption {
+                    type = lib.types.attrsOf lib.types.ints.positive;
+                    default = {};
+                    example = lib.literalExpression ''{ short = 200000; full = 1000000; }'';
+                    description = ''
+                      Selectable context windows in tokens, keyed by profile
+                      name. At least two are needed for switching to mean
+                      anything.
+
+                      This is local pi metadata driving footer reporting and
+                      the auto-compaction threshold; requests still carry the
+                      unchanged model id.
+                    '';
+                  };
+
+                  fast = lib.mkOption {
+                    type = lib.types.nullOr (lib.types.submodule {
+                      options = {
+                        provider = lib.mkOption {
+                          type = lib.types.nullOr lib.types.str;
+                          default = null;
+                          description = "Defaults to the primary model's provider.";
+                        };
+                        model = lib.mkOption {
+                          type = lib.types.str;
+                          description = "Model id to switch to in fast mode.";
+                        };
+                        thinkingLevel = lib.mkOption {
+                          type = lib.types.nullOr (lib.types.enum [
+                            "off"
+                            "minimal"
+                            "low"
+                            "medium"
+                            "high"
+                            "xhigh"
+                            "max"
+                          ]);
+                          default = null;
+                          description = "Thinking level for fast mode. Unset keeps the current level.";
+                        };
+                      };
+                    });
+                    default = null;
+                    description = "Cheaper, quicker model `/fast` switches to.";
+                  };
+                };
+              });
+              default = {};
+              example = lib.literalExpression ''
+                {
+                  "llm-gateway/claude-opus-5" = {
+                    context = { short = 200000; full = 1000000; };
+                    fast.model = "claude-haiku-4-5-20251001";
+                  };
+                }
+              '';
+              description = ''
+                Per-model profiles keyed by `"provider/modelId"`.
+              '';
+            };
+          };
+        };
+        default = {};
+        description = ''
+          Configuration for the `model-profile` extension, written to
+          {file}`model-profile.json` in {option}`programs.pi.configDir`.
+
+          Only written when {option}`models` is non-empty. The extension
+          itself still has to be listed in {option}`programs.pi.extensions`;
+          this option only supplies its configuration.
+        '';
+      };
     };
 
     config = lib.mkIf cfg.enable {
@@ -396,8 +520,15 @@
 
       # Pi only ever reads these, so unlike the JSON files they can stay
       # strictly declarative as symlinks into the store.
+      #
+      # model-profile.json belongs here rather than in `managedFiles`: it is
+      # owned by an extension that only ever reads it, so nothing rewrites it
+      # at runtime and a read-only store symlink costs nothing.
       home.file =
-        lib.optionalAttrs (cfg.context != "") (
+        lib.optionalAttrs hasModelProfiles {
+          "${cfg.configDir}/model-profile.json".source = modelProfilesFile;
+        }
+        // lib.optionalAttrs (cfg.context != "") (
           if lib.isPath cfg.context
           then {"${cfg.configDir}/AGENTS.md".source = cfg.context;}
           else {"${cfg.configDir}/AGENTS.md".text = cfg.context;}
