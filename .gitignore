@@ -116,3 +116,7 @@ dist
 
 # Alchemy
 .alchemy/
+
+# nix build output symlinks
+/result
+/result-*
