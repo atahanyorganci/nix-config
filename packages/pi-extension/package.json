@@ -26,6 +26,7 @@
 		"test": "vitest --run"
 	},
 	"dependencies": {
+		"@imput/cobalt-api": "catalog:",
 		"defuddle": "catalog:",
 		"linkedom": "catalog:",
 		"unpdf": "catalog:"

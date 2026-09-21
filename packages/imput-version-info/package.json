@@ -1,0 +1,11 @@
+{
+	"name": "@imput/version-info",
+	"version": "1.0.1",
+	"private": true,
+	"type": "module",
+	"main": "index.js",
+	"exports": {
+		".": "./index.js",
+		"./package.json": "./package.json"
+	}
+}

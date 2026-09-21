@@ -27,6 +27,11 @@
           ../../package.json
           ../../packages/config
           ../../packages/pi-extension
+
+          # Stands in for cobalt's unpublished `@imput/version-info`. The
+          # `workspace:^` specifier cannot resolve without a member of that
+          # name, so this is required to install, not merely to build.
+          ../../packages/imput-version-info
         ];
       };
     in
@@ -46,12 +51,16 @@
         pnpmDeps = final.fetchPnpmDeps {
           inherit (finalAttrs) pname version src;
           fetcherVersion = 4;
-          hash = "sha256-XqhuI9lnlGKXlh4nEFRuWE+DkCwmwsI6IapGXcvA78o=";
+          hash = "sha256-Lb39RIQOBzpvXO7cYg0G599TfY3lwETosA81ugWVVWQ=";
         };
 
         pnpmWorkspaces = [
           "@yorganci/config"
           "@yorganci/pi-extension"
+
+          # Required by @imput/cobalt-api's `workspace:^` specifier. Omitting it
+          # leaves the dependency unresolvable and fails the install.
+          "@imput/version-info"
         ];
 
         buildPhase = ''

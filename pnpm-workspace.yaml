@@ -2,6 +2,13 @@ packages:
   - packages/*
 allowBuilds:
   "@google/genai": false
+  # Pulled in by @imput/cobalt-api. None are reachable from the extractors we
+  # call: ffmpeg-static and syscall-napi belong to cobalt's tunnel server, and
+  # isolated-vm is imported only by its YouTube service. Building them would add
+  # a C++ toolchain to every install for code that is never loaded.
+  "ffmpeg-static": false
+  "isolated-vm": false
+  "syscall-napi": false
   esbuild: false
   msgpackr-extract: false
   protobufjs: false
@@ -12,6 +19,11 @@ overrides:
   # `effect` than the catalog pins. Pin it so the two stay in step.
   "@effect/platform-node-shared": "4.0.0-rc.112"
 catalog:
+  # Cobalt is consumed as a library rather than as a service: its extractors are
+  # called in process, and it is patched so it bundles (see patchedDependencies).
+  # Pinned to a rev because `api/` has no published release and its internal
+  # layout is not covered by `exports`.
+  "@imput/cobalt-api": "github:imputnet/cobalt#path:/api&a636575b09de1fc55d9b8cd98cac88f5f2f16b42"
   "@distilled.cloud/aws": "1.0.0-rc.8"
   "@distilled.cloud/core": "1.0.0-rc.8"
   "@earendil-works/pi-ai": "0.86.0"
