@@ -76,6 +76,13 @@ export const fetchContent = defineTool({
 				description: "Several URLs to fetch in parallel.",
 			}),
 		),
+		images: Type.Optional(
+			Type.Boolean({
+				description:
+					"Also download the images a page contains and save them locally. Off by default; " +
+					"enable it when a page's diagrams, charts or screenshots are what matters.",
+			}),
+		),
 	}),
 
 	async execute(_toolCallId, params, signal, onUpdate, _ctx) {
@@ -95,6 +102,7 @@ export const fetchContent = defineTool({
 		const results = await extractAll(urls, {
 			...(signal ? { signal } : {}),
 			...(allowRanges.length > 0 ? { allowRanges } : {}),
+			...(params.images ? { includeImages: true } : {}),
 		});
 
 		const succeeded = results.filter(result => result.content.length > 0 || result.image).length;

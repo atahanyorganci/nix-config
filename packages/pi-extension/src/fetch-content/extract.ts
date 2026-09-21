@@ -3,6 +3,7 @@ import { parseHTML } from "linkedom";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createArtifactDir, identifyImage, imageExtension, IMAGE_TYPES, normalizeImage } from "./image.ts";
+import { collectPageImages, DEFAULT_IMAGE_LIMIT } from "./page-images.ts";
 import { fetchRemoteUrl } from "./ssrf.ts";
 import type { FetchRemoteOptions } from "./ssrf.ts";
 
@@ -17,6 +18,13 @@ export interface ExtractOptions extends FetchRemoteOptions {
 	readonly signal?: AbortSignal;
 	readonly timeoutMs?: number;
 	readonly maxBytes?: number;
+	/**
+	 * Download the images a page contains. Off by default: a page can
+	 * reference dozens, each costing a request and a conversion, so the cost is
+	 * only worth paying when the figures are the point of the fetch.
+	 */
+	readonly includeImages?: boolean;
+	readonly imageLimit?: number;
 }
 
 /** A fetched image, normalized and ready to hand to the model. */
@@ -45,6 +53,17 @@ export interface ExtractedContent {
 	readonly siteName?: string;
 	/** Set when the URL was an image rather than a document. */
 	readonly image?: ExtractedImage;
+	/** Images found on the page, present only when they were requested. */
+	readonly images?: readonly PageImageResult[];
+}
+
+/** An image downloaded from within a page, keyed back to where it came from. */
+export interface PageImageResult {
+	readonly src: string;
+	readonly alt: string;
+	readonly path: string;
+	readonly width: number;
+	readonly height: number;
 }
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
@@ -274,6 +293,74 @@ async function extractImage(
 }
 
 /**
+ * Download the images a page referenced, discarding the ones that fail.
+ *
+ * A broken or hotlink-protected image is normal on a page of any age, so one
+ * failure must not cost the article it belongs to. The downloads share a
+ * single directory, which keeps one page's artifacts together.
+ */
+async function downloadPageImages(
+	images: readonly { src: string; alt: string }[],
+	options: ExtractOptions,
+): Promise<PageImageResult[]> {
+	if (images.length === 0) return [];
+
+	const dir = await createArtifactDir();
+	const results: PageImageResult[] = [];
+
+	for (const [index, image] of images.entries()) {
+		if (options.signal?.aborted) break;
+		try {
+			const response = await fetchRemoteUrl(
+				image.src,
+				{
+					...(options.signal ? { signal: options.signal } : {}),
+					headers: { Accept: "image/*" },
+				},
+				options,
+			);
+			if (!response.ok) continue;
+
+			const contentType = response.headers.get("content-type") ?? "";
+			const bytes = await readBytesWithLimit(response, options.maxBytes ?? DEFAULT_MAX_BYTES);
+			if (bytes.byteLength === 0) continue;
+
+			const source = join(dir, `image-${index}${imageExtension(contentType)}`);
+			await writeFile(source, bytes);
+
+			// The same validation as a directly fetched image: a page linking to
+			// an error page is the common case, not an unusual one.
+			const destination = join(dir, `image-${index}.jpg`);
+			const info = await normalizeImage(source, destination);
+			if (!info) continue;
+
+			results.push({ src: image.src, alt: image.alt, path: destination, ...info });
+		} catch {
+			// One unreachable image is not a reason to fail the page.
+			continue;
+		}
+	}
+
+	return results;
+}
+
+/**
+ * List downloaded images beneath the article text.
+ *
+ * They are appended rather than spliced into place: the extractor's markdown
+ * does not preserve where each image sat in the original document, and an
+ * inaccurate position is worse than an honest list at the end.
+ */
+function appendImageGallery(content: string, images: readonly PageImageResult[]): string {
+	if (images.length === 0) return content;
+	const entries = images.map(image => {
+		const caption = image.alt || "image";
+		return `![${caption}](${image.path})\n\n${image.width}x${image.height} — from ${image.src}`;
+	});
+	return `${content}\n\n## Images\n\n${entries.join("\n\n")}`;
+}
+
+/**
  * Fetch one URL and extract its readable content.
  *
  * Every failure is returned rather than thrown: a batch of URLs should report
@@ -340,6 +427,14 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 		// linkedom's Document is structurally compatible but not the DOM lib type,
 		// which this package does not pull in for a Node-only build.
 		const { document } = parseHTML(body);
+
+		// Collected before extraction, which strips most of the document and
+		// rewrites the image sources that survive to point at link targets
+		// rather than files.
+		const candidates = options.includeImages
+			? collectPageImages(document, response.url || url, options.imageLimit ?? DEFAULT_IMAGE_LIMIT)
+			: [];
+
 		const article = await Defuddle(document as Parameters<typeof Defuddle>[0], response.url || url, {
 			markdown: true,
 			// Defuddle parses synchronously before resolving when async is off,
@@ -361,10 +456,13 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 			};
 		}
 
+		const pageImages = await downloadPageImages(candidates, options);
+
 		return {
 			url,
 			title,
-			content,
+			content: appendImageGallery(content, pageImages),
+			...(options.includeImages ? { images: pageImages } : {}),
 			// Short output is surfaced without discarding what was extracted:
 			// the caller sees both the text and the doubt.
 			error:
