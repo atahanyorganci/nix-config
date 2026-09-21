@@ -339,12 +339,14 @@
             else "dark";
         };
 
-        # fetch-content shells out to all three: ImageMagick to validate and
-        # downscale images, poppler to pull figures out of PDFs, and gh to read
-        # GitHub through the API instead of its rendered pages. Putting them on
-        # pi's PATH rather than depending on the user's profile keeps the
-        # extension working regardless of what is installed globally.
-        extraPackages = [pkgs.imagemagick pkgs.poppler-utils pkgs.gh];
+        # fetch-content shells out to all four: ImageMagick to validate and
+        # downscale images, poppler to pull figures out of PDFs, gh to read
+        # GitHub through the API instead of its rendered pages, and ffmpeg to
+        # turn the HLS manifests and split video/audio streams that cobalt
+        # resolves into single playable files. Putting them on pi's PATH rather
+        # than depending on the user's profile keeps the extension working
+        # regardless of what is installed globally.
+        extraPackages = [pkgs.imagemagick pkgs.poppler-utils pkgs.gh pkgs.ffmpeg];
 
         extensions = [
           # Each bundle is a directory holding a single self-contained

@@ -1,6 +1,8 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
+import { isCobaltUrl, resolveMedia } from "./cobalt.ts";
 import { extractAll } from "./extract.ts";
+import { fetchMedia, mediaContentBlocks } from "./media.ts";
 import type { ExtractedContent } from "./extract.ts";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 
@@ -98,27 +100,60 @@ export const fetchContent = defineTool({
 			details: { phase: "fetch" },
 		});
 
+		// Posts whose point is the media they hold are resolved through cobalt
+		// first. Generic extraction sees only the surrounding page, which for a
+		// Bluesky post is its alt text and for TikTok is nothing at all.
+		const mediaUrls = urls.filter(url => isCobaltUrl(url));
+		const mediaBlocks: (TextContent | ImageContent)[] = [];
+		const mediaFailures: string[] = [];
+
+		for (const url of mediaUrls) {
+			const resolved = await resolveMedia(url);
+			// A URL cobalt recognises but cannot resolve falls back to generic
+			// extraction, which at least returns the page around the media.
+			if (!resolved) {
+				mediaFailures.push(url);
+				continue;
+			}
+			const fetched = await fetchMedia(resolved, signal);
+			if (mediaBlocks.length > 0) mediaBlocks.push({ type: "text", text: "\n\n---\n\n" });
+			mediaBlocks.push(...mediaContentBlocks(url, fetched));
+		}
+
+		const pageUrls = urls.filter(url => !mediaUrls.includes(url) || mediaFailures.includes(url));
+
 		const allowRanges = getAllowRanges();
-		const results = await extractAll(urls, {
-			...(signal ? { signal } : {}),
-			...(allowRanges.length > 0 ? { allowRanges } : {}),
-			...(params.images ? { includeImages: true } : {}),
-		});
+		const results =
+			pageUrls.length === 0
+				? []
+				: await extractAll(pageUrls, {
+						...(signal ? { signal } : {}),
+						...(allowRanges.length > 0 ? { allowRanges } : {}),
+						...(params.images ? { includeImages: true } : {}),
+					});
 
 		const succeeded = results.filter(result => result.content.length > 0 || result.image).length;
 
 		// Blocks are flattened rather than joined, since an image cannot be
 		// represented in the text stream that separates the textual results.
-		const content = results.flatMap<TextContent | ImageContent>((result, index) =>
+		const pageBlocks = results.flatMap<TextContent | ImageContent>((result, index) =>
 			index === 0 ? toContentBlocks(result) : [{ type: "text", text: "\n\n---\n\n" }, ...toContentBlocks(result)],
 		);
+
+		const content =
+			mediaBlocks.length > 0 && pageBlocks.length > 0
+				? [...mediaBlocks, { type: "text" as const, text: "\n\n---\n\n" }, ...pageBlocks]
+				: [...mediaBlocks, ...pageBlocks];
+
+		const mediaSucceeded = mediaUrls.length - mediaFailures.length;
 
 		return {
 			content,
 			details: {
 				requested: urls.length,
-				succeeded,
-				failed: urls.length - succeeded,
+				succeeded: succeeded + mediaSucceeded,
+				failed: urls.length - succeeded - mediaSucceeded,
+				...(mediaSucceeded > 0 ? { media: mediaSucceeded } : {}),
 				results: results.map(({ url, title, error, wordCount }) => ({ url, title, error, wordCount })),
 			},
 		};
