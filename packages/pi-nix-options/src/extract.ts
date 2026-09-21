@@ -79,7 +79,10 @@ export class Extractor {
 	readonly diagnostics: readonly ts.Diagnostic[];
 	readonly skipped: SkippedProperty[] = [];
 
-	constructor(private readonly options: ExtractOptions) {
+	private readonly options: ExtractOptions;
+
+	constructor(options: ExtractOptions) {
+		this.options = options;
 		this.program = createProgram(options.settingsManagerDts);
 		this.checker = this.program.getTypeChecker();
 		const source = this.program.getSourceFile(options.settingsManagerDts);

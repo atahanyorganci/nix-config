@@ -8,6 +8,7 @@
 		"declaration": true,
 		"declarationMap": true,
 		"emitDecoratorMetadata": false,
+		"erasableSyntaxOnly": true,
 		"exactOptionalPropertyTypes": true,
 		"experimentalDecorators": false,
 		"forceConsistentCasingInFileNames": true,
@@ -27,6 +28,9 @@
 		"noUncheckedIndexedAccess": false,
 		"noUnusedLocals": true,
 		"noUnusedParameters": true,
+		"paths": {
+			"~/*": ["./src/*"]
+		},
 		"removeComments": false,
 		"resolveJsonModule": true,
 		"rewriteRelativeImportExtensions": true,
@@ -36,9 +40,6 @@
 		"strictNullChecks": true,
 		"stripInternal": true,
 		"target": "ESNext",
-		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo.json",
-		"paths": {
-			"~/*": ["./src/*"]
-		}
+		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo.json"
 	}
 }
