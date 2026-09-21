@@ -2,6 +2,7 @@ import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { extractAll } from "./extract.ts";
 import type { ExtractedContent } from "./extract.ts";
+import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 
 /**
  * CIDRs exempt from the SSRF guard's private-address checks.
@@ -36,6 +37,28 @@ function renderResult(result: ExtractedContent): string {
 	// thin-but-usable extraction is still worth something to the caller.
 	const warning = result.error ? `\n\nNote: ${result.error}` : "";
 	return `${heading}\n\n${meta}${warning}\n\n${result.content}`;
+}
+
+/**
+ * Turn one result into content blocks.
+ *
+ * An image is sent as an image block rather than a path, because pi passes
+ * those through to the model directly. The text alongside it records where the
+ * file landed and what was done to it, so a later turn can reach for the
+ * original instead of re-fetching.
+ */
+function toContentBlocks(result: ExtractedContent): (TextContent | ImageContent)[] {
+	const { image } = result;
+	if (!image) return [{ type: "text", text: renderResult(result) }];
+
+	const original = `${image.originalFormat} ${image.originalWidth}x${image.originalHeight}`;
+	const unchanged = image.width === image.originalWidth && image.height === image.originalHeight;
+	const described = unchanged ? original : `${original}, resized to ${image.width}x${image.height}`;
+
+	return [
+		{ type: "image", data: image.data, mimeType: image.mimeType },
+		{ type: "text", text: `Image from ${result.url}\nSaved to: ${image.path}\n${described}` },
+	];
 }
 
 export const fetchContent = defineTool({
@@ -74,10 +97,16 @@ export const fetchContent = defineTool({
 			...(allowRanges.length > 0 ? { allowRanges } : {}),
 		});
 
-		const succeeded = results.filter(result => result.content.length > 0).length;
+		const succeeded = results.filter(result => result.content.length > 0 || result.image).length;
+
+		// Blocks are flattened rather than joined, since an image cannot be
+		// represented in the text stream that separates the textual results.
+		const content = results.flatMap<TextContent | ImageContent>((result, index) =>
+			index === 0 ? toContentBlocks(result) : [{ type: "text", text: "\n\n---\n\n" }, ...toContentBlocks(result)],
+		);
 
 		return {
-			content: [{ type: "text", text: results.map(renderResult).join("\n\n---\n\n") }],
+			content,
 			details: {
 				requested: urls.length,
 				succeeded,

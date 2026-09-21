@@ -339,6 +339,12 @@
             else "dark";
         };
 
+        # fetch-content shells out to ImageMagick to validate and downscale
+        # images before handing them to the model. Putting it on pi's PATH
+        # rather than depending on the user's profile keeps the extension
+        # working regardless of what is installed globally.
+        extraPackages = [pkgs.imagemagick];
+
         extensions = [
           # Each bundle is a directory holding a single self-contained
           # index.js, so they are pointed at individually rather than through

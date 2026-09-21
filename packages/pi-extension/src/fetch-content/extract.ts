@@ -1,5 +1,8 @@
 import { Defuddle } from "defuddle/node";
 import { parseHTML } from "linkedom";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createArtifactDir, identifyImage, imageExtension, IMAGE_TYPES, normalizeImage } from "./image.ts";
 import { fetchRemoteUrl } from "./ssrf.ts";
 import type { FetchRemoteOptions } from "./ssrf.ts";
 
@@ -16,6 +19,20 @@ export interface ExtractOptions extends FetchRemoteOptions {
 	readonly maxBytes?: number;
 }
 
+/** A fetched image, normalized and ready to hand to the model. */
+export interface ExtractedImage {
+	/** Where the normalized file was written, for later reference. */
+	readonly path: string;
+	readonly mimeType: string;
+	/** Base64, no data: prefix, as pi's ImageContent expects. */
+	readonly data: string;
+	readonly width: number;
+	readonly height: number;
+	readonly originalFormat: string;
+	readonly originalWidth: number;
+	readonly originalHeight: number;
+}
+
 export interface ExtractedContent {
 	readonly url: string;
 	readonly title: string;
@@ -26,6 +43,8 @@ export interface ExtractedContent {
 	readonly published?: string;
 	readonly wordCount?: number;
 	readonly siteName?: string;
+	/** Set when the URL was an image rather than a document. */
+	readonly image?: ExtractedImage;
 }
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
@@ -46,11 +65,15 @@ const THIN_CONTENT_CHARS = 500;
  * parser produces an empty document at best, and on a raw markdown file it
  * throws outright.
  */
-type ContentKind = "markup" | "text" | "unsupported";
+type ContentKind = "markup" | "text" | "image" | "unsupported";
 
-function classifyContentType(contentType: string): ContentKind {
+export function classifyContentType(contentType: string): ContentKind {
 	const type = contentType.toLowerCase().split(";")[0]?.trim() ?? "";
 	if (type === "text/html" || type === "application/xhtml+xml") return "markup";
+	if (IMAGE_TYPES.has(type)) return "image";
+	// SVG is markup, but as a drawing it is only useful rendered, and the
+	// extractor would return its text nodes stripped of the shapes.
+	if (type === "image/svg+xml") return "image";
 	if (type === "text/xml" || type === "application/xml" || type.endsWith("+xml")) return "markup";
 	if (type === "text/plain" || type === "text/markdown" || type === "application/json") return "text";
 	// Everything else under text/* is source code, CSV, config and the like:
@@ -203,6 +226,54 @@ function failure(url: string, error: string): ExtractedContent {
 }
 
 /**
+ * Turn an image response into something the model can look at.
+ *
+ * The bytes are written before being inspected because ImageMagick reads a
+ * path, and that inspection is the point: a content type is a claim, and a
+ * server that mislabels an HTML error page as a PNG would otherwise produce a
+ * silently empty answer from the provider rather than an error.
+ */
+async function extractImage(
+	url: string,
+	response: Response,
+	contentType: string,
+	maxBytes: number,
+): Promise<ExtractedContent> {
+	const bytes = await readBytesWithLimit(response, maxBytes);
+	if (bytes.byteLength === 0) return failure(url, "Response body is empty");
+
+	const dir = await createArtifactDir();
+	const original = join(dir, `source${imageExtension(contentType)}`);
+	await writeFile(original, bytes);
+
+	const info = await identifyImage(original);
+	if (!info) {
+		return failure(url, `Response is labelled ${contentType} but is not a decodable image`);
+	}
+
+	const normalizedPath = join(dir, "image.jpg");
+	const normalized = await normalizeImage(original, normalizedPath);
+	if (!normalized) return failure(url, "Image could not be converted for display");
+
+	return {
+		url,
+		title: textTitle("", url),
+		content: "",
+		error: null,
+		image: {
+			path: normalizedPath,
+			mimeType: "image/jpeg",
+			data: (await readFile(normalizedPath)).toString("base64"),
+			width: normalized.width,
+			height: normalized.height,
+			originalFormat: info.format,
+			originalWidth: info.width,
+			originalHeight: info.height,
+		},
+	};
+}
+
+/**
  * Fetch one URL and extract its readable content.
  *
  * Every failure is returned rather than thrown: a batch of URLs should report
@@ -245,6 +316,12 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 		const kind = classifyContentType(contentType);
 		if (kind === "unsupported") {
 			return failure(url, `Unsupported content type: ${contentType || "unknown"}`);
+		}
+
+		if (kind === "image") {
+			const image = await extractImage(url, response, contentType, maxBytes);
+			controller.signal.throwIfAborted();
+			return image;
 		}
 
 		const body = decodeBody(await readBytesWithLimit(response, maxBytes), charsetFrom(contentType));

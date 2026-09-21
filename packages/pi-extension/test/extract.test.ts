@@ -1,5 +1,10 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { afterAll, describe, expect, it } from "vitest";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { extractContent } from "../src/fetch-content/extract.ts";
 import type { AddressInfo } from "node:net";
 
@@ -117,14 +122,66 @@ describe("content types", () => {
 		expect(result.content).toContain("Body paragraph");
 	});
 
-	it("rejects binary content types", async () => {
+	it("rejects an unhandled binary content type", async () => {
+		const result = await fetchBody("application/octet-stream", Buffer.from([0x00, 0x01]));
+		expect(result.error).toBe("Unsupported content type: application/octet-stream");
+	});
+
+	it("rejects a truncated image rather than forwarding it", async () => {
+		// A PNG signature with no body: the content type is honest but the bytes
+		// are not an image, and unusable image data reaches the model as an empty
+		// response with no error attached.
 		const result = await fetchBody("image/png", Buffer.from([0x89, 0x50, 0x4e, 0x47]));
-		expect(result.error).toBe("Unsupported content type: image/png");
+		expect(result.error).toContain("not a decodable image");
 	});
 
 	it("reports an empty body", async () => {
 		const result = await fetchBody("text/plain", "");
 		expect(result.error).toBe("Response body is empty");
+	});
+});
+
+describe("images", () => {
+	let png: Buffer;
+
+	beforeAll(async () => {
+		const dir = await mkdtemp(join(tmpdir(), "pi-extract-test-"));
+		const path = join(dir, "wide.png");
+		await promisify(execFile)("magick", ["-size", "1600x900", "xc:teal", path]);
+		png = await readFile(path);
+	});
+
+	it("returns a normalized image instead of trying to read it as text", async () => {
+		const result = await fetchBody("image/png", png);
+		expect(result.error).toBeNull();
+		expect(result.image).toMatchObject({
+			mimeType: "image/jpeg",
+			width: 1024,
+			height: 576,
+			originalFormat: "PNG",
+			originalWidth: 1600,
+			originalHeight: 900,
+		});
+	});
+
+	it("carries base64 data that decodes back to a JPEG", async () => {
+		const result = await fetchBody("image/png", png);
+		const decoded = Buffer.from(result.image!.data, "base64");
+		// JPEG start-of-image marker; proves the payload is the converted file
+		// and not, say, the original PNG or a base64 round-trip of text.
+		expect(decoded.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+	});
+
+	it("writes the image somewhere the caller can read it later", async () => {
+		const result = await fetchBody("image/png", png);
+		await expect(readFile(result.image!.path)).resolves.toBeInstanceOf(Buffer);
+	});
+
+	it("detects an HTML error page served as an image", async () => {
+		// Exactly how this fails in the wild: a 200 with the right content type
+		// and an error page in the body.
+		const result = await fetchBody("image/png", "<html><body>404 not found</body></html>");
+		expect(result.error).toContain("not a decodable image");
 	});
 });
 
