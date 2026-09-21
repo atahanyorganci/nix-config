@@ -36,7 +36,8 @@
 	},
 	"pi": {
 		"extensions": [
-			"./src/index.ts"
+			"./src/index.ts",
+			"./src/usage/index.ts"
 		]
 	}
 }
