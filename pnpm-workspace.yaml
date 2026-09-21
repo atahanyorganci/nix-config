@@ -47,3 +47,5 @@ catalog:
   "linkedom": "^0.16.0"
   "unpdf": "^1.8.1"
   "vitest": "^4.1.8"
+patchedDependencies:
+  "@imput/cobalt-api@11.7.1": patches/@imput__cobalt-api@11.7.1.patch

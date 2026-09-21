@@ -180,6 +180,9 @@ catalogs:
 overrides:
   '@effect/platform-node-shared': 4.0.0-rc.112
 
+patchedDependencies:
+  '@imput/cobalt-api@11.7.1': 7716ce7203fb9347437995ed22088909f9dea11cf164140b223fdf7f475a812e
+
 importers:
 
   .:
@@ -296,7 +299,7 @@ importers:
     dependencies:
       '@imput/cobalt-api':
         specifier: 'catalog:'
-        version: https://codeload.github.com/imputnet/cobalt/tar.gz/a636575b09de1fc55d9b8cd98cac88f5f2f16b42#path:/api
+        version: https://codeload.github.com/imputnet/cobalt/tar.gz/a636575b09de1fc55d9b8cd98cac88f5f2f16b42#path:/api(patch_hash=7716ce7203fb9347437995ed22088909f9dea11cf164140b223fdf7f475a812e)
       defuddle:
         specifier: 'catalog:'
         version: 0.19.3
@@ -4570,7 +4573,7 @@ snapshots:
   '@img/sharp-win32-x64@0.35.4':
     optional: true
 
-  '@imput/cobalt-api@https://codeload.github.com/imputnet/cobalt/tar.gz/a636575b09de1fc55d9b8cd98cac88f5f2f16b42#path:/api':
+  '@imput/cobalt-api@https://codeload.github.com/imputnet/cobalt/tar.gz/a636575b09de1fc55d9b8cd98cac88f5f2f16b42#path:/api(patch_hash=7716ce7203fb9347437995ed22088909f9dea11cf164140b223fdf7f475a812e)':
     dependencies:
       '@datastructures-js/priority-queue': 6.4.0
       '@imput/psl': 2.0.4

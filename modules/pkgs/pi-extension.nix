@@ -28,6 +28,11 @@
           ../../packages/config
           ../../packages/pi-extension
 
+          # `patchedDependencies` in pnpm-workspace.yaml resolves these paths
+          # relative to the lockfile, and pnpm hashes their contents while
+          # building the store, so the install fails outright without them.
+          ../../patches
+
           # Stands in for cobalt's unpublished `@imput/version-info`. The
           # `workspace:^` specifier cannot resolve without a member of that
           # name, so this is required to install, not merely to build.

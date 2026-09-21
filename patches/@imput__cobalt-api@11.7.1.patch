@@ -1,0 +1,146 @@
+diff --git a/src/config.js b/src/config.js
+index 2d8ac7a088b93f0bf2a752274785c42b4bbf71ea..528294fd0920d88966e0c5647492db7680a3338d 100644
+--- a/src/config.js
++++ b/src/config.js
+@@ -1,12 +1,18 @@
+-import { getVersion } from "@imput/version-info";
+ import { loadEnvs, validateEnvs } from "./core/env.js";
+ 
+-const version = await getVersion();
++// Upstream resolves this from the surrounding git checkout, which does not
++// exist for a consumer, and only uses it to build the user-agent string.
++const version = "library";
+ 
+ const canonicalEnv = Object.freeze(structuredClone(process.env));
+ const env = loadEnvs();
+ 
+-const genericUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
++// Overridable, and defaulted forward, because sites age this out: TikTok's
++// WAF serves a bot-challenge page to the pinned Chrome/138 while accepting
++// Chrome/140, which makes every extraction fail with `fetch.fail`. Upstream
++// bumps this on its own schedule; the env var is the escape hatch in between.
++const genericUserAgent = process.env.COBALT_USER_AGENT
++    || "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
+ const cobaltUserAgent = `cobalt/${version} (+https://github.com/imputnet/cobalt)`;
+ 
+ export const setTunnelPort = (port) => env.tunnelPort = port;
+@@ -31,7 +37,8 @@ export const updateEnv = (newEnv) => {
+     return changes;
+ }
+ 
+-await validateEnvs(env);
++// validateEnvs() checks server-startup envs (JWT secrets, cluster sizing).
++// It is the second of two top-level awaits and does not apply to library use.
+ 
+ export {
+     env,
+diff --git a/src/core/env.js b/src/core/env.js
+index 4afaa17591bc6537c7146449db50df1dcd6a4390..5db27c2c96f9adaf2bb31176ed4570d50e811fe7 100644
+--- a/src/core/env.js
++++ b/src/core/env.js
+@@ -1,6 +1,19 @@
+-import { Constants } from "youtubei.js";
++// youtubei.js is ~630kB whose only use here is the client-name list below.
++// It also has internal import cycles that bundlers mis-order, so keep it out
++// of the module graph and load it on demand.
++let Constants;
++const __loadConstants = async () => (({ Constants } = await import("youtubei.js")));
+ import { services } from "../processing/service-config.js";
+-import { updateEnv, canonicalEnv, env as currentEnv } from "../config.js";
++// config.js imports this file, so importing it back eagerly forms a cycle.
++// canonicalEnv is only a frozen snapshot of the environment, so take it
++// directly; the other two are read inside functions and can be deferred.
++const canonicalEnv = Object.freeze(structuredClone(process.env));
++let updateEnv, currentEnv;
++const __loadConfig = async () => {
++    const m = await import("../config.js");
++    updateEnv = m.updateEnv;
++    currentEnv = m.env;
++};
+ 
+ import { FileWatcher } from "../misc/file-watcher.js";
+ import { isURL } from "../misc/utils.js";
+@@ -139,6 +152,7 @@ export const loadEnvs = (env = process.env) => {
+ let loggedProxyWarning = false;
+ 
+ export const validateEnvs = async (env) => {
++    await __loadConfig();
+     if (env.sessionEnabled && env.jwtSecret.length < 16) {
+         throw new Error("JWT_SECRET env is too short (must be at least 16 characters long)");
+     }
+@@ -153,6 +167,7 @@ export const validateEnvs = async (env) => {
+         throw new Error('SO_REUSEPORT is not supported');
+     }
+ 
++    if (env.customInnertubeClient) await __loadConstants();
+     if (env.customInnertubeClient && !Constants.SUPPORTED_CLIENTS.includes(env.customInnertubeClient)) {
+         console.error("CUSTOM_INNERTUBE_CLIENT is invalid. Provided client is not supported.");
+         console.error(`Supported clients are: ${Constants.SUPPORTED_CLIENTS.join(', ')}\n`);
+diff --git a/src/misc/cluster.js b/src/misc/cluster.js
+index 1320bb4cc68d814e2ba08e5b505e1142f86ade03..b11f992b47bd6ebe2077329a7a521a1cf7bd8a09 100644
+--- a/src/misc/cluster.js
++++ b/src/misc/cluster.js
+@@ -1,11 +1,15 @@
+ import cluster from "node:cluster";
+ import net from "node:net";
+ import { syncSecrets } from "../security/secrets.js";
+-import { env, isCluster } from "../config.js";
++// Deferred to break the config.js -> core/env.js -> cluster.js cycle. Both
++// bindings are only read inside the functions below.
++let env, isCluster;
++const __loadConfig = async () => (({ env, isCluster } = await import("../config.js")));
+ 
+ export { isPrimary, isWorker } from "node:cluster";
+ 
+ export const supportsReusePort = async () => {
++    await __loadConfig();
+     try {
+         await new Promise((resolve, reject) => {
+             const server = net.createServer().listen({ port: 0, reusePort: true });
+@@ -21,6 +25,7 @@ export const supportsReusePort = async () => {
+ }
+ 
+ export const initCluster = async () => {
++    await __loadConfig();
+     if (cluster.isPrimary) {
+         for (let i = 1; i < env.instanceCount; ++i) {
+             cluster.fork();
+diff --git a/src/store/store.js b/src/store/store.js
+index e268d88db16c2b8e2762e9ad90ce258876dba9c6..fd2f98a3b78ac7c2a9485b5c34451563bc773c66 100644
+--- a/src/store/store.js
++++ b/src/store/store.js
+@@ -1,10 +1,8 @@
+ import { env } from '../config.js';
++import MemoryStore from './memory-store.js';
++import RedisStore from './redis-store.js';
+ 
+-let _export;
+-if (env.redisURL) {
+-    _export = await import('./redis-store.js');
+-} else {
+-    _export = await import('./memory-store.js');
+-}
+-
+-export default _export.default;
++// Upstream selects the implementation with a top-level await, which turns every
++// transitive importer into an async module. Both modules are side-effect-free at
++// import time and the choice depends only on an env var, so select eagerly.
++export default env.redisURL ? RedisStore : MemoryStore;
+diff --git a/src/stream/manage.js b/src/stream/manage.js
+index 93e9e652473ea61dfb2892fb4ed8b85e26b347ef..30bb98138968e03210bbf36e56f481d64589f0ad 100644
+--- a/src/stream/manage.js
++++ b/src/stream/manage.js
+@@ -6,7 +6,12 @@ import { strict as assert } from "assert";
+ import { setMaxListeners } from "node:events";
+ 
+ import { env } from "../config.js";
+-import { closeRequest } from "./shared.js";
++// Inlined from shared.js, which imports this file back. The sole consumer
++// here (destroyInternalStream) is synchronous, so it cannot await a dynamic
++// import the way the other cycles are broken.
++const closeRequest = (controller) => {
++    try { controller.abort() } catch {}
++};
+ import { decryptStream, encryptStream } from "../misc/crypto.js";
+ import { hashHmac } from "../security/secrets.js";
+ import { zip } from "../misc/utils.js";
