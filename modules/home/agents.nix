@@ -293,6 +293,10 @@
             src = "${pkgs.yorganci-pi-extension}/web-search";
           }
           {
+            name = "fetch-content";
+            src = "${pkgs.yorganci-pi-extension}/fetch-content";
+          }
+          {
             name = "usage";
             src = "${pkgs.yorganci-pi-extension}/usage";
           }
