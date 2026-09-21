@@ -285,11 +285,16 @@
         };
 
         extensions = [
+          # Each bundle is a directory holding a single self-contained
+          # index.js, so they are pointed at individually rather than through
+          # the package's `pi` manifest.
           {
-            # Carries both the web_search tool and the usage widget; pi reads
-            # the entry points from the package's own `pi` manifest.
-            name = "yorganci";
-            src = ../../packages/pi-extension;
+            name = "web-search";
+            src = "${pkgs.yorganci-pi-extension}/web-search";
+          }
+          {
+            name = "usage";
+            src = "${pkgs.yorganci-pi-extension}/usage";
           }
           {
             name = "context-budget";

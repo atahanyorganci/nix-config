@@ -5,12 +5,17 @@
 	"keywords": [
 		"pi-package"
 	],
+	"files": [
+		"dist"
+	],
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts",
-		"./*": "./src/*.ts"
+		"./package.json": "./package.json",
+		"./usage": "./src/usage/index.ts",
+		"./web-search": "./src/web-search/index.ts"
 	},
 	"scripts": {
+		"build": "rolldown -c rolldown.config.ts",
 		"check": "tsc --noEmit",
 		"format": "oxfmt --check .",
 		"format:fix": "oxfmt --write .",
@@ -25,6 +30,7 @@
 		"oxfmt": "catalog:",
 		"oxlint": "catalog:",
 		"oxlint-tsgolint": "catalog:",
+		"rolldown": "catalog:",
 		"typebox": "catalog:",
 		"typescript": "catalog:"
 	},
@@ -36,8 +42,8 @@
 	},
 	"pi": {
 		"extensions": [
-			"./src/index.ts",
-			"./src/usage/index.ts"
+			"./dist/usage",
+			"./dist/web-search"
 		]
 	}
 }
