@@ -264,9 +264,64 @@
         };
       }
     ];
+
+    # Both the long-context OpenAI models and the Claude ones price a request
+    # by its total input tokens, so a session that drifts past a tier boundary
+    # silently costs multiples for every later turn. Capping the window makes
+    # pi compact before that happens; `full` opts back in when the work
+    # genuinely needs the room.
+    #
+    # Thresholds come from the `inputTokensAbove` tiers declared above, so the
+    # budget and the price break stay the same number.
+    shortContextTokens = 272000;
+
+    # Fast mode targets for the models worth pairing. Keyed by primary model
+    # id, so an entry that outlives its model fails the assertion below rather
+    # than silently never applying.
+    fastModels = {
+      "claude-opus-5" = "claude-sonnet-5";
+      "claude-opus-4-8" = "claude-sonnet-4-6";
+      "claude-sonnet-5" = "claude-haiku-4-5-20251001";
+      "gpt-5.6-sol" = "gpt-5.6-luna";
+      "gpt-6-astra" = "gpt-5.6-terra";
+    };
+
+    # Derived from `gatewayModels` rather than written out again: a model that
+    # gains a tier or changes its window updates both files at once.
+    modelProfiles = lib.listToAttrs (lib.concatMap (
+        model: let
+          fast = fastModels.${model.id} or null;
+          # Only models roomy enough for the cap to bite get a context axis;
+          # below it `short` and `full` would be the same number.
+          context = lib.optionalAttrs (model.contextWindow > shortContextTokens) {
+            short = shortContextTokens;
+            full = model.contextWindow;
+          };
+          profile =
+            lib.optionalAttrs (context != {}) {
+              inherit context;
+              defaultContext = "short";
+            }
+            // lib.optionalAttrs (fast != null) {fast.model = fast;};
+        in
+          lib.optional (profile != {}) (lib.nameValuePair "llm-gateway/${model.id}" profile)
+      )
+      gatewayModels);
   in {
     options.agents.enable = lib.mkEnableOption "Agent harnesses";
     config = lib.mkIf config.agents.enable {
+      # A fast target naming a model the gateway does not serve would only
+      # surface as a warning at session start, long after the typo.
+      assertions = let
+        ids = map (model: model.id) gatewayModels;
+        missing = lib.filter (target: !(lib.elem target ids)) (lib.attrValues fastModels);
+      in [
+        {
+          assertion = missing == [];
+          message = "agents: fast-mode targets not served by llm-gateway: ${lib.concatStringsSep ", " missing}.";
+        }
+      ];
+
       programs.pi = {
         enable = true;
         settings = {
@@ -301,15 +356,12 @@
             src = "${pkgs.yorganci-pi-extension}/usage";
           }
           {
-            name = "context-budget";
-            src = pkgs.fetchFromGitHub {
-              owner = "magoz";
-              repo = "pi-context-budget";
-              rev = "b39f70e78217b25309439be22e603d8e4b9f5a01";
-              sha256 = "sha256-fqfVsL4iTWA/RYJxLIAq8ZsMHkaVv+QzxOsR89KkqPU=";
-            };
+            name = "model-profile";
+            src = "${pkgs.yorganci-pi-extension}/model-profile";
           }
         ];
+
+        modelProfiles.models = modelProfiles;
 
         models.providers.llm-gateway = {
           baseUrl = "http://localhost:${toString gatewayPort}/v1";
