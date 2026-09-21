@@ -166,6 +166,34 @@ function textTitle(text: string, url: string): string {
 	return "";
 }
 
+/**
+ * Explain an HTTP failure, and where possible say what to do about it.
+ *
+ * A bare status line tells the caller the fetch failed but not whether trying
+ * something else could succeed. A missing page is the case worth spelling out:
+ * it usually existed once, so searching for its current address and retrying
+ * is a real option rather than a guess.
+ */
+function httpErrorMessage(status: number, statusText: string): string {
+	const base = `HTTP ${status}${statusText ? `: ${statusText}` : ""}`;
+	if (status === 404 || status === 410) {
+		return (
+			`${base}. The origin server says this page does not exist, so it cannot be fetched. ` +
+			`It may have moved or been renamed: search for the current URL, then retry with it.`
+		);
+	}
+	if (status === 429) {
+		return `${base}. The origin is rate limiting this client, so retrying immediately will fail the same way.`;
+	}
+	if (status === 401 || status === 403) {
+		return `${base}. The page exists but is not public, and this tool sends no credentials.`;
+	}
+	if (status >= 500) {
+		return `${base}. This is a fault on the origin server, not in the request.`;
+	}
+	return base;
+}
+
 function errorMessage(cause: unknown): string {
 	return cause instanceof Error ? cause.message : String(cause);
 }
@@ -210,7 +238,7 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 		);
 
 		if (!response.ok) {
-			return failure(url, `HTTP ${response.status}: ${response.statusText}`);
+			return failure(url, httpErrorMessage(response.status, response.statusText));
 		}
 
 		const contentType = response.headers.get("content-type") ?? "";

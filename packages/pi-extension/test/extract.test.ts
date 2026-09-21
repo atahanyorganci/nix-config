@@ -26,6 +26,23 @@ function serve(contentType: string, body: Buffer | string): Promise<string> {
 const fetchBody = async (contentType: string, body: Buffer | string) =>
 	await extractContent(await serve(contentType, body), { allowRanges: ["127.0.0.0/8"] });
 
+/** Serve a bare status code, for the paths where only the status matters. */
+function serveStatus(status: number): Promise<string> {
+	return new Promise(resolve => {
+		const server = createServer((_request, response) => {
+			response.statusCode = status;
+			response.end();
+		});
+		servers.push(server);
+		server.listen(0, "127.0.0.1", () => {
+			resolve(`http://127.0.0.1:${(server.address() as AddressInfo).port}/gone.html`);
+		});
+	});
+}
+
+const fetchStatus = async (status: number) =>
+	await extractContent(await serveStatus(status), { allowRanges: ["127.0.0.0/8"] });
+
 afterAll(() => {
 	for (const server of servers) server.close();
 });
@@ -108,6 +125,30 @@ describe("content types", () => {
 	it("reports an empty body", async () => {
 		const result = await fetchBody("text/plain", "");
 		expect(result.error).toBe("Response body is empty");
+	});
+});
+
+describe("HTTP failures", () => {
+	it.each([
+		[404, "search for the current URL"],
+		[410, "search for the current URL"],
+		[429, "rate limiting"],
+		[403, "not public"],
+		[503, "fault on the origin server"],
+	])("explains HTTP %i", async (status, hint) => {
+		const result = await fetchStatus(status);
+		expect(result.error).toContain(hint);
+	});
+
+	it("still reports the status code itself", async () => {
+		// The advice is additive: a caller keying on the number must still find it.
+		const result = await fetchStatus(404);
+		expect(result.error).toContain("HTTP 404");
+	});
+
+	it("leaves an unremarkable status without advice", async () => {
+		const result = await fetchStatus(418);
+		expect(result.error).toBe("HTTP 418: I'm a Teapot");
 	});
 });
 
