@@ -14,6 +14,7 @@ export default defineConfig({
 	// `index.js` inside.
 	input: {
 		"fetch-content": "src/fetch-content/index.ts",
+		"model-profile": "src/model-profile/index.ts",
 		usage: "src/usage/index.ts",
 		"web-search": "src/web-search/index.ts",
 	},

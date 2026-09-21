@@ -12,6 +12,7 @@
 	"exports": {
 		"./fetch-content": "./src/fetch-content/index.ts",
 		"./package.json": "./package.json",
+		"./model-profile": "./src/model-profile/index.ts",
 		"./usage": "./src/usage/index.ts",
 		"./web-search": "./src/web-search/index.ts"
 	},
@@ -50,6 +51,7 @@
 	"pi": {
 		"extensions": [
 			"./dist/fetch-content",
+			"./dist/model-profile",
 			"./dist/usage",
 			"./dist/web-search"
 		]
