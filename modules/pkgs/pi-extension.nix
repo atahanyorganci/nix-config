@@ -46,7 +46,7 @@
         pnpmDeps = final.fetchPnpmDeps {
           inherit (finalAttrs) pname version src;
           fetcherVersion = 4;
-          hash = "sha256-szuiPz0rFtJJWDuFcZTIM36568K3TtO/BtUE863Ay8o=";
+          hash = "sha256-XqhuI9lnlGKXlh4nEFRuWE+DkCwmwsI6IapGXcvA78o=";
         };
 
         pnpmWorkspaces = [

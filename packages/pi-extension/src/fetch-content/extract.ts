@@ -4,6 +4,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createArtifactDir, identifyImage, imageExtension, IMAGE_TYPES, normalizeImage } from "./image.ts";
 import { collectPageImages, DEFAULT_IMAGE_LIMIT } from "./page-images.ts";
+import { extractPdf } from "./pdf.ts";
 import { fetchRemoteUrl } from "./ssrf.ts";
 import type { FetchRemoteOptions } from "./ssrf.ts";
 
@@ -55,6 +56,10 @@ export interface ExtractedContent {
 	readonly image?: ExtractedImage;
 	/** Images found on the page, present only when they were requested. */
 	readonly images?: readonly PageImageResult[];
+	/** Page count, for documents that have pages. */
+	readonly pageCount?: number;
+	/** Directory holding the extracted parts of an oversized document. */
+	readonly artifactDir?: string;
 }
 
 /** An image downloaded from within a page, keyed back to where it came from. */
@@ -84,11 +89,12 @@ const THIN_CONTENT_CHARS = 500;
  * parser produces an empty document at best, and on a raw markdown file it
  * throws outright.
  */
-type ContentKind = "markup" | "text" | "image" | "unsupported";
+type ContentKind = "markup" | "text" | "image" | "pdf" | "unsupported";
 
 export function classifyContentType(contentType: string): ContentKind {
 	const type = contentType.toLowerCase().split(";")[0]?.trim() ?? "";
 	if (type === "text/html" || type === "application/xhtml+xml") return "markup";
+	if (type === "application/pdf") return "pdf";
 	if (IMAGE_TYPES.has(type)) return "image";
 	// SVG is markup, but as a drawing it is only useful rendered, and the
 	// extractor would return its text nodes stripped of the shapes.
@@ -409,6 +415,24 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 			const image = await extractImage(url, response, contentType, maxBytes);
 			controller.signal.throwIfAborted();
 			return image;
+		}
+
+		if (kind === "pdf") {
+			const bytes = await readBytesWithLimit(response, maxBytes);
+			if (bytes.byteLength === 0) return failure(url, "Response body is empty");
+			const pdf = await extractPdf(bytes, url, {
+				signal: controller.signal,
+				...(options.includeImages ? { includeImages: true } : {}),
+			});
+			controller.signal.throwIfAborted();
+			return {
+				url,
+				title: pdf.title,
+				content: pdf.content,
+				error: pdf.content ? null : "PDF contains no extractable text",
+				pageCount: pdf.pageCount,
+				...(pdf.artifactDir ? { artifactDir: pdf.artifactDir } : {}),
+			};
 		}
 
 		const body = decodeBody(await readBytesWithLimit(response, maxBytes), charsetFrom(contentType));

@@ -8,38 +8,43 @@ import { defineConfig } from "rolldown";
  * Bundling also keeps the shipped artifact a handful of files rather than a
  * `node_modules` tree, whose symlinks break once copied into the Nix store.
  */
-export default defineConfig({
-	// One bundle per extension. The directory layout mirrors `src`, so
-	// `pi.extensions` can point at `./dist/<name>` and pi picks up the
-	// `index.js` inside.
-	input: {
-		"fetch-content": "src/fetch-content/index.ts",
-		"model-profile": "src/model-profile/index.ts",
-		usage: "src/usage/index.ts",
-		"web-search": "src/web-search/index.ts",
-	},
-	platform: "node",
 
-	// Pi injects these at load time. Inlining them would ship a second copy of
-	// the SDK, whose classes fail instanceof checks against the objects pi
-	// hands to the extension. Everything else is inlined, which is rolldown's
-	// default.
-	external: [/^@earendil-works\//, "typebox"],
+const EXTENSIONS = ["fetch-content", "model-profile", "usage", "web-search"];
 
-	output: {
-		dir: "dist",
-		format: "esm",
-		entryFileNames: "[name]/index.js",
+// Pi injects these at load time. Inlining them would ship a second copy of
+// the SDK, whose classes fail instanceof checks against the objects pi hands
+// to the extension. Everything else is inlined, which is rolldown's default.
+const EXTERNAL = [/^@earendil-works\//, "typebox"];
 
-		// Pi loads each extension on its own, so no entry may depend on a
-		// sibling chunk: hoisting shared code would emit imports that only
-		// resolve relative to `dist`.
-		inlineDynamicImports: false,
-		manualChunks: () => null,
+/**
+ * One build per extension, rather than one build with several inputs.
+ *
+ * A shared build can only inline dynamic imports for all entries or none, and
+ * turning it off lets a dependency emit a sibling chunk: unpdf reaches PDF.js
+ * that way, which produced an `import("../pdfjs-*.js")` pointing outside the
+ * extension's own directory — the one place pi cannot follow, since each
+ * extension is installed as a standalone folder.
+ */
+export default defineConfig(
+	EXTENSIONS.map(name => ({
+		input: { [name]: `src/${name}/index.ts` },
+		platform: "node" as const,
+		external: EXTERNAL,
+		output: {
+			dir: "dist",
+			format: "esm" as const,
+			entryFileNames: "[name]/index.js",
 
-		// A stack trace pointing into a bundle is unreadable without this, and
-		// pi parses the source rather than serving it, so size costs nothing.
-		sourcemap: true,
-		minify: false,
-	},
-});
+			// Everything the entry reaches, static or dynamic, ends up in its
+			// own file. With one entry per build this cannot merge unrelated
+			// extensions together.
+			inlineDynamicImports: true,
+
+			// A stack trace pointing into a bundle is unreadable without this,
+			// and pi parses the source rather than serving it, so size costs
+			// nothing.
+			sourcemap: true,
+			minify: false,
+		},
+	})),
+);

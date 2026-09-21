@@ -33,4 +33,5 @@ catalog:
   "typescript": "^7.0.2"
   "defuddle": "0.19.3"
   "linkedom": "^0.16.0"
+  "unpdf": "^1.8.1"
   "vitest": "^4.1.8"

@@ -27,7 +27,8 @@
 	},
 	"dependencies": {
 		"defuddle": "catalog:",
-		"linkedom": "catalog:"
+		"linkedom": "catalog:",
+		"unpdf": "catalog:"
 	},
 	"devDependencies": {
 		"@earendil-works/pi-ai": "catalog:",

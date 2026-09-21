@@ -167,6 +167,9 @@ catalogs:
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
+    unpdf:
+      specifier: ^1.8.1
+      version: 1.8.1
     vitest:
       specifier: ^4.1.8
       version: 4.1.11
@@ -292,6 +295,9 @@ importers:
       linkedom:
         specifier: 'catalog:'
         version: 0.16.11
+      unpdf:
+        specifier: 'catalog:'
+        version: 1.8.1
     devDependencies:
       '@earendil-works/pi-ai':
         specifier: 'catalog:'
@@ -3156,6 +3162,15 @@ packages:
 
   universal-user-agent@7.0.3:
     resolution: {integrity: sha512-TmnEAEAsBJVZM/AADELsK76llnwcf9vMKuPz8JflO1frO8Lchitr0fNaN9d+Ap0BjKtqWqd/J17qeDnXh8CL2A==}
+
+  unpdf@1.8.1:
+    resolution: {integrity: sha512-xkURhy2SoGpOIH0a1gLHNkASPIQYonadDJs2AQwPEfUakafeD9EA1WTWWsaR++gfTCXJpV27W7tU1nXuk82UKQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@napi-rs/canvas': ^0.1.69 || ^1.0.0
+    peerDependenciesMeta:
+      '@napi-rs/canvas':
+        optional: true
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
@@ -6040,6 +6055,8 @@ snapshots:
       pathe: 2.0.3
 
   universal-user-agent@7.0.3: {}
+
+  unpdf@1.8.1: {}
 
   util-deprecate@1.0.2: {}
 
