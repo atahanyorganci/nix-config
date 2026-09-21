@@ -1,5 +1,5 @@
-import { BunRuntime } from "@effect/platform-bun";
-import * as BunServices from "@effect/platform-bun/BunServices";
+import { NodeRuntime } from "@effect/platform-node";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { matchesHost } from "@yorganci/netbird-alchemy";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
 import { peersGet } from "@yorganci/netbird-api/peers";
@@ -102,9 +102,9 @@ const listPeers = Command.make("list-peers", {
 );
 
 const program = Command.run(listPeers, { version: "0.0.0" }).pipe(
-	Effect.provide(BunServices.layer),
+	Effect.provide(NodeServices.layer),
 	Effect.scoped,
 	Effect.orDie,
 );
 
-BunRuntime.runMain(program as Effect.Effect<void>);
+NodeRuntime.runMain(program as Effect.Effect<void>);

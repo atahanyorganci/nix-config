@@ -19,7 +19,10 @@ pi-options *args:
     # Formatted with the repo's own Nix formatter so `nix fmt` leaves the
     # generated files alone and --check stays meaningful.
     alejandra="$(nix build --no-link --impure --print-out-paths --expr 'let f = builtins.getFlake (toString ./.); p = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in p.alejandra')/bin/alejandra"
-    bun packages/pi-nix-options/src/main.ts \
+    # Node runs the generator's TypeScript directly (type stripping), so the
+    # flake's own Node is used rather than whatever happens to be on PATH.
+    node="$(nix build --no-link --impure --print-out-paths --expr 'let f = builtins.getFlake (toString ./.); p = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in p.nodejs')/bin/node"
+    "$node" packages/pi-nix-options/src/main.ts \
         --pi-root "$root" \
         --out-dir {{pi_out}} \
         --formatter "$alejandra -q -" \

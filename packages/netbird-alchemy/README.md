@@ -97,7 +97,7 @@ Integration tests use `alchemy/Test/Vitest` with an Alchemy Docker fixture:
 Requires a local Docker daemon. If Docker is unavailable, cases are skipped via `skipIf(!isDockerReady)`.
 
 ```bash
-bun run test
+pnpm run test
 ```
 
 If an interrupted run leaves orphans:

@@ -1,6 +1,6 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
-import { BunCrypto, BunFileSystem, BunHttpClient, BunPath, BunRuntime } from "@effect/platform-bun";
+import { NodeCrypto, NodeFileSystem, NodeHttpClient, NodePath, NodeRuntime } from "@effect/platform-node";
 import { Console, Crypto, Effect, FileSystem, Layer, Path } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import * as Yaml from "yaml";
@@ -160,6 +160,6 @@ const program = Effect.gen(function* () {
 });
 
 program.pipe(
-	Effect.provide(Layer.mergeAll(BunFileSystem.layer, BunPath.layer, BunHttpClient.layer, BunCrypto.layer)),
-	BunRuntime.runMain,
+	Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeHttpClient.layerUndici, NodeCrypto.layer)),
+	NodeRuntime.runMain,
 );

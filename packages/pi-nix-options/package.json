@@ -13,7 +13,7 @@
 		"check": "tsc --noEmit",
 		"format": "oxfmt --check .",
 		"format:fix": "oxfmt --write .",
-		"generate": "bun src/main.ts",
+		"generate": "node src/main.ts",
 		"lint": "oxlint .",
 		"lint:fix": "oxlint --fix .",
 		"test": "vitest --run"

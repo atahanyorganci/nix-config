@@ -1,4 +1,4 @@
-import * as BunCrypto from "@effect/platform-bun/BunCrypto";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import { havePropsChanged, isResolved } from "alchemy/Diff";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
@@ -160,4 +160,4 @@ export const NixExprProvider = () =>
 			} satisfies NixExprAttributes;
 		}),
 		delete: () => Effect.void,
-	}).pipe(Layer.provide(BunCrypto.layer));
+	}).pipe(Layer.provide(NodeCrypto.layer));

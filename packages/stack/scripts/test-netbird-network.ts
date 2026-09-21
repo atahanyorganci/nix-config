@@ -1,5 +1,5 @@
-import { BunRuntime } from "@effect/platform-bun";
-import * as BunServices from "@effect/platform-bun/BunServices";
+import { NodeRuntime } from "@effect/platform-node";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
 import { dnsNameserversGet } from "@yorganci/netbird-api/dns";
 import { groupsGet } from "@yorganci/netbird-api/groups";
@@ -20,11 +20,13 @@ import * as Option from "effect/Option";
 import * as Command from "effect/unstable/cli/Command";
 import * as Flag from "effect/unstable/cli/Flag";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { promises as dns } from "node:dns";
 import { isIPv4 } from "node:net";
 import { netbirdCredentialsFromConfig } from "../src/netbird-credentials.ts";
 
 /** Inventory hosts that should normally be online on the mesh. */
+
 const REQUIRED_PEERS = ["mars", "mercury", "venus", "jupiter"] as const;
 
 /** Segment groups HomeInfra always maintains. */
@@ -184,70 +186,70 @@ type ClientStatus = {
 	rawPeersCount: string;
 };
 
-const readNetbirdStdout = async (args: string[]) => {
-	const proc = Bun.spawn(["netbird", ...args], { stdout: "pipe", stderr: "pipe" });
-	const stdout = await new Response(proc.stdout).text();
-	await proc.exited;
-	return stdout;
-};
+// Only stdout is of interest: the callers parse it and treat a failed or
+// silent `netbird` as "nothing to report" rather than an error.
+const readNetbirdStdout = (args: string[]) =>
+	Effect.gen(function* () {
+		const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+		return yield* spawner.string(ChildProcess.make("netbird", args));
+	}).pipe(Effect.orElseSucceed(() => ""));
 
-const parseNetbirdClientStatus = (): Effect.Effect<ClientStatus> =>
-	Effect.tryPromise({
-		try: async () => {
-			// Summary output has "Relays: N/N Available"; detail (-d) lists per-peer
-			// proxy status and does not include those summary ratios.
-			const [summary, detail] = await Promise.all([readNetbirdStdout(["status"]), readNetbirdStdout(["status", "-d"])]);
+const parseNetbirdClientStatus = () =>
+	Effect.gen(function* () {
+		// Summary output has "Relays: N/N Available"; detail (-d) lists per-peer
+		// proxy status and does not include those summary ratios.
+		const [summary, detail] = yield* Effect.all([readNetbirdStdout(["status"]), readNetbirdStdout(["status", "-d"])], {
+			concurrency: 2,
+		});
 
-			const managementConnected = /Management:\s*Connected/i.test(summary);
-			const signalConnected = /Signal:\s*Connected/i.test(summary);
-			const relaysMatch = /Relays:\s*(\d+)\s*\/\s*(\d+)\s*Available/i.exec(summary);
-			const nameserversMatch = /Nameservers:\s*(\d+)\s*\/\s*(\d+)\s*Available/i.exec(summary);
-			const peersMatch = /Peers count:\s*(\d+)\s*\/\s*(\d+)\s*Connected/i.exec(summary);
-			const fqdnMatch = /FQDN:\s*(\S+)/i.exec(summary);
+		const managementConnected = /Management:\s*Connected/i.test(summary);
+		const signalConnected = /Signal:\s*Connected/i.test(summary);
+		const relaysMatch = /Relays:\s*(\d+)\s*\/\s*(\d+)\s*Available/i.exec(summary);
+		const nameserversMatch = /Nameservers:\s*(\d+)\s*\/\s*(\d+)\s*Available/i.exec(summary);
+		const peersMatch = /Peers count:\s*(\d+)\s*\/\s*(\d+)\s*Connected/i.exec(summary);
+		const fqdnMatch = /FQDN:\s*(\S+)/i.exec(summary);
 
-			let proxyConnected = 0;
-			let proxyConnecting = 0;
-			let proxyIdle = 0;
-			let inProxyBlock = false;
-			for (const line of detail.split("\n")) {
-				if (/^\s*proxy-[\w.-]+\.netbird\./i.test(line)) {
-					inProxyBlock = true;
-					continue;
-				}
-				if (inProxyBlock && /^\s*\S[\w.-]+\.netbird\./i.test(line)) {
-					inProxyBlock = false;
-				}
-				if (!inProxyBlock) continue;
-				if (/Status:\s*Connected\b/i.test(line)) {
-					proxyConnected += 1;
-					inProxyBlock = false;
-				} else if (/Status:\s*Connecting\b/i.test(line)) {
-					proxyConnecting += 1;
-					inProxyBlock = false;
-				} else if (/Status:\s*Idle\b/i.test(line)) {
-					proxyIdle += 1;
-					inProxyBlock = false;
-				}
+		let proxyConnected = 0;
+		let proxyConnecting = 0;
+		let proxyIdle = 0;
+		let inProxyBlock = false;
+		for (const line of detail.split("\n")) {
+			if (/^\s*proxy-[\w.-]+\.netbird\./i.test(line)) {
+				inProxyBlock = true;
+				continue;
 			}
+			if (inProxyBlock && /^\s*\S[\w.-]+\.netbird\./i.test(line)) {
+				inProxyBlock = false;
+			}
+			if (!inProxyBlock) continue;
+			if (/Status:\s*Connected\b/i.test(line)) {
+				proxyConnected += 1;
+				inProxyBlock = false;
+			} else if (/Status:\s*Connecting\b/i.test(line)) {
+				proxyConnecting += 1;
+				inProxyBlock = false;
+			} else if (/Status:\s*Idle\b/i.test(line)) {
+				proxyIdle += 1;
+				inProxyBlock = false;
+			}
+		}
 
-			return {
-				available: true,
-				managementConnected,
-				signalConnected,
-				relaysOk: relaysMatch ? relaysMatch[1] === relaysMatch[2] && Number(relaysMatch[2]) > 0 : false,
-				nameserversOk: nameserversMatch
-					? nameserversMatch[1] === nameserversMatch[2] && Number(nameserversMatch[2]) > 0
-					: false,
-				peersConnected: peersMatch ? Number(peersMatch[1]) : 0,
-				peersTotal: peersMatch ? Number(peersMatch[2]) : 0,
-				proxyConnected,
-				proxyConnecting,
-				proxyIdle,
-				fqdn: fqdnMatch?.[1] ?? "",
-				rawPeersCount: peersMatch ? `${peersMatch[1]}/${peersMatch[2]}` : "unknown",
-			} satisfies ClientStatus;
-		},
-		catch: error => error,
+		return {
+			available: true,
+			managementConnected,
+			signalConnected,
+			relaysOk: relaysMatch ? relaysMatch[1] === relaysMatch[2] && Number(relaysMatch[2]) > 0 : false,
+			nameserversOk: nameserversMatch
+				? nameserversMatch[1] === nameserversMatch[2] && Number(nameserversMatch[2]) > 0
+				: false,
+			peersConnected: peersMatch ? Number(peersMatch[1]) : 0,
+			peersTotal: peersMatch ? Number(peersMatch[2]) : 0,
+			proxyConnected,
+			proxyConnecting,
+			proxyIdle,
+			fqdn: fqdnMatch?.[1] ?? "",
+			rawPeersCount: peersMatch ? `${peersMatch[1]}/${peersMatch[2]}` : "unknown",
+		} satisfies ClientStatus;
 	}).pipe(
 		Effect.catch(() =>
 			Effect.succeed({
@@ -548,9 +550,9 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 );
 
 const program = Command.run(testNetbirdNetwork, { version: "0.0.0" }).pipe(
-	Effect.provide(BunServices.layer),
+	Effect.provide(NodeServices.layer),
 	Effect.scoped,
 	Effect.orDie,
 );
 
-BunRuntime.runMain(program as Effect.Effect<void>);
+NodeRuntime.runMain(program as Effect.Effect<void>);

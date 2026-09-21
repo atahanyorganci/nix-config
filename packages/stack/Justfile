@@ -8,27 +8,27 @@ ALCHEMY_PLAIN := "1"
 
 AWS_REGION := "us-east-2"
 
-bun := require("bun")
-bunx := require("bunx")
+node := require("node")
+pnpm := require("pnpm")
 
 plan *args:
-    {{ bunx }} alchemy plan --log-level all {{ args }}
+    {{ pnpm }} exec alchemy plan --log-level all {{ args }}
 
 deploy *args:
-    {{ bunx }} alchemy deploy --yes --log-level all {{ args }}
+    {{ pnpm }} exec alchemy deploy --yes --log-level all {{ args }}
 
 destroy *args:
-    {{ bunx }} alchemy destroy --yes --log-level all {{ args }}
+    {{ pnpm }} exec alchemy destroy --yes --log-level all {{ args }}
 
 # Print users, groups, peers, routes, nameservers and policy rules from the live account.
 verify *args:
-    {{ bun }} scripts/verify-access.ts {{ args }}
+    {{ node }} scripts/verify-access.ts {{ args }}
 
 test *args:
-    {{ bun }} scripts/test-netbird-network.ts {{ args }}
+    {{ node }} scripts/test-netbird-network.ts {{ args }}
 
 bootstrap:
-    {{ bunx }} alchemy cloudflare bootstrap
+    {{ pnpm }} exec alchemy cloudflare bootstrap
 
 configure:
-    {{ bunx }} alchemy login --configure
+    {{ pnpm }} exec alchemy login --configure

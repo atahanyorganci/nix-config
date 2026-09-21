@@ -16,13 +16,13 @@
 	},
 	"scripts": {
 		"check": "tsc --noEmit",
-		"convert": "bun scripts/convert.ts",
+		"convert": "node scripts/convert.ts",
 		"format": "oxfmt --check .",
 		"format:fix": "oxfmt --write .",
-		"generate": "bun scripts/convert.ts && bun scripts/generate.ts && bun run lint:fix && bun run format:fix",
+		"generate": "node scripts/convert.ts && node scripts/generate.ts && pnpm run lint:fix && pnpm run format:fix",
 		"lint": "oxlint .",
 		"lint:fix": "oxlint --fix .",
-		"spec:download": "bun scripts/download.ts"
+		"spec:download": "node scripts/download.ts"
 	},
 	"dependencies": {
 		"@distilled.cloud/core": "catalog:",
@@ -30,7 +30,7 @@
 	},
 	"devDependencies": {
 		"@effect/language-service": "catalog:",
-		"@effect/platform-bun": "catalog:",
+		"@effect/platform-node": "catalog:",
 		"@yorganci/config": "workspace:*",
 		"oxfmt": "catalog:",
 		"oxlint": "catalog:",

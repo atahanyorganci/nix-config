@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * generate — turn the Smithy JSON models in .generated-specs into the NetBird
  * Effect SDK.
@@ -18,6 +18,7 @@
  */
 import { runGeneratorCli } from "@distilled.cloud/core/codegen/cli";
 import { ERROR_MATCHERS_TRAIT, NULLABLE_TRAIT, RAW_RESPONSE_TRAIT } from "@distilled.cloud/core/codegen/openapi";
+import { fileURLToPath } from "node:url";
 import type { SdkSpec } from "@distilled.cloud/core/codegen/generator";
 
 const SENSITIVE_TRAIT = "smithy.api#sensitive";
@@ -96,7 +97,7 @@ const spec: SdkSpec = {
 
 runGeneratorCli({
 	description: "Generate the NetBird Effect SDK from the Smithy models",
-	root: `${import.meta.dir}/..`,
+	root: fileURLToPath(new URL("..", import.meta.url)),
 	// The RFC-6902 patch chain in patches/*.patch.json applies to the OpenAPI
 	// document in scripts/convert.ts, never to the Smithy models.
 	patchesDir: false,

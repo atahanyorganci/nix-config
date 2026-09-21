@@ -13,5 +13,5 @@
 			}
 		]
 	},
-	"include": ["./src/**/*.ts", "./oxfmt.config.ts", "./oxlint.config.ts"]
+	"include": ["./src/**/*.ts", "./oxfmt.config.ts", "./oxlint.config.ts", "scripts/**/*.ts"]
 }

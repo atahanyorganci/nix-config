@@ -1,5 +1,5 @@
-import { BunRuntime } from "@effect/platform-bun";
-import * as BunServices from "@effect/platform-bun/BunServices";
+import { NodeRuntime } from "@effect/platform-node";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
 import { setupKeysPost } from "@yorganci/netbird-api/setup_keys";
 import { AlchemyContextLive } from "alchemy/AlchemyContext";
@@ -17,35 +17,32 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Argument from "effect/unstable/cli/Argument";
 import * as Command from "effect/unstable/cli/Command";
 import * as Flag from "effect/unstable/cli/Flag";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { readHomeInfraGroupId } from "../src/home-infra-state.ts";
 import * as Inventory from "../src/inventory.ts";
 import { netbirdCredentialsFromConfig } from "../src/netbird-credentials.ts";
 import netbirdServerStack from "../stack/netbird-server.ts";
 
 const SETUP_KEY_EXPIRES_IN_SECONDS = 86_400;
-const REPO_ROOT = `${import.meta.dir}/../../..`;
 
-const evalInventory = Effect.tryPromise({
-	try: async () => {
-		const proc = Bun.spawn(["nix", "eval", "--json", ".#inventory"], {
-			cwd: REPO_ROOT,
-			stdout: "pipe",
-			stderr: "pipe",
-		});
-		const stdout = await new Response(proc.stdout).text();
-		const stderr = await new Response(proc.stderr).text();
-		const code = await proc.exited;
-		if (code !== 0) {
-			throw new Error(stderr.trim() || `nix eval .#inventory exited ${code}`);
-		}
-		return JSON.parse(stdout) as unknown;
-	},
-	catch: cause => new Error(cause instanceof Error ? cause.message : String(cause)),
+// The repository root, three levels up from `packages/stack/scripts`. Resolved
+// through `Path` so the script does not depend on the working directory.
+const repoRoot = Effect.gen(function* () {
+	const path = yield* Path.Path;
+	return path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..", "..");
+});
+
+const evalInventory = Effect.gen(function* () {
+	const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+	const cwd = yield* repoRoot;
+	const stdout = yield* spawner.string(ChildProcess.make("nix", ["eval", "--json", ".#inventory"], { cwd }));
+	return JSON.parse(stdout) as unknown;
 }).pipe(Effect.flatMap(value => Schema.decodeUnknownEffect(Inventory.Inventory)(value)));
 
 const groupIdFromState = (state: State.StateService, stage: string, groupName: Inventory.NetBirdGroupName) =>
@@ -182,9 +179,9 @@ const createSetupKeys = Command.make("create-setup-keys", {
 );
 
 const program = Command.run(createSetupKeys, { version: "0.0.0" }).pipe(
-	Effect.provide(BunServices.layer),
+	Effect.provide(NodeServices.layer),
 	Effect.scoped,
 	Effect.orDie,
 );
 
-BunRuntime.runMain(program as Effect.Effect<void>);
+NodeRuntime.runMain(program as Effect.Effect<void>);

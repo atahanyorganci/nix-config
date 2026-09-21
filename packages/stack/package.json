@@ -15,8 +15,8 @@
 	},
 	"dependencies": {
 		"@distilled.cloud/aws": "catalog:",
-		"@effect/platform-bun": "catalog:",
 		"@effect/platform-node": "catalog:",
+		"@types/node": "catalog:",
 		"@yorganci/netbird-alchemy": "workspace:*",
 		"@yorganci/netbird-api": "workspace:*",
 		"alchemy": "catalog:",
@@ -24,7 +24,7 @@
 	},
 	"devDependencies": {
 		"@effect/language-service": "catalog:",
-		"@types/bun": "^1.3.14",
+		"@types/node": "catalog:",
 		"@yorganci/config": "workspace:*",
 		"oxfmt": "catalog:",
 		"oxlint": "catalog:",

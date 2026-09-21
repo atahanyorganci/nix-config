@@ -1,5 +1,5 @@
-import { BunRuntime } from "@effect/platform-bun";
-import * as BunServices from "@effect/platform-bun/BunServices";
+import { NodeRuntime } from "@effect/platform-node";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
 import { reverseProxiesClustersGet } from "@yorganci/netbird-api/services";
 import { ProfileLive, withProfileOverride } from "alchemy/Auth/Profile";
@@ -101,9 +101,9 @@ const listProxyClusters = Command.make("list-proxy-clusters", {
 );
 
 const program = Command.run(listProxyClusters, { version: "0.0.0" }).pipe(
-	Effect.provide(BunServices.layer),
+	Effect.provide(NodeServices.layer),
 	Effect.scoped,
 	Effect.orDie,
 );
 
-BunRuntime.runMain(program as Effect.Effect<void>);
+NodeRuntime.runMain(program as Effect.Effect<void>);

@@ -22,7 +22,7 @@
 	},
 	"devDependencies": {
 		"@effect/language-service": "catalog:",
-		"@effect/platform-bun": "catalog:",
+		"@effect/platform-node": "catalog:",
 		"@effect/vitest": "catalog:",
 		"@yorganci/config": "workspace:*",
 		"oxfmt": "catalog:",

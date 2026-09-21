@@ -1,25 +1,11 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { convertOpenApiToSmithy } from "@distilled.cloud/core/codegen/openapi";
 import { applyOperation, isStaleTargetError, type PatchFile } from "@distilled.cloud/core/json-patch";
-/**
- * convert — NetBird's OpenAPI description → Smithy JSON models in
- * .generated-specs, one model (one service module) per API tag.
- *
- *   1. Read spec/netbird.api.json (written by scripts/download.ts, which
- *      already assigns path-derived operation ids such as `policiesPost`).
- *   2. Apply every patches/*.patch.json RFC-6902 chain ONCE to the full
- *      document. Stale targets warn and skip (the spec is refetched from a
- *      tagged upstream file and drifts); malformed patches fail the run.
- *   3. Bucket operations by their single tag and convert each bucket through
- *      distilled's shared `convertOpenApiToSmithy`.
- *
- * `scripts/generate.ts` then compiles the models with `patchesDir: false`:
- * patches apply here, to the OpenAPI document, never to the Smithy models.
- */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const rootDir = path.resolve(import.meta.dir, "..");
+const rootDir = fileURLToPath(new URL("..", import.meta.url));
 const specPath = path.join(rootDir, "spec/netbird.api.json");
 const patchDir = path.join(rootDir, "patches");
 const outDir = path.join(rootDir, ".generated-specs");
@@ -43,7 +29,7 @@ const toPascal = (slug: string): string =>
 
 // ---- 1. Read the full spec ----------------------------------------------
 if (!fs.existsSync(specPath)) {
-	throw new Error(`${specPath} not found — run \`bun run spec:download\` first`);
+	throw new Error(`${specPath} not found — run \`pnpm run spec:download\` first`);
 }
 const fullSpec = JSON.parse(fs.readFileSync(specPath, "utf-8"));
 

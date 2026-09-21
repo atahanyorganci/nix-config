@@ -1,5 +1,5 @@
-import { BunRuntime } from "@effect/platform-bun";
-import * as BunServices from "@effect/platform-bun/BunServices";
+import { NodeRuntime } from "@effect/platform-node";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
 import { dnsNameserversGet } from "@yorganci/netbird-api/dns";
 import { groupsGet } from "@yorganci/netbird-api/groups";
@@ -138,9 +138,9 @@ const verifyAccess = Command.make("verify-access", {
 );
 
 const program = Command.run(verifyAccess, { version: "0.0.0" }).pipe(
-	Effect.provide(BunServices.layer),
+	Effect.provide(NodeServices.layer),
 	Effect.scoped,
 	Effect.orDie,
 );
 
-BunRuntime.runMain(program as Effect.Effect<void>);
+NodeRuntime.runMain(program as Effect.Effect<void>);
