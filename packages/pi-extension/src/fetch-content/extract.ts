@@ -38,16 +38,47 @@ export const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
  */
 const THIN_CONTENT_CHARS = 500;
 
-/** Content types worth handing to an HTML extractor. */
-function isTextualContentType(contentType: string): boolean {
-	const type = contentType.toLowerCase();
-	return (
-		type.includes("text/html") ||
-		type.includes("application/xhtml") ||
-		type.includes("text/plain") ||
-		type.includes("application/xml") ||
-		type.includes("text/xml")
-	);
+/**
+ * How a response body should be turned into content.
+ *
+ * The distinction matters: markup goes to the extractor, while plain text is
+ * already the content and only needs passing through. Feeding text to an HTML
+ * parser produces an empty document at best, and on a raw markdown file it
+ * throws outright.
+ */
+type ContentKind = "markup" | "text" | "unsupported";
+
+function classifyContentType(contentType: string): ContentKind {
+	const type = contentType.toLowerCase().split(";")[0]?.trim() ?? "";
+	if (type === "text/html" || type === "application/xhtml+xml") return "markup";
+	if (type === "text/xml" || type === "application/xml" || type.endsWith("+xml")) return "markup";
+	if (type === "text/plain" || type === "text/markdown" || type === "application/json") return "text";
+	// Everything else under text/* is source code, CSV, config and the like:
+	// readable as-is, and nothing an HTML extractor should touch.
+	if (type.startsWith("text/")) return "text";
+	return "unsupported";
+}
+
+/**
+ * Resolve the body's character encoding from the Content-Type header.
+ *
+ * Defaulting to UTF-8 mis-decodes older and non-English pages: latin-1 bytes
+ * for "Café" come out as "Caf\uFFFD" and the damage is irreversible by the time
+ * the text reaches the extractor.
+ */
+function charsetFrom(contentType: string): string {
+	return /charset\s*=\s*["']?([^;"'\s]+)/i.exec(contentType)?.[1] ?? "utf-8";
+}
+
+/** Decode bytes with `charset`, falling back to UTF-8 when the label is unknown. */
+function decodeBody(bytes: Uint8Array, charset: string): string {
+	try {
+		return new TextDecoder(charset).decode(bytes);
+	} catch {
+		// TextDecoder throws on labels it does not implement; a mojibake UTF-8
+		// reading still beats failing the whole fetch.
+		return new TextDecoder("utf-8").decode(bytes);
+	}
 }
 
 /**
@@ -73,8 +104,14 @@ function formatBytes(bytes: number): string {
 	return `${bytes} bytes`;
 }
 
-/** Read a response body, refusing to buffer more than `maxBytes`. */
-async function readTextWithLimit(response: Response, maxBytes: number): Promise<string> {
+/**
+ * Read a response body into bytes, refusing to buffer more than `maxBytes`.
+ *
+ * Decoding is left to the caller because the character set comes from the
+ * headers, and a streaming decoder would have to commit to one before the
+ * body is known to be within budget.
+ */
+async function readBytesWithLimit(response: Response, maxBytes: number): Promise<Uint8Array> {
 	// Trust Content-Length when present to avoid streaming a huge body at all.
 	const declared = Number(response.headers.get("content-length") ?? Number.NaN);
 	if (Number.isFinite(declared) && declared > maxBytes) {
@@ -82,11 +119,10 @@ async function readTextWithLimit(response: Response, maxBytes: number): Promise<
 	}
 
 	const body = response.body;
-	if (!body) return "";
+	if (!body) return new Uint8Array();
 
-	const decoder = new TextDecoder();
 	const reader = body.getReader();
-	let text = "";
+	const chunks: Uint8Array[] = [];
 	let total = 0;
 	try {
 		for (;;) {
@@ -96,12 +132,38 @@ async function readTextWithLimit(response: Response, maxBytes: number): Promise<
 			if (total > maxBytes) {
 				throw new Error(`Response exceeds ${formatBytes(maxBytes)} limit`);
 			}
-			text += decoder.decode(value, { stream: true });
+			chunks.push(value);
 		}
 	} finally {
 		await reader.cancel().catch(() => {});
 	}
-	return text + decoder.decode();
+
+	const bytes = new Uint8Array(total);
+	let offset = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return bytes;
+}
+
+/**
+ * Derive a title for a body that has no markup to carry one.
+ *
+ * A leading markdown heading is the best available answer; otherwise the file
+ * name from the URL beats both an empty title and an arbitrary first line.
+ */
+function textTitle(text: string, url: string): string {
+	const heading = /^#{1,6}\s+(.+)$/m.exec(text.slice(0, 2000))?.[1]?.trim();
+	if (heading) return heading;
+	try {
+		const { pathname } = new URL(url);
+		const name = pathname.split("/").filter(Boolean).at(-1);
+		if (name) return decodeURIComponent(name);
+	} catch {
+		// Fall through to the empty title below.
+	}
+	return "";
 }
 
 function errorMessage(cause: unknown): string {
@@ -140,7 +202,7 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 					// A plain, honest identifier. Sites that block it would equally
 					// block a spoofed one once they look past the header.
 					"User-Agent": "pi-fetch-content/1.0 (+https://github.com/atahanyorganci/nix-config)",
-					Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+					Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
 					"Accept-Language": "en-US,en;q=0.9",
 				},
 			},
@@ -152,17 +214,27 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 		}
 
 		const contentType = response.headers.get("content-type") ?? "";
-		if (!isTextualContentType(contentType)) {
+		const kind = classifyContentType(contentType);
+		if (kind === "unsupported") {
 			return failure(url, `Unsupported content type: ${contentType || "unknown"}`);
 		}
 
-		const html = await readTextWithLimit(response, maxBytes);
+		const body = decodeBody(await readBytesWithLimit(response, maxBytes), charsetFrom(contentType));
 		controller.signal.throwIfAborted();
+
+		// Plain text is already the content. Running it through the extractor
+		// yields an empty document, or throws outright on input with no markup.
+		if (kind === "text") {
+			const text = body.trim();
+			return text
+				? { url, title: textTitle(text, url), content: text, error: null }
+				: failure(url, "Response body is empty");
+		}
 
 		// Defuddle mutates the document it is given, so it gets a fresh parse.
 		// linkedom's Document is structurally compatible but not the DOM lib type,
 		// which this package does not pull in for a Node-only build.
-		const { document } = parseHTML(html);
+		const { document } = parseHTML(body);
 		const article = await Defuddle(document as Parameters<typeof Defuddle>[0], response.url || url, {
 			markdown: true,
 			// Defuddle parses synchronously before resolving when async is off,
@@ -178,7 +250,7 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 				url,
 				title,
 				content: "",
-				error: isLikelyJsRendered(html)
+				error: isLikelyJsRendered(body)
 					? "Page appears to be JavaScript-rendered (content loads dynamically)"
 					: "Could not extract readable content from HTML structure",
 			};
@@ -191,7 +263,7 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 			// Short output is surfaced without discarding what was extracted:
 			// the caller sees both the text and the doubt.
 			error:
-				content.length < THIN_CONTENT_CHARS && isLikelyJsRendered(html)
+				content.length < THIN_CONTENT_CHARS && isLikelyJsRendered(body)
 					? "Extracted content is unusually short; the page may be JavaScript-rendered"
 					: null,
 			...(article.author ? { author: article.author } : {}),
