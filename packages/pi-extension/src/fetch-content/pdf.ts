@@ -16,7 +16,9 @@ import { createArtifactDir, normalizeImage } from "./image.ts";
 
 const run = promisify(execFile);
 
-const PDFIMAGES = process.env.FETCH_CONTENT_PDFIMAGES ?? "pdfimages";
+// Read at call time rather than at import: a constant captured when the
+// module loads cannot be overridden afterwards.
+const pdfimages = () => process.env.FETCH_CONTENT_PDFIMAGES ?? "pdfimages";
 
 /**
  * Above either bound a PDF is written to disk instead of returned whole.
@@ -123,7 +125,7 @@ async function extractPdfImages(source: string, imageDir: string): Promise<PdfIm
 	await mkdir(imageDir, { recursive: true });
 
 	try {
-		await run(PDFIMAGES, ["-png", "-p", source, join(imageDir, "img")]);
+		await run(pdfimages(), ["-png", "-p", source, join(imageDir, "img")]);
 	} catch {
 		// A PDF with no extractable images, an encrypted one, or a poppler that
 		// is not installed: none of them are a reason to lose the text.

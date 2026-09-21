@@ -2,6 +2,7 @@ import { Defuddle } from "defuddle/node";
 import { parseHTML } from "linkedom";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fetchGithubPage, isGithubUrl, matchRoute, rawUrlFor } from "./handlers/github.ts";
 import { createArtifactDir, identifyImage, imageExtension, IMAGE_TYPES, normalizeImage } from "./image.ts";
 import { collectPageImages, DEFAULT_IMAGE_LIMIT } from "./page-images.ts";
 import { extractPdf } from "./pdf.ts";
@@ -375,6 +376,9 @@ function appendImageGallery(content: string, images: readonly PageImageResult[])
 export async function extractContent(url: string, options: ExtractOptions = {}): Promise<ExtractedContent> {
 	if (options.signal?.aborted) return failure(url, "Aborted");
 
+	const handled = await handleGithubUrl(url, options);
+	if (handled) return handled;
+
 	const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 	const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
 
@@ -507,6 +511,42 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 	} finally {
 		clearTimeout(timer);
 		options.signal?.removeEventListener("abort", onAbort);
+	}
+}
+
+/**
+ * Route a GitHub URL to the API, or return null to use the generic path.
+ *
+ * A failure here falls through rather than propagating: the rendered page is a
+ * worse answer than the API's, but it is a far better one than an error, and
+ * `gh` may simply be absent.
+ */
+async function handleGithubUrl(url: string, options: ExtractOptions): Promise<ExtractedContent | null> {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return null;
+	}
+	if (!isGithubUrl(parsed)) return null;
+
+	const route = matchRoute(parsed.pathname);
+	if (!route) return null;
+
+	// A blob's rendered page extracts as its own line-number gutter, so the
+	// file is fetched from the raw host instead. That needs no credentials,
+	// and the normal content-type handling applies to whatever comes back.
+	if (route.kind === "blob") {
+		const raw = await extractContent(rawUrlFor(route), options);
+		if (raw.error && !raw.content) return null;
+		return { ...raw, url, title: raw.title || `${route.owner}/${route.repo}: ${route.path ?? ""}` };
+	}
+
+	try {
+		const page = await fetchGithubPage(route, options.signal);
+		return { url, title: page.title, content: page.content, error: null };
+	} catch {
+		return null;
 	}
 }
 

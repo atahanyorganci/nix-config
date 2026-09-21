@@ -20,8 +20,10 @@ const run = promisify(execFile);
  * long as ImageMagick is installed; the overrides exist for tests and for
  * pointing at a specific build.
  */
-const IDENTIFY = process.env.FETCH_CONTENT_IDENTIFY ?? "identify";
-const MAGICK = process.env.FETCH_CONTENT_MAGICK ?? "magick";
+// Read at call time rather than at import: a constant captured when the
+// module loads cannot be overridden afterwards.
+const identify = () => process.env.FETCH_CONTENT_IDENTIFY ?? "identify";
+const magick = () => process.env.FETCH_CONTENT_MAGICK ?? "magick";
 
 /** Long edge of a normalized image, in pixels. */
 export const DEFAULT_MAX_DIMENSION = 1024;
@@ -83,7 +85,7 @@ export async function identifyImage(path: string): Promise<ImageInfo | null> {
 	try {
 		// A multi-frame image (GIF, some TIFFs) prints one line per frame;
 		// only the first matters here.
-		const { stdout } = await run(IDENTIFY, ["-format", "%m %w %h\n", path]);
+		const { stdout } = await run(identify(), ["-format", "%m %w %h\n", path]);
 		const [format, width, height] = (stdout.split("\n")[0] ?? "").trim().split(/\s+/);
 		if (!format || !width || !height) return null;
 		const parsed = { format, width: Number(width), height: Number(height) };
@@ -116,7 +118,7 @@ export async function normalizeImage(
 ): Promise<ImageInfo | null> {
 	const maxDimension = options.maxDimension ?? DEFAULT_MAX_DIMENSION;
 	try {
-		await run(MAGICK, [
+		await run(magick(), [
 			// Take the first frame: an animation would otherwise write one file
 			// per frame and the destination path would not exist.
 			`${source}[0]`,

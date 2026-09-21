@@ -339,11 +339,12 @@
             else "dark";
         };
 
-        # fetch-content shells out to both: ImageMagick to validate and
-        # downscale images, poppler to pull figures out of PDFs. Putting them
-        # on pi's PATH rather than depending on the user's profile keeps the
+        # fetch-content shells out to all three: ImageMagick to validate and
+        # downscale images, poppler to pull figures out of PDFs, and gh to read
+        # GitHub through the API instead of its rendered pages. Putting them on
+        # pi's PATH rather than depending on the user's profile keeps the
         # extension working regardless of what is installed globally.
-        extraPackages = [pkgs.imagemagick pkgs.poppler-utils];
+        extraPackages = [pkgs.imagemagick pkgs.poppler-utils pkgs.gh];
 
         extensions = [
           # Each bundle is a directory holding a single self-contained
