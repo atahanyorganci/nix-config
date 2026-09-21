@@ -5,5 +5,5 @@
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext"
 	},
-	"include": ["./src/**/*.ts", "./oxfmt.config.ts", "./oxlint.config.ts"]
+	"include": ["./src/**/*.ts", "./test/**/*.ts", "./oxfmt.config.ts", "./oxlint.config.ts", "./rolldown.config.ts"]
 }
