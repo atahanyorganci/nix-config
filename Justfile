@@ -30,3 +30,36 @@ pi-options *args:
 
 # Fail if the committed option declarations do not match the pinned pi.
 pi-options-check: (pi-options "--check")
+
+# Repoint the cobalt dependency at a newer upstream rev and reapply the patch.
+#
+# The patch exists because cobalt's async import cycles deadlock any bundler
+# (see patches/). Upstream does not know about it, so a change to one of the
+# five patched files makes it stop applying. Running this turns that into a
+# visible conflict at a moment of choosing, rather than a service that quietly
+# breaks the next time the lockfile is regenerated.
+#
+# Takes the new commit; with no argument it reapplies against the pinned one.
+cobalt-sync rev="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    current="$(grep -oE '[0-9a-f]{40}' pnpm-workspace.yaml | head -1)"
+    rev="{{rev}}"
+    rev="${rev:-$current}"
+    if [ "$rev" != "$current" ]; then
+        echo "cobalt: $current -> $rev"
+        # The rev is embedded in the catalog specifier, so the edit is textual.
+        sed -i.bak "s/$current/$rev/" pnpm-workspace.yaml && rm -f pnpm-workspace.yaml.bak
+    fi
+    # --force so the patched copy in the store is rebuilt from the new source
+    # rather than reused; a stale copy would hide a conflict.
+    if ! pnpm install --force; then
+        echo
+        echo "The patch no longer applies to $rev." >&2
+        echo "Regenerate it: pnpm patch @imput/cobalt-api, edit, pnpm patch-commit <dir>." >&2
+        exit 1
+    fi
+    # Applying cleanly is necessary but not sufficient: the point of the patch
+    # is that the result bundles, so prove that rather than assume it.
+    pnpm --filter @yorganci/pi-extension run build
+    echo "Patch applies and the bundle still builds."
