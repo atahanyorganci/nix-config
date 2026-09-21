@@ -1,8 +1,12 @@
-{
+{...}: {
   perSystem = {pkgs, ...}: {
     devShells.infra = pkgs.mkShellNoCC {
-      buildInputs = with pkgs; [
-        bun
+      shellHook = ''
+        corepack install
+      '';
+      packages = with pkgs; [
+        nodejs-slim
+        corepack
         awscli2
       ];
     };
