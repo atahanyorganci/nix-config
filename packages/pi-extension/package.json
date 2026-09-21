@@ -10,6 +10,7 @@
 	],
 	"type": "module",
 	"exports": {
+		"./fetch-content": "./src/fetch-content/index.ts",
 		"./package.json": "./package.json",
 		"./usage": "./src/usage/index.ts",
 		"./web-search": "./src/web-search/index.ts"
@@ -22,6 +23,10 @@
 		"lint": "oxlint .",
 		"lint:fix": "oxlint --fix .",
 		"test": "vitest --run"
+	},
+	"dependencies": {
+		"defuddle": "catalog:",
+		"linkedom": "catalog:"
 	},
 	"devDependencies": {
 		"@earendil-works/pi-ai": "catalog:",
@@ -44,6 +49,7 @@
 	},
 	"pi": {
 		"extensions": [
+			"./dist/fetch-content",
 			"./dist/usage",
 			"./dist/web-search"
 		]

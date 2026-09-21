@@ -46,7 +46,7 @@
         pnpmDeps = final.fetchPnpmDeps {
           inherit (finalAttrs) pname version src;
           fetcherVersion = 4;
-          hash = "sha256-cGc985p9IyKCKRtshyhkXllyj2/iMR2X08Ritxxih5o=";
+          hash = "sha256-szuiPz0rFtJJWDuFcZTIM36568K3TtO/BtUE863Ay8o=";
         };
 
         pnpmWorkspaces = [
@@ -82,9 +82,14 @@
           for bundle in "$out"/*/index.js; do
             node --check "$bundle"
 
+            # Anchored to an import/export statement, and tolerant of the
+            # space rolldown emits after `from`. Matching the bare `from"..."`
+            # spelling alone finds nothing, and matching any quoted string
+            # reports ordinary literals that merely follow the word `from`.
             leaked=$(
-              grep -oE 'from"[^"]+"' "$bundle" \
-                | sed -E 's/^from"|"$//g' \
+              grep -oE '(^|[;}])[[:space:]]*(import|export)[^;]*from ?"[^"]+"' "$bundle" \
+                | grep -oE 'from ?"[^"]+"' \
+                | sed -E 's/^from ?"|"$//g' \
                 | grep -vE '^(@earendil-works/|typebox$|node:)' \
                 || true
             )

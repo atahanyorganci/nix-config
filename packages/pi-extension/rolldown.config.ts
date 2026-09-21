@@ -13,6 +13,7 @@ export default defineConfig({
 	// `pi.extensions` can point at `./dist/<name>` and pi picks up the
 	// `index.js` inside.
 	input: {
+		"fetch-content": "src/fetch-content/index.ts",
 		usage: "src/usage/index.ts",
 		"web-search": "src/web-search/index.ts",
 	},
