@@ -93,6 +93,15 @@
         installCheckPhase = ''
           runHook preInstallCheck
 
+          # Node's own list of built-in modules, which are legal to import
+          # unprefixed. Cobalt spells several that way (`from "crypto"`) and
+          # rolldown's createRequire shim emits `from "module"`; neither is an
+          # unbundled dependency. Asking node rather than hardcoding the names
+          # keeps this correct across node versions.
+          builtins=$(
+            node -e 'console.log(require("module").builtinModules.filter(m => !m.startsWith("_")).join("|"))'
+          )
+
           for bundle in "$out"/*/index.js; do
             node --check "$bundle"
 
@@ -104,7 +113,7 @@
               grep -oE '(^|[;}])[[:space:]]*(import|export)[^;]*from ?"[^"]+"' "$bundle" \
                 | grep -oE 'from ?"[^"]+"' \
                 | sed -E 's/^from ?"|"$//g' \
-                | grep -vE '^(@earendil-works/|typebox$|node:)' \
+                | grep -vE "^(@earendil-works/|typebox\$|node:|($builtins)\$)" \
                 || true
             )
             if [ -n "$leaked" ]; then
