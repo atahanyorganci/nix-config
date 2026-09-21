@@ -3,7 +3,7 @@
 # Source: @earendil-works/pi-coding-agent 0.84.4
 #         dist/core/keybindings.d.ts (AppKeybindings)
 #         @earendil-works/pi-tui dist/keybindings.d.ts (Keybindings)
-# Regenerate: bun run --filter @yorganci/pi-nix-options generate
+# Regenerate: pnpm --filter @yorganci/pi-nix-options run generate
 #
 # 89 action ids. A value may be a single key ("ctrl+p") or a list of
 # keys. Unset actions keep pi's default binding.

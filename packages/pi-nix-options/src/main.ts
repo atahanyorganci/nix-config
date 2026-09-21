@@ -1,9 +1,9 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Generates the Nix option declarations consumed by the `programs.pi` module.
  *
  * Usage:
- *   bun src/main.ts --pi-root <dir> --out-dir <dir> [--check]
+ *   node src/main.ts --pi-root <dir> --out-dir <dir> [--check]
  *
  * `--check` regenerates in memory and exits non-zero if the result differs from
  * what is on disk, so CI can prove the committed files match the pinned pi.
@@ -18,7 +18,7 @@ import { Extractor } from "./extract.ts";
 import { resolvePiPackage } from "./resolve.ts";
 import type { OptionNode } from "./model.ts";
 
-const REGENERATE_HINT = "bun run --filter @yorganci/pi-nix-options generate";
+const REGENERATE_HINT = "pnpm --filter @yorganci/pi-nix-options run generate";
 
 interface Args {
 	piRoot: string;

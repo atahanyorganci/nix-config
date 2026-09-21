@@ -2,7 +2,7 @@
 #
 # Source: @earendil-works/pi-coding-agent 0.84.4
 #         dist/core/settings-manager.d.ts (interface Settings)
-# Regenerate: bun run --filter @yorganci/pi-nix-options generate
+# Regenerate: pnpm --filter @yorganci/pi-nix-options run generate
 #
 # Every option is nullable and defaults to null; the module drops null
 # values so unset options are absent from settings.json and pi applies its
