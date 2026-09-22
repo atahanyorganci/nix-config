@@ -100,11 +100,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1771873910,
-        "narHash": "sha256-LKpOpJBnoDUhKP0O0gjxE8TUvb/3eeqt0yOd+9JlSa4=",
+        "lastModified": 1790066777,
+        "narHash": "sha256-T4a0XlKBX6kWF1Uxcbs23bHcFA0cioh7ov9bUPHsY6I=",
         "owner": "atahanyorganci",
         "repo": "brightness-cli",
-        "rev": "bb4e0287fe14f8fc7109083abcb9df3af8a1a2d2",
+        "rev": "96596a94b01d3c5a33a873d5a715c77c9dec1d26",
         "type": "github"
       },
       "original": {
@@ -673,11 +673,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1771470520,
-        "narHash": "sha256-PvytHcaYN5cPUll7FB70mXv1rRsIBRmu47fFfq3haxA=",
+        "lastModified": 1790062494,
+        "narHash": "sha256-Mds1vuoczq1fRm1rf+Iar8IKDBHNjOMo2JqqPWJUlng=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "a1d4cc1f264c45d3745af0d2ca5e59d460e58777",
+        "rev": "b88764907c1b2de6c0e206d8d9d9634d91c81334",
         "type": "github"
       },
       "original": {
