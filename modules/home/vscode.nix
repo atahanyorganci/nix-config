@@ -8,7 +8,7 @@
   }: let
     system = pkgs.stdenv.hostPlatform.system;
     pkg =
-      if pkgs.stdenv.isDarwin
+      if pkgs.stdenv.hostPlatform.isDarwin
       then inputs.nix-casks.packages.${system}.visual-studio-code
       else pkgs.vscode;
   in {
@@ -18,7 +18,7 @@
         packages = [pkg];
         sessionVariables.EDITOR = "code --wait";
       };
-      programs.vscode = lib.mkIf pkgs.stdenv.isLinux {
+      programs.vscode = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         package = pkg;
         enable = true;
         enableUpdateCheck = true;

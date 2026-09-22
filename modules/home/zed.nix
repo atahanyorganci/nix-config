@@ -8,7 +8,7 @@
   }: let
     system = pkgs.stdenv.hostPlatform.system;
     package =
-      if pkgs.stdenv.isDarwin
+      if pkgs.stdenv.hostPlatform.isDarwin
       then inputs.nix-casks.packages.${system}.zed
       else pkgs.zed;
   in {

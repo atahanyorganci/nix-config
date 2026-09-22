@@ -8,7 +8,7 @@
   }: let
     system = pkgs.stdenv.hostPlatform.system;
     pkg =
-      if pkgs.stdenv.isDarwin
+      if pkgs.stdenv.hostPlatform.isDarwin
       then inputs.nix-casks.packages.${system}.ghostty
       else pkgs.ghostty;
   in {
