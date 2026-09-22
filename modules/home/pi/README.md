@@ -121,13 +121,13 @@ programs.pi = {
     }
   ];
 
-  modelProfiles.models."llm-gateway/claude-opus-5" = {
+  modelProfiles.models."llm-gateway/claude-code/claude-opus-5" = {
     context = {
       short = 272000;
       full = 1000000;
     };
     defaultContext = "short";
-    fast.model = "claude-sonnet-5";
+    fast.model = "claude-code/claude-sonnet-5";
   };
 };
 ```

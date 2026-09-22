@@ -80,10 +80,10 @@ The file itself:
 {
 	"shortcuts": { "context": "alt+shift+c", "fast": "alt+shift+f" },
 	"models": {
-		"llm-gateway/claude-opus-5": {
+		"llm-gateway/claude-code/claude-opus-5": {
 			"defaultContext": "short",
 			"context": { "short": 272000, "full": 1000000 },
-			"fast": { "model": "claude-sonnet-5", "thinkingLevel": "low" }
+			"fast": { "model": "claude-code/claude-sonnet-5", "thinkingLevel": "low" }
 		}
 	}
 }

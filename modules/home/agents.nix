@@ -48,7 +48,7 @@
 
     gatewayModels = map mkModel [
       {
-        id = "gpt-5.6-terra";
+        id = "codex/gpt-5.6-terra";
         name = "GPT-5.6-Terra";
         contextWindow = 1050000;
         maxTokens = 128000;
@@ -69,7 +69,7 @@
         ];
       }
       {
-        id = "gpt-5.6-luna";
+        id = "codex/gpt-5.6-luna";
         name = "GPT-5.6-Luna";
         contextWindow = 1050000;
         maxTokens = 128000;
@@ -90,7 +90,7 @@
         ];
       }
       {
-        id = "gpt-5.6-sol";
+        id = "codex/gpt-5.6-sol";
         name = "GPT-5.6-Sol";
         contextWindow = 1050000;
         maxTokens = 128000;
@@ -111,7 +111,7 @@
         ];
       }
       {
-        id = "gpt-6-astra";
+        id = "codex/gpt-6-astra";
         name = "GPT-6-Astra";
         contextWindow = 1050000;
         maxTokens = 128000;
@@ -132,7 +132,7 @@
         ];
       }
       {
-        id = "claude-fable-5-1";
+        id = "claude-code/claude-fable-5-1";
         name = "Claude Fable 5.1";
         contextWindow = 1000000;
         maxTokens = 128000;
@@ -144,7 +144,7 @@
         };
       }
       {
-        id = "claude-opus-5";
+        id = "claude-code/claude-opus-5";
         name = "Claude Opus 5";
         contextWindow = 1000000;
         maxTokens = 128000;
@@ -156,7 +156,7 @@
         };
       }
       {
-        id = "claude-sonnet-5";
+        id = "claude-code/claude-sonnet-5";
         name = "Claude Sonnet 5";
         contextWindow = 1000000;
         maxTokens = 128000;
@@ -168,7 +168,7 @@
         };
       }
       {
-        id = "claude-fable-5";
+        id = "claude-code/claude-fable-5";
         name = "Claude Fable 5";
         contextWindow = 1000000;
         maxTokens = 128000;
@@ -180,7 +180,7 @@
         };
       }
       {
-        id = "claude-opus-4-8";
+        id = "claude-code/claude-opus-4-8";
         name = "Claude Opus 4.8";
         contextWindow = 1000000;
         maxTokens = 128000;
@@ -192,7 +192,7 @@
         };
       }
       {
-        id = "claude-opus-4-7";
+        id = "claude-code/claude-opus-4-7";
         name = "Claude Opus 4.7";
         contextWindow = 1000000;
         maxTokens = 128000;
@@ -204,7 +204,7 @@
         };
       }
       {
-        id = "claude-sonnet-4-6";
+        id = "claude-code/claude-sonnet-4-6";
         name = "Claude Sonnet 4.6";
         contextWindow = 1000000;
         maxTokens = 128000;
@@ -216,7 +216,7 @@
         };
       }
       {
-        id = "claude-opus-4-6";
+        id = "claude-code/claude-opus-4-6";
         name = "Claude Opus 4.6";
         contextWindow = 1000000;
         maxTokens = 128000;
@@ -228,7 +228,7 @@
         };
       }
       {
-        id = "claude-opus-4-5-20251101";
+        id = "claude-code/claude-opus-4-5-20251101";
         name = "Claude Opus 4.5";
         contextWindow = 200000;
         maxTokens = 64000;
@@ -240,7 +240,7 @@
         };
       }
       {
-        id = "claude-haiku-4-5-20251001";
+        id = "claude-code/claude-haiku-4-5-20251001";
         name = "Claude Haiku 4.5";
         contextWindow = 200000;
         maxTokens = 64000;
@@ -252,7 +252,7 @@
         };
       }
       {
-        id = "claude-sonnet-4-5-20250929";
+        id = "claude-code/claude-sonnet-4-5-20250929";
         name = "Claude Sonnet 4.5";
         contextWindow = 200000;
         maxTokens = 64000;
@@ -279,11 +279,11 @@
     # id, so an entry that outlives its model fails the assertion below rather
     # than silently never applying.
     fastModels = {
-      "claude-opus-5" = "claude-sonnet-5";
-      "claude-opus-4-8" = "claude-sonnet-4-6";
-      "claude-sonnet-5" = "claude-haiku-4-5-20251001";
-      "gpt-5.6-sol" = "gpt-5.6-luna";
-      "gpt-6-astra" = "gpt-5.6-terra";
+      "claude-code/claude-opus-5" = "claude-code/claude-sonnet-5";
+      "claude-code/claude-opus-4-8" = "claude-code/claude-sonnet-4-6";
+      "claude-code/claude-sonnet-5" = "claude-code/claude-haiku-4-5-20251001";
+      "codex/gpt-5.6-sol" = "codex/gpt-5.6-luna";
+      "codex/gpt-6-astra" = "codex/gpt-5.6-terra";
     };
 
     # Derived from `gatewayModels` rather than written out again: a model that
@@ -326,7 +326,7 @@
         enable = true;
         settings = {
           defaultProvider = "llm-gateway";
-          defaultModel = "claude-opus-5";
+          defaultModel = "claude-code/claude-opus-5";
           defaultThinkingLevel = "high";
           quietStartup = true;
           compaction.enabled = true;
