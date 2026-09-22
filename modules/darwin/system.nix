@@ -5,7 +5,10 @@
     ...
   }: let
     system = pkgs.stdenv.hostPlatform.system;
-    casks = inputs.nix-casks.packages.${system};
+    # `ghostty` deliberately comes from `pkgs` rather than straight from the
+    # cask set: `flake.overlays.ghostty` patches it to expose `$out/bin`, and
+    # going direct here would put a second ~62M copy in the closure.
+    casks = inputs.nix-casks.packages.${system} // {inherit (pkgs) ghostty;};
     systemAppDir = "/System/Applications";
   in {
     config = {

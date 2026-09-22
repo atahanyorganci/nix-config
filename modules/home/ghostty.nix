@@ -1,16 +1,13 @@
 {
   flake.modules.homeManager.ghostty = {
-    inputs,
     pkgs,
     lib,
     config,
     ...
   }: let
-    system = pkgs.stdenv.hostPlatform.system;
-    pkg =
-      if pkgs.stdenv.hostPlatform.isDarwin
-      then inputs.nix-casks.packages.${system}.ghostty
-      else pkgs.ghostty;
+    # On Darwin this is the cask, patched by `flake.overlays.ghostty` to expose
+    # `$out/bin/ghostty`; elsewhere it is the nixpkgs build.
+    pkg = pkgs.ghostty;
   in {
     options.ghostty.enable = lib.mkEnableOption "Ghostty Terminal";
     config = lib.mkIf config.ghostty.enable {
