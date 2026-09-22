@@ -147,6 +147,51 @@ function isLikelyJsRendered(html: string): boolean {
 	return hasAppRoot && bodyText.length < THIN_CONTENT_CHARS;
 }
 
+/**
+ * Run the extractor with its logging muted.
+ *
+ * Defuddle narrates its own recoveries to the console: a stylesheet it cannot
+ * read, a schema.org block that will not parse, and on a failed markdown
+ * conversion a thousand characters of the offending HTML. None of it is
+ * actionable here, and all of it goes to a stream pi is drawing its interface
+ * on, where it corrupts the display rather than informing anyone.
+ *
+ * The console is restored in `finally`, so a throw cannot leave it stubbed.
+ */
+async function withQuietConsole<T>(run: () => Promise<T>): Promise<T> {
+	const { debug, error, info, log, warn } = console;
+	const quiet = () => {};
+	Object.assign(console, { debug: quiet, error: quiet, info: quiet, log: quiet, warn: quiet });
+	try {
+		return await run();
+	} finally {
+		Object.assign(console, { debug, error, info, log, warn });
+	}
+}
+
+/**
+ * Give a parsed document the location linkedom omits.
+ *
+ * linkedom leaves `document.location` and `document.URL` undefined, and the
+ * extractor reads them to resolve relative links, pick a favicon and name the
+ * site. Without them it falls back to the page's own `og:url` or canonical
+ * link, which are frequently relative paths -- and a relative path throws
+ * inside `new URL()`, costing the domain and everything derived from it.
+ *
+ * Defuddle is told the URL separately, and since 0.19.4 prefers that argument,
+ * so this is belt and braces: it keeps the document self-describing for any
+ * code that reads it directly, here or inside the extractor.
+ */
+function setDocumentLocation(document: object, url: string): void {
+	try {
+		const location = new URL(url);
+		Object.assign(document, { location, URL: location.href });
+	} catch {
+		// A URL that failed to parse could not have been fetched, so this is
+		// unreachable in practice and harmless if it is not.
+	}
+}
+
 /** Format a byte count for an error message, without rounding small limits to 0. */
 function formatBytes(bytes: number): string {
 	if (bytes >= 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)}MB`;
@@ -456,6 +501,7 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 		// linkedom's Document is structurally compatible but not the DOM lib type,
 		// which this package does not pull in for a Node-only build.
 		const { document } = parseHTML(body);
+		setDocumentLocation(document, response.url || url);
 
 		// Collected before extraction, which strips most of the document and
 		// rewrites the image sources that survive to point at link targets
@@ -468,12 +514,15 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 		// else outside the article.
 		const meta = parseOpenGraph(document as unknown as Parameters<typeof parseOpenGraph>[0]);
 
-		const article = await Defuddle(document as Parameters<typeof Defuddle>[0], response.url || url, {
-			markdown: true,
-			// Defuddle parses synchronously before resolving when async is off,
-			// which keeps it interruptible by the checks around it.
-			useAsync: false,
-		});
+		const article = await withQuietConsole(
+			async () =>
+				await Defuddle(document as Parameters<typeof Defuddle>[0], response.url || url, {
+					markdown: true,
+					// Defuddle parses synchronously before resolving when async is off,
+					// which keeps it interruptible by the checks around it.
+					useAsync: false,
+				}),
+		);
 
 		const content = article.content?.trim() ?? "";
 		const title = article.title?.trim() ?? "";

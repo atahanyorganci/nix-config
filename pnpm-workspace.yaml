@@ -43,8 +43,15 @@ catalog:
   "turbo": "^2.10.5"
   "typebox": "^1.3.34"
   "typescript": "^7.0.2"
-  "defuddle": "0.19.3"
-  "linkedom": "^0.16.0"
+  # 0.19.4 is the first release to hand the page URL to its metadata pass.
+  # Before it, that pass read `document.location`, which linkedom leaves unset,
+  # and fell back to whatever `og:url` or `<link rel=canonical>` held -- often a
+  # relative path, which threw inside `new URL()` and lost the domain with it.
+  "defuddle": "0.19.4"
+  # Matches defuddle's own optional dependency so one copy is installed rather
+  # than two. At ^0.16.0 both ended up in the bundle, several MB of duplicate
+  # DOM implementation that nothing shares.
+  "linkedom": "^0.18.13"
   "unpdf": "^1.8.1"
   "vitest": "^4.1.8"
 patchedDependencies:

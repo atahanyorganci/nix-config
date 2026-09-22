@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { extractContent } from "../src/fetch-content/extract.ts";
 import type { AddressInfo } from "node:net";
 
@@ -138,6 +138,60 @@ describe("content types", () => {
 	it("reports an empty body", async () => {
 		const result = await fetchBody("text/plain", "");
 		expect(result.error).toBe("Response body is empty");
+	});
+});
+
+/**
+ * A page describing itself with relative URLs.
+ *
+ * This is the shape that used to break extraction: the extractor read the
+ * document's own location, found nothing because linkedom does not set it,
+ * fell back to `og:url`, and threw on the relative path -- losing the domain
+ * and printing the failure to the console on the way out.
+ *
+ * It carries no `og:site_name` deliberately. That tag is read on its own path
+ * and survived the failure, so asserting on it would pass either way; with it
+ * absent the site name falls back to the domain, which is exactly what the
+ * throw destroyed.
+ */
+const RELATIVE_METADATA =
+	`<html><head><title>Post</title>` +
+	`<link rel="canonical" href="/posts/one">` +
+	`<meta property="og:url" content="/posts/one">` +
+	`</head><body><article>${"<p>Body paragraph with enough text to look like an article.</p>".repeat(10)}` +
+	`</article></body></html>`;
+
+describe("page metadata", () => {
+	it("resolves metadata on a page whose own URLs are relative", async () => {
+		const result = await fetchBody("text/html", RELATIVE_METADATA);
+		expect(result.error).toBeNull();
+		expect(result.content).toContain("Body paragraph");
+		// Empty before the fix: the throw abandoned the metadata pass midway,
+		// leaving the domain unresolved and the site name with nothing to use.
+		expect(result.siteName).toBe("127.0.0.1");
+	});
+
+	it("keeps the extractor's logging off the console", async () => {
+		// Pi draws its interface on these streams, so a library writing to them
+		// corrupts the display rather than informing anyone.
+		const spies = (["debug", "error", "info", "log", "warn"] as const).map(level =>
+			vi.spyOn(console, level).mockImplementation(() => {}),
+		);
+		try {
+			await fetchBody("text/html", RELATIVE_METADATA);
+			for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+		} finally {
+			for (const spy of spies) spy.mockRestore();
+		}
+	});
+
+	it("extracts a page carrying no metadata at all", async () => {
+		const body = `<html><head><title>Bare</title></head><body><article>${"<p>Body paragraph with enough text to look like an article.</p>".repeat(
+			10,
+		)}</article></body></html>`;
+		const result = await fetchBody("text/html", body);
+		expect(result.error).toBeNull();
+		expect(result.content).toContain("Body paragraph");
 	});
 });
 
