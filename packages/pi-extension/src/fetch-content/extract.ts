@@ -3,6 +3,7 @@ import { parseHTML } from "linkedom";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fetchGithubPage, isGithubUrl, matchRoute, rawUrlFor } from "./handlers/github.ts";
+import { parseOpenGraph, preferMetadata, prefersMetadata, renderOpenGraph } from "./handlers/opengraph.ts";
 import { createArtifactDir, identifyImage, imageExtension, IMAGE_TYPES, normalizeImage } from "./image.ts";
 import { collectPageImages, DEFAULT_IMAGE_LIMIT } from "./page-images.ts";
 import { extractPdf } from "./pdf.ts";
@@ -463,6 +464,10 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 			? collectPageImages(document, response.url || url, options.imageLimit ?? DEFAULT_IMAGE_LIMIT)
 			: [];
 
+		// Read before extraction: Defuddle strips the head along with everything
+		// else outside the article.
+		const meta = parseOpenGraph(document as unknown as Parameters<typeof parseOpenGraph>[0]);
+
 		const article = await Defuddle(document as Parameters<typeof Defuddle>[0], response.url || url, {
 			markdown: true,
 			// Defuddle parses synchronously before resolving when async is off,
@@ -473,10 +478,31 @@ export async function extractContent(url: string, options: ExtractOptions = {}):
 		const content = article.content?.trim() ?? "";
 		const title = article.title?.trim() ?? "";
 
+		// A login wall extracts as text, so it counts as success by length alone.
+		// Where the metadata is the better answer, take it: on these hosts the
+		// rendered page is navigation and prompts, and the post is in the head.
+		const hostPrefersMetadata = prefersMetadata(response.url || url);
+		if (
+			(hostPrefersMetadata || content.length < THIN_CONTENT_CHARS) &&
+			preferMetadata(meta, content, hostPrefersMetadata)
+		) {
+			return {
+				url,
+				title: meta.title ?? title,
+				content: renderOpenGraph(meta),
+				error: null,
+				// Defuddle's own reading of the document is kept where the metadata
+				// is silent: it finds a date in the body that no `og:` tag carries.
+				...(meta.author || article.author ? { author: meta.author ?? article.author } : {}),
+				...(meta.published || article.published ? { published: meta.published ?? article.published } : {}),
+				...(meta.siteName || article.site ? { siteName: meta.siteName ?? article.site } : {}),
+			};
+		}
+
 		if (!content) {
 			return {
 				url,
-				title,
+				title: title || (meta.title ?? ""),
 				content: "",
 				error: isLikelyJsRendered(body)
 					? "Page appears to be JavaScript-rendered (content loads dynamically)"

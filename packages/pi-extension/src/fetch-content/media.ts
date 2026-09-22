@@ -3,9 +3,10 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { createArtifactDir, identifyImage, imageExtension, normalizeImage } from "./image.ts";
+import { facts, formatBytes } from "./render.ts";
 import { fetchRemoteUrl } from "./ssrf.ts";
 import type { CobaltMedia } from "./cobalt.ts";
-import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
+import type { FetchResult } from "./render.ts";
 
 /**
  * Downloading what cobalt resolved.
@@ -42,16 +43,56 @@ const MAX_SECONDS = 15 * 60;
 /** How long ffmpeg may run before it is assumed to be stuck on a slow origin. */
 const FFMPEG_TIMEOUT_MS = 180_000;
 
+/**
+ * What the media is, in the terms a model can act on.
+ *
+ * Cobalt's own kind describes delivery -- `hls` is a manifest, `merge` is two
+ * streams to mux -- which matters to ffmpeg and to nothing else. Reporting it
+ * told the model that a TikTok video was an "hls", which is not a kind of
+ * thing that exists to a reader.
+ */
+export type MediaKind = "image" | "video" | "audio";
+
+/** Collapse cobalt's delivery strategy into what the file actually is. */
+export function mediaKind(kind: CobaltMedia["kind"]): MediaKind {
+	switch (kind) {
+		case "photo":
+			return "image";
+		case "audio":
+			return "audio";
+		// video, hls and merge all end up as one playable video file.
+		default:
+			return "video";
+	}
+}
+
 export interface FetchedMedia {
-	readonly kind: CobaltMedia["kind"];
+	readonly kind: MediaKind;
 	readonly service: string;
 	/** Where the file landed, or undefined when only an image block was produced. */
 	readonly path?: string;
 	readonly bytes?: number;
 	readonly seconds?: number;
-	/** Present for photos: the normalized image, ready to send to the model. */
-	readonly image?: { readonly data: string; readonly mimeType: string };
+	/**
+	 * Present for photos: the normalized image, ready to send to the model.
+	 *
+	 * The dimensions ride along because they are measured anyway during
+	 * normalization, and without them a photo is the one result that cannot say
+	 * how big it is -- a directly fetched image reports its size, and this did
+	 * not.
+	 */
+	readonly image?: {
+		readonly data: string;
+		readonly mimeType: string;
+		readonly width: number;
+		readonly height: number;
+		readonly originalFormat: string;
+		readonly originalWidth: number;
+		readonly originalHeight: number;
+	};
 	readonly error?: string;
+	/** Set when the file on disk is a fragment, so a path does not imply a whole file. */
+	readonly incomplete?: boolean;
 }
 
 /**
@@ -113,8 +154,9 @@ async function probeSeconds(url: string, headers: Readonly<Record<string, string
  * stripping as one found on a page.
  */
 async function fetchPhoto(media: CobaltMedia, signal?: AbortSignal): Promise<FetchedMedia> {
+	const kind = mediaKind(media.kind);
 	const url = media.urls[0];
-	if (!url) return { kind: media.kind, service: media.service, error: "No image URL" };
+	if (!url) return { kind, service: media.service, error: "No image URL" };
 
 	const response = await fetchRemoteUrl(url, {
 		// Photo CDNs apply the same rule as video ones; Instagram and Snapchat
@@ -123,7 +165,7 @@ async function fetchPhoto(media: CobaltMedia, signal?: AbortSignal): Promise<Fet
 		signal: signal ?? null,
 	});
 	if (!response.ok) {
-		return { kind: media.kind, service: media.service, error: `HTTP ${response.status}` };
+		return { kind, service: media.service, error: `HTTP ${response.status}` };
 	}
 
 	const dir = await createArtifactDir();
@@ -139,7 +181,7 @@ async function fetchPhoto(media: CobaltMedia, signal?: AbortSignal): Promise<Fet
 	// an empty response rather than an error.
 	const info = await identifyImage(path);
 	if (!info) {
-		return { kind: media.kind, service: media.service, path, bytes: bytes.length, error: "Not a decodable image" };
+		return { kind, service: media.service, path, bytes: bytes.length, error: "Not a decodable image" };
 	}
 
 	// Downscales, flattens transparency and strips EXIF, writing a JPEG beside
@@ -147,17 +189,22 @@ async function fetchPhoto(media: CobaltMedia, signal?: AbortSignal): Promise<Fet
 	const normalizedPath = join(dir, `${safeName(media.filename).replace(/\.[^.]*$/, "")}.jpg`);
 	const normalized = await normalizeImage(path, normalizedPath);
 	if (!normalized) {
-		return { kind: media.kind, service: media.service, path, bytes: bytes.length, error: "Could not normalize image" };
+		return { kind, service: media.service, path, bytes: bytes.length, error: "Could not normalize image" };
 	}
 
 	return {
-		kind: media.kind,
+		kind,
 		service: media.service,
 		path: normalizedPath,
 		bytes: bytes.length,
 		image: {
 			data: (await readFile(normalizedPath)).toString("base64"),
 			mimeType: "image/jpeg",
+			width: normalized.width,
+			height: normalized.height,
+			originalFormat: info.format,
+			originalWidth: info.width,
+			originalHeight: info.height,
 		},
 	};
 }
@@ -176,10 +223,11 @@ async function fetchPhoto(media: CobaltMedia, signal?: AbortSignal): Promise<Fet
  * the bitstream filter" aborts the whole remux.
  */
 async function remux(media: CobaltMedia, signal?: AbortSignal): Promise<FetchedMedia> {
+	const kind = mediaKind(media.kind);
 	const seconds = await probeSeconds(media.urls[0] ?? "", media.headers);
 	if (seconds !== null && seconds > MAX_SECONDS) {
 		return {
-			kind: media.kind,
+			kind,
 			service: media.service,
 			seconds,
 			error: `Too long to download (${Math.round(seconds)}s, limit ${MAX_SECONDS}s)`,
@@ -211,22 +259,23 @@ async function remux(media: CobaltMedia, signal?: AbortSignal): Promise<FetchedM
 		await run(ffmpeg(), args, { timeout: FFMPEG_TIMEOUT_MS, signal });
 	} catch (error) {
 		const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
-		return { kind: media.kind, service: media.service, error: `ffmpeg failed: ${reason}` };
+		return { kind, service: media.service, error: `ffmpeg failed: ${reason}` };
 	}
 
 	const { size } = await stat(path);
 	if (size >= MAX_BYTES) {
 		return {
-			kind: media.kind,
+			kind,
 			service: media.service,
 			path,
 			bytes: size,
+			incomplete: true,
 			error: `Stopped at the ${Math.round(MAX_BYTES / 1024 / 1024)}MB limit; the file is incomplete`,
 		};
 	}
 
 	return {
-		kind: media.kind,
+		kind,
 		service: media.service,
 		path,
 		bytes: size,
@@ -243,41 +292,59 @@ export async function fetchMedia(media: CobaltMedia, signal?: AbortSignal): Prom
 		// A failed download is a result, not an exception: the caller may have
 		// asked for several URLs and the others can still succeed.
 		return {
-			kind: media.kind,
+			kind: mediaKind(media.kind),
 			service: media.service,
 			error: error instanceof Error ? error.message : String(error),
 		};
 	}
 }
 
-/** Human-readable size, so the model can judge whether a file is worth opening. */
-function formatBytes(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+/** Describe a normalized image the way the direct-image path does. */
+function describeImage(image: NonNullable<FetchedMedia["image"]>): string {
+	const original = `${image.originalFormat} ${image.originalWidth}x${image.originalHeight}`;
+	const unchanged = image.width === image.originalWidth && image.height === image.originalHeight;
+	return unchanged ? original : `${original}, resized to ${image.width}x${image.height}`;
 }
 
 /**
- * Render one fetched media item as blocks.
+ * Describe fetched media as a result, leaving presentation to the renderer.
  *
- * A photo goes out as an image block, which pi passes to the model directly.
- * Everything else is a path plus a description, since a tool result cannot
- * carry a video.
+ * A photo becomes an image block, which pi passes to the model directly.
+ * Video and audio cannot travel in a tool result, so they become attachments:
+ * a path the caller can play, transcode or upload.
  */
-export function mediaContentBlocks(url: string, media: FetchedMedia): (TextContent | ImageContent)[] {
-	const lines = [`Media from ${url}`, `Service: ${media.service}`, `Type: ${media.kind}`];
-	if (media.path) lines.push(`Saved to: ${media.path}`);
-	if (media.bytes !== undefined) lines.push(`Size: ${formatBytes(media.bytes)}`);
-	if (media.seconds !== undefined) lines.push(`Duration: ${Math.round(media.seconds)}s`);
-	if (media.error) lines.push(`Note: ${media.error}`);
+export function mediaResult(url: string, media: FetchedMedia): FetchResult {
+	const image = media.image;
 
-	// Video and audio are referenced rather than returned; say so, or the model
-	// is left to guess whether it already has the content.
-	if (!media.image && media.path) {
-		lines.push("The file itself was not returned; read or play it from the path above.");
-	}
-
-	const text: TextContent = { type: "text", text: lines.join("\n") };
-	if (!media.image) return [text];
-	return [{ type: "image", data: media.image.data, mimeType: media.image.mimeType }, text];
+	return {
+		url,
+		title: "",
+		// The media is the content; anything said about it belongs in the facts.
+		content: "",
+		error: media.error ?? null,
+		facts: facts(
+			{ label: "Service", value: media.service },
+			{ label: "Type", value: media.kind },
+			image ? { label: "Image", value: describeImage(image) } : null,
+			// An image is returned inline, so its path is a note rather than the
+			// point; a video's path is the only way to reach it and is an
+			// attachment instead.
+			image && media.path ? { label: "Saved to", value: media.path } : null,
+			image && media.bytes !== undefined ? { label: "Size", value: formatBytes(media.bytes) } : null,
+		),
+		...(image ? { images: [{ type: "image" as const, data: image.data, mimeType: image.mimeType }] } : {}),
+		...(!image && media.path
+			? {
+					attachments: [
+						{
+							path: media.path,
+							kind: media.kind,
+							...(media.bytes === undefined ? {} : { bytes: media.bytes }),
+							...(media.seconds === undefined ? {} : { seconds: media.seconds }),
+							...(media.incomplete ? { incomplete: true } : {}),
+						},
+					],
+				}
+			: {}),
+	};
 }

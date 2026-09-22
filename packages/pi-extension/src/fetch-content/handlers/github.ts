@@ -206,6 +206,12 @@ function list(heading: string, entries: readonly string[], separator = "\n"): st
 	return entries.length > 0 ? `## ${heading}\n\n${entries.join(separator)}` : null;
 }
 
+/**
+ * A page's title and body, kept apart.
+ *
+ * The body carries no heading of its own: the shared renderer adds one from
+ * `title`, and a provider that emitted its own would have it printed twice.
+ */
 export interface GithubPage {
 	readonly title: string;
 	readonly content: string;
@@ -255,7 +261,6 @@ async function fetchPull(route: GithubRoute, signal?: AbortSignal): Promise<Gith
 	return {
 		title,
 		content: sections(
-			`# ${title}`,
 			[
 				`${route.owner}/${route.repo} #${route.rest} \u2014 ${state}`,
 				`${pull.user?.login ?? "someone"} wants to merge ${pull.head?.ref ?? "?"} into ${pull.base?.ref ?? "?"}`,
@@ -296,7 +301,6 @@ async function fetchIssue(route: GithubRoute, signal?: AbortSignal): Promise<Git
 	return {
 		title,
 		content: sections(
-			`# ${title}`,
 			[
 				`${route.owner}/${route.repo} #${route.rest} \u2014 ${issue.state ?? "unknown"}`,
 				`opened by ${issue.user?.login ?? "someone"}`,
@@ -327,7 +331,6 @@ async function fetchCommit(route: GithubRoute, signal?: AbortSignal): Promise<Gi
 	return {
 		title,
 		content: sections(
-			`# ${title}`,
 			[
 				`${route.owner}/${route.repo} ${commit.sha?.slice(0, 8) ?? route.rest.slice(0, 8)}`,
 				`${commit.commit?.author?.name ?? "someone"} on ${commit.commit?.author?.date ?? "an unknown date"}`,
@@ -359,7 +362,6 @@ async function fetchCompare(route: GithubRoute, signal?: AbortSignal): Promise<G
 	return {
 		title,
 		content: sections(
-			`# ${title}`,
 			[
 				`${comparison.status ?? "compared"}: ${comparison.ahead_by ?? 0} ahead,` +
 					` ${comparison.behind_by ?? 0} behind`,
@@ -391,7 +393,6 @@ async function fetchRelease(route: GithubRoute, signal?: AbortSignal): Promise<G
 	return {
 		title,
 		content: sections(
-			`# ${title}`,
 			[
 				`${route.owner}/${route.repo} ${release.tag_name ?? route.rest}` +
 					`${release.prerelease ? " (prerelease)" : ""}`,
@@ -429,7 +430,6 @@ async function fetchTree(route: GithubRoute, signal?: AbortSignal): Promise<Gith
 	return {
 		title,
 		content: sections(
-			`# ${title}`,
 			`${route.owner}/${route.repo} at ${route.rest}`,
 			list(
 				"Contents",
@@ -466,7 +466,6 @@ async function fetchRepo(route: GithubRoute, signal?: AbortSignal): Promise<Gith
 	return {
 		title,
 		content: sections(
-			`# ${title}`,
 			[
 				repository.description ?? "",
 				repository.archived ? "archived" : "",

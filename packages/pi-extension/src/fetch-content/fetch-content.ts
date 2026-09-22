@@ -1,10 +1,11 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { isCobaltUrl, resolveMedia } from "./cobalt.ts";
-import { extractAll } from "./extract.ts";
-import { fetchMedia, mediaContentBlocks } from "./media.ts";
-import type { ExtractedContent } from "./extract.ts";
-import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
+import { extractContent } from "./extract.ts";
+import { fetchMedia, mediaResult } from "./media.ts";
+import { facts, joinResults } from "./render.ts";
+import type { ExtractedContent, ExtractOptions } from "./extract.ts";
+import type { FetchResult } from "./render.ts";
 
 /**
  * CIDRs exempt from the SSRF guard's private-address checks.
@@ -20,47 +21,105 @@ export function getAllowRanges(): string[] {
 		.filter(entry => entry.length > 0);
 }
 
-/** Render one result as markdown, keeping the source URL attached to its text. */
-function renderResult(result: ExtractedContent): string {
-	const heading = result.title ? `# ${result.title}` : `# ${result.url}`;
-	const meta = [
-		`Source: ${result.url}`,
-		result.author ? `Author: ${result.author}` : "",
-		result.published ? `Published: ${result.published}` : "",
-	]
-		.filter(Boolean)
-		.join("\n");
+/**
+ * Describe an extracted page as a result.
+ *
+ * Everything the extractor learned is reported here. Several of these were
+ * computed and then dropped: a fifty-page PDF that fitted inline never said it
+ * had fifty pages, because the old renderer only printed author and date.
+ */
+function pageResult(result: ExtractedContent): FetchResult {
+	const { image } = result;
 
-	if (!result.content) {
-		return `${heading}\n\n${meta}\n\nError: ${result.error ?? "No content extracted"}`;
-	}
+	const described = image
+		? image.width === image.originalWidth && image.height === image.originalHeight
+			? `${image.originalFormat} ${image.originalWidth}x${image.originalHeight}`
+			: `${image.originalFormat} ${image.originalWidth}x${image.originalHeight},` +
+				` resized to ${image.width}x${image.height}`
+		: "";
 
-	// A warning rides along with the content rather than replacing it, so a
-	// thin-but-usable extraction is still worth something to the caller.
-	const warning = result.error ? `\n\nNote: ${result.error}` : "";
-	return `${heading}\n\n${meta}${warning}\n\n${result.content}`;
+	return {
+		url: result.url,
+		title: result.title,
+		content: result.content,
+		error: result.error,
+		facts: facts(
+			result.author ? { label: "Author", value: result.author } : null,
+			result.published ? { label: "Published", value: result.published } : null,
+			result.siteName ? { label: "Site", value: result.siteName } : null,
+			result.pageCount === undefined ? null : { label: "Pages", value: String(result.pageCount) },
+			result.wordCount === undefined ? null : { label: "Words", value: result.wordCount.toLocaleString("en-US") },
+			image ? { label: "Image", value: described } : null,
+			image ? { label: "Saved to", value: image.path } : null,
+			result.artifactDir ? { label: "Artifacts", value: result.artifactDir } : null,
+		),
+		...(image ? { images: [{ type: "image" as const, data: image.data, mimeType: image.mimeType }] } : {}),
+	};
 }
 
 /**
- * Turn one result into content blocks.
+ * Fetch one URL, taking the media behind it and the page around it together.
  *
- * An image is sent as an image block rather than a path, because pi passes
- * those through to the model directly. The text alongside it records where the
- * file landed and what was done to it, so a later turn can reach for the
- * original instead of re-fetching.
+ * These used to be exclusive: a URL cobalt resolved was removed from the page
+ * list entirely, so a post with a photo returned the photo and lost the text
+ * that explained it, while a post cobalt declined returned the page's login
+ * wall and lost nothing only because there was no media to lose. An X post is
+ * both things, and neither path on its own answers what was asked.
  */
-function toContentBlocks(result: ExtractedContent): (TextContent | ImageContent)[] {
-	const { image } = result;
-	if (!image) return [{ type: "text", text: renderResult(result) }];
+async function fetchOne(url: string, options: ExtractOptions): Promise<FetchResult> {
+	if (!isCobaltUrl(url)) return pageResult(await extractContent(url, options));
 
-	const original = `${image.originalFormat} ${image.originalWidth}x${image.originalHeight}`;
-	const unchanged = image.width === image.originalWidth && image.height === image.originalHeight;
-	const described = unchanged ? original : `${original}, resized to ${image.width}x${image.height}`;
+	// Both legs run together: the media download is the slow one, and making
+	// the page wait for it would double the latency of every social URL.
+	const [media, page] = await Promise.all([
+		resolveMedia(url)
+			.then(async resolved => (resolved ? await fetchMedia(resolved, options.signal) : null))
+			.catch(() => null),
+		// A post whose media resolves still has text worth reading, and a
+		// failure here must not cost the media.
+		extractContent(url, options).catch(() => null),
+	]);
 
-	return [
-		{ type: "image", data: image.data, mimeType: image.mimeType },
-		{ type: "text", text: `Image from ${result.url}\nSaved to: ${image.path}\n${described}` },
-	];
+	if (!media) {
+		// Cobalt declined, which is the common case for a text-only post.
+		return pageResult(page ?? { url, title: "", content: "", error: "Could not fetch" });
+	}
+
+	const mediaSide = mediaResult(url, media);
+	const pageSide = page && page.content.trim() ? pageResult(page) : null;
+	if (!pageSide) return mediaSide;
+
+	// The page supplies what the post says; the media supplies what it shows.
+	return {
+		...pageSide,
+		error: pageSide.error ?? mediaSide.error,
+		facts: facts(...(mediaSide.facts ?? []), ...(pageSide.facts ?? [])),
+		...(mediaSide.images ? { images: mediaSide.images } : {}),
+		...(mediaSide.attachments ? { attachments: mediaSide.attachments } : {}),
+	};
+}
+
+/**
+ * Fetch several URLs with bounded concurrency, preserving input order.
+ *
+ * The cap keeps a large batch from opening dozens of sockets at once. Order is
+ * the caller's: results used to come back media-first, so a two-URL call could
+ * answer them in the opposite order to the one asked.
+ */
+async function fetchAll(urls: readonly string[], options: ExtractOptions, concurrency = 5): Promise<FetchResult[]> {
+	const results: FetchResult[] = Array.from({ length: urls.length });
+	let next = 0;
+
+	const worker = async () => {
+		for (;;) {
+			const index = next++;
+			if (index >= urls.length) return;
+			results[index] = await fetchOne(urls[index]!, options);
+		}
+	};
+
+	await Promise.all(Array.from({ length: Math.min(concurrency, urls.length) }, worker));
+	return results;
 }
 
 export const fetchContent = defineTool({
@@ -115,61 +174,38 @@ export const fetchContent = defineTool({
 			details: { phase: "fetch" },
 		});
 
-		// Posts whose point is the media they hold are resolved through cobalt
-		// first. Generic extraction sees only the surrounding page, which for a
-		// Bluesky post is its alt text and for TikTok is nothing at all.
-		const mediaUrls = urls.filter(url => isCobaltUrl(url));
-		const mediaBlocks: (TextContent | ImageContent)[] = [];
-		const mediaFailures: string[] = [];
-
-		for (const url of mediaUrls) {
-			const resolved = await resolveMedia(url);
-			// A URL cobalt recognises but cannot resolve falls back to generic
-			// extraction, which at least returns the page around the media.
-			if (!resolved) {
-				mediaFailures.push(url);
-				continue;
-			}
-			const fetched = await fetchMedia(resolved, signal);
-			if (mediaBlocks.length > 0) mediaBlocks.push({ type: "text", text: "\n\n---\n\n" });
-			mediaBlocks.push(...mediaContentBlocks(url, fetched));
-		}
-
-		const pageUrls = urls.filter(url => !mediaUrls.includes(url) || mediaFailures.includes(url));
-
 		const allowRanges = getAllowRanges();
-		const results =
-			pageUrls.length === 0
-				? []
-				: await extractAll(pageUrls, {
-						...(signal ? { signal } : {}),
-						...(allowRanges.length > 0 ? { allowRanges } : {}),
-						...(params.images ? { includeImages: true } : {}),
-					});
+		const results = await fetchAll(urls, {
+			...(signal ? { signal } : {}),
+			...(allowRanges.length > 0 ? { allowRanges } : {}),
+			...(params.images ? { includeImages: true } : {}),
+		});
 
-		const succeeded = results.filter(result => result.content.length > 0 || result.image).length;
-
-		// Blocks are flattened rather than joined, since an image cannot be
-		// represented in the text stream that separates the textual results.
-		const pageBlocks = results.flatMap<TextContent | ImageContent>((result, index) =>
-			index === 0 ? toContentBlocks(result) : [{ type: "text", text: "\n\n---\n\n" }, ...toContentBlocks(result)],
-		);
-
-		const content =
-			mediaBlocks.length > 0 && pageBlocks.length > 0
-				? [...mediaBlocks, { type: "text" as const, text: "\n\n---\n\n" }, ...pageBlocks]
-				: [...mediaBlocks, ...pageBlocks];
-
-		const mediaSucceeded = mediaUrls.length - mediaFailures.length;
+		// A result counts as a success when it carries something to read or look
+		// at, which is not the same as having no error: a thin extraction reports
+		// both content and a warning.
+		const succeeded = results.filter(
+			result =>
+				result.content.trim().length > 0 || (result.images?.length ?? 0) > 0 || (result.attachments?.length ?? 0) > 0,
+		).length;
 
 		return {
-			content,
+			// Blocks are flattened rather than joined, since an image cannot be
+			// represented in the text stream that separates the textual results.
+			content: joinResults(results),
 			details: {
 				requested: urls.length,
-				succeeded: succeeded + mediaSucceeded,
-				failed: urls.length - succeeded - mediaSucceeded,
-				...(mediaSucceeded > 0 ? { media: mediaSucceeded } : {}),
-				results: results.map(({ url, title, error, wordCount }) => ({ url, title, error, wordCount })),
+				succeeded,
+				failed: urls.length - succeeded,
+				// Every URL is reported, media included. The counts derive from this
+				// array rather than being tallied separately, so they cannot disagree
+				// with it.
+				results: results.map(result => ({
+					url: result.url,
+					title: result.title,
+					error: result.error,
+					...(result.attachments?.length ? { attachments: result.attachments.map(a => a.path) } : {}),
+				})),
 			},
 		};
 	},
