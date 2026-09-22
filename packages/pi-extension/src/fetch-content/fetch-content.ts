@@ -66,23 +66,38 @@ function toContentBlocks(result: ExtractedContent): (TextContent | ImageContent)
 export const fetchContent = defineTool({
 	name: "fetch_content",
 	label: "Fetch Content",
+	// The model cannot tell from a URL whether this tool will help, so the
+	// description names the cases that are not obvious -- media posts, PDFs and
+	// GitHub -- and says what comes back for each. Without that it falls back to
+	// treating every URL as an article and gives up on the ones that are not.
 	description:
-		"Fetch one or more web pages and return their main content as markdown, with navigation, ads and boilerplate removed.",
-	promptSnippet: "Use to read the content of a web page by URL.",
+		"Fetch one or more URLs and return their content, chosen by what the URL points at:\n" +
+		"- Web pages: main content as markdown, with navigation, ads and boilerplate removed.\n" +
+		"- Images: returned directly as an image, downscaled to fit.\n" +
+		"- PDFs: extracted text, plus embedded figures as images. Long documents are written to files instead.\n" +
+		"- GitHub pages: read through the API, so pull requests, issues, commits, releases and file " +
+		"contents come back as structured text rather than rendered HTML.\n" +
+		"- Social media posts (TikTok, Instagram, Bluesky, Reddit, X, Vimeo, SoundCloud and others): the " +
+		"media itself rather than the page around it. Photos are returned as images; video and audio are " +
+		"downloaded and their file paths reported, since they cannot be returned inline.",
+	promptSnippet: "Use to read a web page, image, PDF, GitHub page, or the media behind a social media post, by URL.",
 	parameters: Type.Object({
-		url: Type.Optional(Type.String({ description: "A single URL to fetch." })),
+		url: Type.Optional(Type.String({ description: "A single URL to fetch. Provide either this or urls." })),
 		urls: Type.Optional(
 			Type.Array(Type.String(), {
 				minItems: 1,
 				maxItems: 10,
-				description: "Several URLs to fetch in parallel.",
+				description:
+					"Several URLs to fetch in parallel. Prefer this over repeated calls; " +
+					"one URL failing does not affect the others.",
 			}),
 		),
 		images: Type.Optional(
 			Type.Boolean({
 				description:
-					"Also download the images a page contains and save them locally. Off by default; " +
-					"enable it when a page's diagrams, charts or screenshots are what matters.",
+					"Also download the images a web page contains and save them locally. Off by default; " +
+					"enable it when a page's diagrams, charts or screenshots are what matters. Does not " +
+					"apply to image, PDF or social media URLs, which already return their images.",
 			}),
 		),
 	}),
