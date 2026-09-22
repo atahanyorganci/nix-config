@@ -144,6 +144,18 @@
         };
       }
       {
+        id = "claude-code/claude-opus-5-5";
+        name = "Claude Opus 5.5";
+        contextWindow = 1000000;
+        maxTokens = 128000;
+        cost = mkCost {
+          input = 4;
+          output = 20;
+          cacheRead = 0.2;
+          cacheWrite = 5;
+        };
+      }
+      {
         id = "claude-code/claude-opus-5";
         name = "Claude Opus 5";
         contextWindow = 1000000;
@@ -279,6 +291,7 @@
     # id, so an entry that outlives its model fails the assertion below rather
     # than silently never applying.
     fastModels = {
+      "claude-code/claude-opus-5-5" = "claude-code/claude-sonnet-5";
       "claude-code/claude-opus-5" = "claude-code/claude-sonnet-5";
       "claude-code/claude-opus-4-8" = "claude-code/claude-sonnet-4-6";
       "claude-code/claude-sonnet-5" = "claude-code/claude-haiku-4-5-20251001";
@@ -326,7 +339,7 @@
         enable = true;
         settings = {
           defaultProvider = "llm-gateway";
-          defaultModel = "claude-code/claude-opus-5";
+          defaultModel = "claude-code/claude-opus-5-5";
           defaultThinkingLevel = "high";
           quietStartup = true;
           compaction.enabled = true;
