@@ -43,10 +43,14 @@
       final.stdenvNoCC.mkDerivation (finalAttrs: {
         inherit pname version src;
 
+        # `pnpm_11` is required here, not redundant: `pnpm-config-hook.sh`
+        # calls bare `pnpm` from `PATH`, and unlike the deprecated
+        # `pnpm_11.configHook`, the top-level `pnpmConfigHook` does not
+        # propagate a pnpm of its own. Dropping it fails the configure phase.
         nativeBuildInputs = [
           final.nodejs
           final.pnpm_11
-          final.pnpm_11.configHook
+          final.pnpmConfigHook
         ];
 
         # Fetches the pnpm store as a fixed-output derivation. `pnpmWorkspaces`
