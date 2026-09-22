@@ -28,12 +28,17 @@
       then "/Users/${target.ssh.user}/.gnupg/S.gpg-agent"
       else "/run/user/${toString target.ssh.uid}/gnupg/S.gpg-agent";
 
-    matchBlocksFromInventory =
+    # `programs.ssh.settings` takes OpenSSH directive names and treats each
+    # attribute name as a `Host` pattern. `header` is set explicitly so the
+    # block still matches every hostname while the attribute name stays the
+    # short inventory name (which is what `lib.hm.dag` ordering would refer
+    # to).
+    settingsFromInventory =
       lib.mapAttrs (_name: target: {
-        host = lib.concatStringsSep " " target.ssh.hostNames;
-        user = target.ssh.user;
-        forwardAgent = true;
-        remoteForwards = [
+        header = "Host ${lib.concatStringsSep " " target.ssh.hostNames}";
+        User = target.ssh.user;
+        ForwardAgent = true;
+        RemoteForward = [
           {
             bind.address = remoteAgentSocket target;
             host.address = localExtraSocket;
@@ -69,7 +74,7 @@
         enable = true;
         enableDefaultConfig = false;
         inherit includes;
-        matchBlocks = lib.mkIf config.gpg.agent.enable matchBlocksFromInventory;
+        settings = lib.mkIf config.gpg.agent.enable settingsFromInventory;
       };
       home.packages = with pkgs; [
         openssl
