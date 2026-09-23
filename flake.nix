@@ -59,6 +59,13 @@
       url = "github:nix-community/nixos-anywhere";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hunk = {
+      url = "github:modem-dev/hunk";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.bun2nix.inputs.flake-parts.follows = "flake-parts";
+      inputs.bun2nix.inputs.import-tree.follows = "import-tree";
+      inputs.bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
+    };
     hermes-agent = {
       url = "github:NousResearch/hermes-agent/v2026.7.20";
       inputs.nixpkgs.follows = "nixpkgs";

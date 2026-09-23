@@ -17,6 +17,7 @@
     };
     gpg.enable = true;
     gum.enable = true;
+    hunk.enable = true;
     python.enable = true;
     shell = {
       bash.enable = true;
