@@ -1,4 +1,6 @@
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { formatDuration, formatExtras, parseRows } from "./report.ts";
+import type { UsageRow, WindowRow } from "./report.ts";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 
@@ -8,63 +10,6 @@ const ENDPOINT = process.env.PI_USAGE_ENDPOINT ?? "http://localhost:3000/_/usage
 const WIDGET_ID = "local-usage";
 const MIN_BAR_WIDTH = 6;
 const MAX_BAR_WIDTH = 30;
-
-type UsageWindow = {
-	used: number;
-	resetAt: string | null;
-};
-
-type UsageRow = UsageWindow & {
-	label: string;
-};
-
-type UsageResponse = Record<
-	string,
-	{
-		success?: boolean;
-		data?: Record<string, UsageWindow>;
-	}
->;
-
-function humanize(value: string): string {
-	return value.replaceAll("_", " ");
-}
-
-function parseRows(value: unknown): UsageRow[] {
-	if (!value || typeof value !== "object") throw new Error("invalid response");
-
-	const rows: UsageRow[] = [];
-	for (const [provider, result] of Object.entries(value as UsageResponse)) {
-		if (!result?.success || !result.data || typeof result.data !== "object") continue;
-
-		for (const [windowName, window] of Object.entries(result.data)) {
-			if (!window || typeof window.used !== "number" || !Number.isFinite(window.used)) continue;
-			rows.push({
-				label: `${humanize(provider)} ${humanize(windowName)}`,
-				used: Math.max(0, Math.min(1, window.used)),
-				resetAt: typeof window.resetAt === "string" ? window.resetAt : null,
-			});
-		}
-	}
-
-	if (rows.length === 0) throw new Error("response contained no usage data");
-	return rows;
-}
-
-function formatDuration(resetAt: string | null, now = Date.now()): string | undefined {
-	if (!resetAt) return undefined;
-	const milliseconds = new Date(resetAt).getTime() - now;
-	if (!Number.isFinite(milliseconds) || milliseconds <= 0) return "now";
-
-	const totalMinutes = Math.ceil(milliseconds / 60_000);
-	const days = Math.floor(totalMinutes / 1_440);
-	const hours = Math.floor((totalMinutes % 1_440) / 60);
-	const minutes = totalMinutes % 60;
-
-	if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-	if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-	return `${minutes}m`;
-}
 
 function progressBar(used: number, width: number): string {
 	const filled = Math.round(used * width);
@@ -77,14 +22,18 @@ function usageColor(used: number): "accent" | "warning" | "error" {
 	return "accent";
 }
 
-function renderRows(rows: UsageRow[], width: number, theme: Theme): string[] {
+function renderRows(allRows: UsageRow[], width: number, theme: Theme): string[] {
 	if (width <= 0) return [];
 
+	// Bars are sized from the window rows alone; extras rows are free text that
+	// only shares the label column, and is truncated to whatever width is left.
+	const rows = allRows.filter((row): row is WindowRow => row.kind === "window");
+	const now = Date.now();
 	const percentages = rows.map(row => `${Math.round(row.used * 100)}`.padStart(3) + "%");
-	const resetDurations = rows.map(row => formatDuration(row.resetAt));
+	const resetDurations = rows.map(row => formatDuration(row.resetAt, now));
 	const fullResets = resetDurations.map(duration => (duration ? `  ·  resets in ${duration}` : ""));
 	const shortResets = resetDurations.map(duration => (duration ? ` · ${duration}` : ""));
-	const longestLabel = Math.max(...rows.map(row => visibleWidth(row.label)));
+	const longestLabel = Math.max(0, ...allRows.map(row => visibleWidth(row.label)));
 
 	let resets = fullResets;
 	let resetWidth = Math.max(0, ...resets.map(visibleWidth));
@@ -112,13 +61,20 @@ function renderRows(rows: UsageRow[], width: number, theme: Theme): string[] {
 
 	barWidth = Math.max(1, Math.min(MAX_BAR_WIDTH, barWidth));
 
-	return rows.map((row, index) => {
-		const label = truncateToWidth(row.label, labelWidth, "…");
-		const labelPadding = " ".repeat(Math.max(0, labelWidth - visibleWidth(label)));
-		const bar = progressBar(row.used, barWidth);
+	const padLabel = (text: string): string => {
+		const label = truncateToWidth(text, labelWidth, "…");
+		return label + " ".repeat(Math.max(0, labelWidth - visibleWidth(label)));
+	};
+
+	return allRows.map(row => {
+		if (row.kind === "extras") {
+			const line = `${theme.fg("muted", padLabel(row.label))}  ${theme.fg("dim", formatExtras(row, now) ?? "")}`;
+			return truncateToWidth(line, width, "…");
+		}
+		const index = rows.indexOf(row);
 		const line =
-			`${theme.fg("muted", label + labelPadding)}  ` +
-			`${theme.fg(usageColor(row.used), bar)} ` +
+			`${theme.fg("muted", padLabel(row.label))}  ` +
+			`${theme.fg(usageColor(row.used), progressBar(row.used, barWidth))} ` +
 			`${theme.fg("text", percentages[index] ?? "  ?%")}` +
 			`${theme.fg("dim", resets[index] ?? "")}`;
 		return truncateToWidth(line, width, "");
