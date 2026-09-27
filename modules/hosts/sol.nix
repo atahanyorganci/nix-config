@@ -27,7 +27,6 @@
     tools.enable = true;
     uutils.enable = true;
     wget.enable = true;
-    zed.enable = true;
   };
   solDarwinModule = {
     pkgs,
