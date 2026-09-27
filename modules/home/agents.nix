@@ -374,6 +374,10 @@
             src = "${pkgs.yorganci-pi-extension}/fetch-content";
           }
           {
+            name = "context7";
+            src = "${pkgs.yorganci-pi-extension}/context7";
+          }
+          {
             name = "usage";
             src = "${pkgs.yorganci-pi-extension}/usage";
           }

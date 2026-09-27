@@ -9,7 +9,7 @@ import { defineConfig } from "rolldown";
  * `node_modules` tree, whose symlinks break once copied into the Nix store.
  */
 
-const EXTENSIONS = ["fetch-content", "model-profile", "usage", "web-search"];
+const EXTENSIONS = ["context7", "fetch-content", "model-profile", "usage", "web-search"];
 
 // Pi injects these at load time. Inlining them would ship a second copy of
 // the SDK, whose classes fail instanceof checks against the objects pi hands

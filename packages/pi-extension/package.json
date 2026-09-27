@@ -10,6 +10,7 @@
 	],
 	"type": "module",
 	"exports": {
+		"./context7": "./src/context7/index.ts",
 		"./fetch-content": "./src/fetch-content/index.ts",
 		"./package.json": "./package.json",
 		"./model-profile": "./src/model-profile/index.ts",
@@ -52,6 +53,7 @@
 	},
 	"pi": {
 		"extensions": [
+			"./dist/context7",
 			"./dist/fetch-content",
 			"./dist/model-profile",
 			"./dist/usage",
