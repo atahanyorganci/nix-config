@@ -5,11 +5,20 @@
     pkgs,
     ...
   }: let
-    # Every model behind the local gateway is reached over one
-    # OpenAI-compatible endpoint, so the per-model entries differ only in a
-    # handful of fields. Describe them as data and build the provider from
-    # that rather than repeating the same shape for every model.
     gatewayPort = 3000;
+    allEfforts = ["none" "low" "medium" "high" "xhigh"];
+    mkThinkingLevelMap = efforts:
+      lib.mapAttrs (_: effort:
+        if effort != null && lib.elem effort efforts
+        then effort
+        else null) {
+        off = "none";
+        minimal = null;
+        low = "low";
+        medium = "medium";
+        high = "high";
+        xhigh = "xhigh";
+      };
 
     mkModel = {
       id,
@@ -17,14 +26,17 @@
       contextWindow,
       maxTokens,
       cost ? null,
-      reasoning ? true,
+      efforts ? allEfforts,
       image ? true,
       compat ? null,
-    }:
+    }: let
+      reasoning = efforts != [];
+    in
       {
         inherit id name reasoning contextWindow maxTokens;
         input = ["text"] ++ lib.optional image "image";
       }
+      // lib.optionalAttrs reasoning {thinkingLevelMap = mkThinkingLevelMap efforts;}
       // lib.optionalAttrs (cost != null) {inherit cost;}
       // lib.optionalAttrs (compat != null) {inherit compat;};
 
@@ -94,19 +106,41 @@
         name = "GPT-5.6-Sol";
         contextWindow = 1050000;
         maxTokens = 128000;
+        # Promotional rates, which OpenAI guarantees through 2026-11-21.
+        cost = mkCost [
+          {
+            input = 4;
+            output = 20;
+            cacheRead = 0.4;
+            cacheWrite = 5;
+          }
+          {
+            inputTokensAbove = 272000;
+            input = 8;
+            output = 30;
+            cacheRead = 0.8;
+            cacheWrite = 10;
+          }
+        ];
+      }
+      {
+        id = "codex/gpt-5.5";
+        name = "GPT-5.5";
+        contextWindow = 1050000;
+        maxTokens = 128000;
         cost = mkCost [
           {
             input = 5;
             output = 30;
             cacheRead = 0.5;
-            cacheWrite = 6.25;
+            cacheWrite = 0;
           }
           {
             inputTokensAbove = 272000;
             input = 10;
             output = 45;
             cacheRead = 1;
-            cacheWrite = 12.5;
+            cacheWrite = 0;
           }
         ];
       }
@@ -115,6 +149,7 @@
         name = "GPT-6-Astra";
         contextWindow = 1050000;
         maxTokens = 128000;
+        efforts = lib.remove "none" allEfforts;
         cost = mkCost [
           {
             input = 10;
@@ -128,6 +163,48 @@
             output = 75;
             cacheRead = 2;
             cacheWrite = 25;
+          }
+        ];
+      }
+      {
+        id = "codex/gpt-6-sol";
+        name = "GPT-6-Sol";
+        contextWindow = 1050000;
+        maxTokens = 128000;
+        cost = mkCost [
+          {
+            input = 2;
+            output = 10;
+            cacheRead = 0.2;
+            cacheWrite = 2.5;
+          }
+          {
+            inputTokensAbove = 272000;
+            input = 4;
+            output = 15;
+            cacheRead = 0.4;
+            cacheWrite = 5;
+          }
+        ];
+      }
+      {
+        id = "codex/gpt-6-luna";
+        name = "GPT-6-Luna";
+        contextWindow = 1050000;
+        maxTokens = 128000;
+        cost = mkCost [
+          {
+            input = 0.1;
+            output = 0.5;
+            cacheRead = 0.01;
+            cacheWrite = 0.125;
+          }
+          {
+            inputTokensAbove = 272000;
+            input = 0.2;
+            output = 0.75;
+            cacheRead = 0.02;
+            cacheWrite = 0.25;
           }
         ];
       }
@@ -173,10 +250,10 @@
         contextWindow = 1000000;
         maxTokens = 128000;
         cost = mkCost {
-          input = 3;
-          output = 15;
-          cacheRead = 0.3;
-          cacheWrite = 3.75;
+          input = 2;
+          output = 10;
+          cacheRead = 0.2;
+          cacheWrite = 2.5;
         };
       }
       {
@@ -220,6 +297,7 @@
         name = "Claude Sonnet 4.6";
         contextWindow = 1000000;
         maxTokens = 128000;
+        efforts = lib.remove "xhigh" allEfforts;
         cost = mkCost {
           input = 3;
           output = 15;
@@ -232,6 +310,7 @@
         name = "Claude Opus 4.6";
         contextWindow = 1000000;
         maxTokens = 128000;
+        efforts = lib.remove "xhigh" allEfforts;
         cost = mkCost {
           input = 5;
           output = 25;
@@ -244,6 +323,7 @@
         name = "Claude Opus 4.5";
         contextWindow = 200000;
         maxTokens = 64000;
+        efforts = lib.remove "xhigh" allEfforts;
         cost = mkCost {
           input = 5;
           output = 25;
@@ -256,6 +336,7 @@
         name = "Claude Haiku 4.5";
         contextWindow = 200000;
         maxTokens = 64000;
+        efforts = [];
         cost = mkCost {
           input = 1;
           output = 5;
@@ -268,6 +349,7 @@
         name = "Claude Sonnet 4.5";
         contextWindow = 200000;
         maxTokens = 64000;
+        efforts = [];
         cost = mkCost {
           input = 3;
           output = 15;
@@ -297,6 +379,7 @@
       "claude-code/claude-sonnet-5" = "claude-code/claude-haiku-4-5-20251001";
       "codex/gpt-5.6-sol" = "codex/gpt-5.6-luna";
       "codex/gpt-6-astra" = "codex/gpt-5.6-terra";
+      "codex/gpt-6-sol" = "codex/gpt-6-luna";
     };
 
     # Derived from `gatewayModels` rather than written out again: a model that
