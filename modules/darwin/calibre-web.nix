@@ -160,6 +160,17 @@
         };
       };
       environment.systemPackages = [cfg.package];
+      # Publish via the NetBird reverse proxy at `library.<domain>`; this also
+      # opens the mesh ACL for the listen port.
+      httpServices.library = {
+        port = cfg.listen.port;
+        expose = {
+          enable = true;
+          private = true;
+          accessGroups = ["Admin" "Users"];
+        };
+        auth = {type = "none";};
+      };
     };
   };
 }
