@@ -375,25 +375,37 @@
     # module drops unset fields and empty entries, so a model with nothing to
     # configure writes nothing.
     #
+    # Context profiles come from the price breaks: one capped at each
+    # `inputTokensAbove` below the window, named by its size (`272k`), plus
+    # `full`. Sessions start on the lowest, so pi compacts before a request
+    # is billed at the next tier. A model with flat pricing gets no profiles.
+    #
     # `fast` marks the models whose `/v1/models` entry lists the `priority`
     # service tier: while `/fast` is on, their requests ask for it, and
     # `fastCostMultiplier` is how much more those requests cost.
     mkProfile = {
+      id,
       contextWindow,
+      cost ? null,
       fast ? false,
       fastCostMultiplier ? 2,
       ...
     }: let
-      capped = contextWindow > 272000;
-    in {
-      context = lib.mkIf capped {
-        short = 272000;
-        full = contextWindow;
+      breaks = lib.unique (lib.sort lib.lessThan (lib.catAttrs "inputTokensAbove" (cost.tiers or [])));
+      unreachable = lib.filter (tokens: tokens >= contextWindow) breaks;
+      name = tokens:
+        if lib.mod tokens 1000 == 0
+        then "${toString (tokens / 1000)}k"
+        else toString tokens;
+    in
+      lib.throwIf (unreachable != [])
+      "mkProfile: ${id} has price breaks at or above its ${toString contextWindow}-token window: ${toString unreachable}"
+      {
+        context = lib.mkIf (breaks != []) (lib.listToAttrs (map (tokens: lib.nameValuePair (name tokens) tokens) breaks) // {full = contextWindow;});
+        defaultContext = lib.mkIf (breaks != []) (name (lib.head breaks));
+        inherit fast;
+        fastCostMultiplier = lib.mkIf fast fastCostMultiplier;
       };
-      defaultContext = lib.mkIf capped "short";
-      inherit fast;
-      fastCostMultiplier = lib.mkIf fast fastCostMultiplier;
-    };
   in {
     options.agents.enable = lib.mkEnableOption "Agent harnesses";
     config = lib.mkIf config.agents.enable {

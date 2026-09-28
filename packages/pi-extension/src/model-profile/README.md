@@ -99,8 +99,10 @@ model does.
 
 Declared through Nix as `programs.pi.modelProfiles`, which writes
 `model-profile.json` into pi's config directory. In this repo the profiles are
-derived from the gateway model list in `modules/home/agents.nix`, so a model
-that changes its window updates both `models.json` and this file at once.
+derived from the gateway model list in `modules/home/agents.nix`: each price
+break (`inputTokensAbove`) below the window becomes a profile named by its size,
+plus `full`, starting on the lowest. A model with flat pricing gets none, and a
+change to a model's window or tiers updates both `models.json` and this file.
 
 The file itself:
 
@@ -109,8 +111,8 @@ The file itself:
 	"shortcuts": { "context": "alt+shift+c", "fast": "alt+shift+f" },
 	"models": {
 		"llm-gateway/codex/gpt-5.5": {
-			"defaultContext": "short",
-			"context": { "short": 272000, "full": 1050000 },
+			"defaultContext": "272k",
+			"context": { "272k": 272000, "full": 1050000 },
 			"fast": true,
 			"fastCostMultiplier": 2.5
 		}
