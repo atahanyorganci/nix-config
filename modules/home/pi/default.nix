@@ -29,7 +29,9 @@
     modelProfilesJson = let
       profiles = stripNulls cfg.modelProfiles;
       prune = lib.filterAttrs (_: model: model != {});
-      models = prune (lib.mapAttrs (_: model: lib.filterAttrs (_: value: value != {}) model) (profiles.models or {}));
+      # `fast = false` is the default and says nothing, so it is dropped with
+      # the empty `context`; an entry left with neither is then pruned.
+      models = prune (lib.mapAttrs (_: model: lib.filterAttrs (_: value: value != {} && value != false) model) (profiles.models or {}));
     in
       lib.optionalAttrs (profiles ? shortcuts && profiles.shortcuts != {}) {
         inherit (profiles) shortcuts;
@@ -411,43 +413,36 @@
                   };
 
                   fast = lib.mkOption {
-                    type = lib.types.nullOr (lib.types.submodule {
-                      options = {
-                        provider = lib.mkOption {
-                          type = lib.types.nullOr lib.types.str;
-                          default = null;
-                          description = "Defaults to the primary model's provider.";
-                        };
-                        model = lib.mkOption {
-                          type = lib.types.str;
-                          description = "Model id to switch to in fast mode.";
-                        };
-                        thinkingLevel = lib.mkOption {
-                          type = lib.types.nullOr (lib.types.enum [
-                            "off"
-                            "minimal"
-                            "low"
-                            "medium"
-                            "high"
-                            "xhigh"
-                            "max"
-                          ]);
-                          default = null;
-                          description = "Thinking level for fast mode. Unset keeps the current level.";
-                        };
-                      };
-                    });
+                    type = lib.types.bool;
+                    default = false;
+                    description = ''
+                      Whether the model offers the provider's fast path.
+                      While `/fast` is on, its requests carry
+                      `service_tier: "priority"`: same model, faster output,
+                      a multiple of the price.
+                    '';
+                  };
+
+                  fastCostMultiplier = lib.mkOption {
+                    type = lib.types.nullOr (lib.types.addCheck lib.types.number (value: value >= 1));
                     default = null;
-                    description = "Cheaper, quicker model `/fast` switches to.";
+                    example = 2.5;
+                    description = ''
+                      How much more a fast request costs than a standard one.
+                      Pi prices responses from the model's standard rates, so
+                      the extension scales the recorded cost of fast responses
+                      by this. Unset means the extension's default of 2.
+                    '';
                   };
                 };
               });
               default = {};
               example = lib.literalExpression ''
                 {
-                  "llm-gateway/claude-opus-5" = {
-                    context = { short = 200000; full = 1000000; };
-                    fast.model = "claude-haiku-4-5-20251001";
+                  "llm-gateway/codex/gpt-5.5" = {
+                    context = { "272k" = 272000; full = 1050000; };
+                    fast = true;
+                    fastCostMultiplier = 2.5;
                   };
                 }
               '';

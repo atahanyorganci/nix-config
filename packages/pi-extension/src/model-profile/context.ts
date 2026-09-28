@@ -114,7 +114,7 @@ export function requestContextProfile(pi: ExtensionAPI, state: State, ctx: Exten
 	}
 
 	if (!ctx.isIdle()) {
-		state.pending = { ...state.pending, model: modelKey(model), context: profile };
+		state.pending = { model: modelKey(model), context: profile };
 		renderStatus(state, ctx, `→ ${formatTokens(budget)} pending`);
 		return;
 	}

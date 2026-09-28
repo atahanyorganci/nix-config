@@ -6,13 +6,13 @@
  * - Context budgets are per model key and persisted as custom session
  *   entries, which are branch-aware and excluded from LLM context. They are
  *   a durable preference: "this model should compact at 272k".
- * - Fast mode is session-transient and global, because only one model is
- *   active at a time. It is an explicit "do this next bit cheaply" switch,
- *   so restoring it on resume would silently route work to the cheap model
- *   long after the reason for enabling it had passed.
+ * - Fast mode is one session-transient switch. It follows the session across
+ *   model changes and applies to whichever active model offers it. It costs
+ *   a multiple of the standard rate, so restoring it on resume would keep
+ *   paying that long after the reason for enabling it had passed.
  */
 
-import type { Config, ModelProfileConfig, ThinkingLevel } from "./config.ts";
+import type { Config, ModelProfileConfig } from "./config.ts";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
@@ -21,18 +21,17 @@ export const STATUS_KEY = "model-profile";
 
 export type AnyModel = Model<Api> | Model<any>;
 
-/** The model fast mode displaced, and the level to put back on exit. */
-export interface PrimaryState {
-	model: AnyModel;
-	thinkingLevel: ThinkingLevel | undefined;
-}
+/**
+ * APIs whose request body takes OpenAI's `service_tier`. Fast mode is only
+ * requested through those; other APIs spell it differently, if at all.
+ */
+const SERVICE_TIER_APIS: ReadonlySet<string> = new Set(["openai-completions", "openai-responses"]);
 
-/** A change that could not be applied because pi was streaming. */
+/** A context change that could not be applied because pi was streaming. */
 export interface Pending {
-	/** Target model key; a context change is dropped if the model moved on. */
+	/** Target model key; the change is dropped if the model moved on. */
 	model: string;
-	context?: string | undefined;
-	fast?: boolean | undefined;
+	context: string;
 }
 
 export interface PersistedContext {
@@ -54,14 +53,14 @@ export class State {
 	config: Config;
 	/** Active context profile per model key. */
 	readonly contextProfiles = new Map<string, string>();
-	/** Set while fast mode is active; holds what to restore on exit. */
-	fastPrimary: PrimaryState | undefined;
-	pending: Pending | undefined;
+	/** The session's fast-mode switch. It only takes effect where {@link fastApplies}. */
+	fastEnabled = false;
 	/**
-	 * Set while `pi.setModel()` is in flight so the `model_select` handler it
-	 * triggers can tell an extension-driven switch from a user-driven one.
+	 * Model key of the request last sent with the fast path, until its
+	 * response is finalized. Tells `message_end` which cost to scale.
 	 */
-	switching = false;
+	fastRequest: string | undefined;
+	pending: Pending | undefined;
 	/** Guards the `agent_settled` drain against re-entering itself. */
 	applying = false;
 	/**
@@ -82,16 +81,22 @@ export class State {
 		return model ? this.config.models[modelKey(model)] : undefined;
 	}
 
-	get fastActive(): boolean {
-		return this.fastPrimary !== undefined;
+	/** Whether a model is configured for fast mode and reached through an API that can ask for it. */
+	fastCapable(model: AnyModel | undefined): boolean {
+		return model !== undefined && this.configFor(model)?.fast === true && SERVICE_TIER_APIS.has(model.api);
+	}
+
+	/** Whether requests to this model go out with the fast path right now. */
+	fastApplies(model: AnyModel | undefined): boolean {
+		return this.fastEnabled && this.fastCapable(model);
 	}
 
 	/** Clears per-session state, keeping the loaded configuration. */
 	reset(): void {
 		this.contextProfiles.clear();
-		this.fastPrimary = undefined;
+		this.fastEnabled = false;
+		this.fastRequest = undefined;
 		this.pending = undefined;
-		this.switching = false;
 		this.applying = false;
 		this.statusRevision++;
 		this.compactionStatus = undefined;
@@ -137,17 +142,20 @@ export function savedContextProfile(
  * The budget is shown only when the model actually has profiles to switch
  * between: pi's own footer already reports context usage, so repeating a
  * fixed window here would just imply a control that does not exist.
+ *
+ * Fast mode shows `⚡` where it applies, and `⚡ n/a` while it is on but the
+ * active model has no fast path, so the switch is never invisible.
  */
 export function baseStatus(state: State, model: AnyModel): string | undefined {
 	const parts: string[] = [];
 	if (state.configFor(model)?.context) parts.push(`ctx:${formatTokens(model.contextWindow)}`);
-	if (state.fastActive) parts.push("⚡");
+	if (state.fastEnabled) parts.push(state.fastCapable(model) ? "⚡" : "⚡ n/a");
 	return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
 /**
- * Renders the footer for the active model: the selected context window, a
- * lightning bolt in fast mode, and an optional transient suffix used while
+ * Renders the footer for the active model: the selected context window, the
+ * fast-mode indicator, and an optional transient suffix used while
  * compacting or while a change waits for the agent to settle.
  */
 export function renderStatus(state: State, ctx: ExtensionContext, suffix?: string): void {

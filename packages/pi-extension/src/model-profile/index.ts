@@ -1,16 +1,16 @@
 /**
- * model-profile — per-model context budgets and fast-mode alternatives.
+ * model-profile — per-model context budgets and the provider's fast path.
  *
  * Two independent axes over the active model:
  *
  * - `/context` selects the effective context window, which pi uses for
  *   footer reporting, overflow handling, and the auto-compaction threshold.
  *   This is local metadata; the provider still receives the unchanged model id.
- * - `/fast` swaps in a cheaper, quicker model (and optionally a lower
- *   thinking level) for the next stretch of work, and back again.
+ * - `/fast` asks the provider for its faster, pricier path on the same model,
+ *   by adding `service_tier: "priority"` to each request.
  *
- * They are kept orthogonal on purpose: toggling fast mode preserves the
- * context profile of each model, and changing the budget never alters routing.
+ * They are kept orthogonal on purpose: neither changes the model, and each
+ * leaves the other's setting alone.
  *
  * Configuration lives in `${agentDir}/model-profile.json`, with trusted
  * projects able to layer `${cwd}/.pi/model-profile.json` over it. See
@@ -20,7 +20,7 @@
 import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type LoadResult, loadGlobalConfig, loadProjectConfig } from "./config.ts";
 import { applyContextProfile, nextContextProfile, requestContextProfile, resolveContextProfile } from "./context.ts";
-import { applyFastMode, requestFastMode, resolveFastTarget } from "./fast.ts";
+import { setFastMode, settleFastResponse, withFastPath } from "./fast.ts";
 import { State, STATUS_KEY, formatTokens, modelKey, renderStatus, savedContextProfile } from "./state.ts";
 
 export default function modelProfileExtension(pi: ExtensionAPI): void {
@@ -30,10 +30,10 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 	const state = new State(global.config);
 
 	/**
-	 * Restores both axes for the active model. Context comes from the branch
-	 * so `/tree` and `/resume` land on what that branch was using; fast mode
-	 * is deliberately not restored, since it is a transient "be cheap now"
-	 * switch rather than a durable preference.
+	 * Restores the context axis for the active model, from the branch so
+	 * `/tree` and `/resume` land on what that branch was using. Fast mode is
+	 * deliberately not restored: it costs a multiple of the standard rate, and
+	 * is a switch for the moment rather than a durable preference.
 	 */
 	function restore(ctx: ExtensionContext): void {
 		const model = ctx.model;
@@ -56,8 +56,8 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 		}
 	}
 
-	/** Drains queued changes once the agent settles. */
-	async function applyPending(ctx: ExtensionContext): Promise<void> {
+	/** Drains a queued context change once the agent settles. */
+	function applyPending(ctx: ExtensionContext): void {
 		if (state.applying || !ctx.isIdle()) return;
 
 		state.applying = true;
@@ -70,8 +70,7 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 				// for the old one no longer applies.
 				if (!ctx.model || modelKey(ctx.model) !== pending.model) continue;
 
-				if (pending.context) applyContextProfile(pi, state, ctx, pending.context);
-				if (pending.fast !== undefined) await applyFastMode(pi, state, ctx, pending.fast);
+				applyContextProfile(pi, state, ctx, pending.context);
 			}
 		} finally {
 			state.applying = false;
@@ -94,15 +93,7 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 
 		restore(ctx);
 
-		// Surface a misconfigured fast target at startup rather than at the
-		// moment the user reaches for it.
-		const fast = resolveFastTarget(state, ctx);
-		if (fast && !fast.model) {
-			const provider = fast.config.provider ?? ctx.model?.provider;
-			ctx.ui.notify(`model-profile: fast model ${provider}/${fast.config.model} is not available.`, "warning");
-		}
-
-		if (pi.getFlag("fast") === true) await requestFastMode(pi, state, ctx, true);
+		if (pi.getFlag("fast") === true) setFastMode(state, ctx, true);
 	});
 
 	pi.on("session_tree", async (_event, ctx) => {
@@ -114,20 +105,21 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("model_select", async (_event, ctx) => {
-		// Our own setModel call; enableFast/disableFast own the state here and
-		// will re-apply context and status once the switch completes.
-		if (state.switching) return;
-
-		// A user-driven model change means any fast-mode restore target is
-		// stale: exiting fast mode would otherwise yank them back to a model
-		// they deliberately navigated away from.
-		state.fastPrimary = undefined;
+		// A context change queued for the previous model no longer applies. Fast
+		// mode stays on and follows the new model, where it offers the fast path.
 		state.pending = undefined;
 		restore(ctx);
 	});
 
 	pi.on("agent_settled", async (_event, ctx) => {
-		await applyPending(ctx);
+		applyPending(ctx);
+	});
+
+	pi.on("before_provider_request", (event, ctx) => withFastPath(state, ctx, event.payload));
+
+	pi.on("message_end", (event, ctx) => {
+		const message = settleFastResponse(state, ctx, event.message);
+		return message === undefined ? undefined : { message: message as typeof event.message };
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
@@ -136,7 +128,7 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.registerFlag("fast", {
-		description: "Start the session in fast mode",
+		description: "Start the session with fast mode on",
 		type: "boolean",
 		default: false,
 	});
@@ -159,7 +151,7 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 	pi.registerShortcut(state.config.shortcuts.fast, {
 		description: "Toggle fast mode",
 		handler: async ctx => {
-			await requestFastMode(pi, state, ctx, !state.fastActive);
+			setFastMode(state, ctx, !state.fastEnabled);
 		},
 	});
 
@@ -220,7 +212,7 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.registerCommand("fast", {
-		description: "Toggle a faster, cheaper model for the current session",
+		description: "Toggle the provider's faster, pricier path for the current session",
 		getArgumentCompletions(prefix: string) {
 			const matches = ["on", "off", "status"].filter(value => value.startsWith(prefix.trim().toLowerCase()));
 			return matches.length > 0 ? matches.map(value => ({ value, label: value })) : null;
@@ -229,26 +221,26 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 			const action = args.trim().toLowerCase();
 
 			if (action === "status") {
-				const target = resolveFastTarget(state, ctx);
-				if (state.fastActive) {
+				const key = ctx.model ? modelKey(ctx.model) : "the current model";
+				const capable = state.fastCapable(ctx.model);
+				if (state.fastEnabled) {
 					ctx.ui.notify(
-						`Fast mode is on: ${ctx.model ? modelKey(ctx.model) : "unknown"} (restores ${modelKey(state.fastPrimary!.model)}).`,
-						"info",
+						capable
+							? `Fast mode is on for ${key}.`
+							: `Fast mode is on, but ${key} has no fast mode; requests go at standard speed.`,
+						capable ? "info" : "warning",
 					);
-				} else if (target) {
-					const provider = target.config.provider ?? ctx.model?.provider;
-					ctx.ui.notify(`Fast mode is off; would switch to ${provider}/${target.config.model}.`, "info");
 				} else {
 					ctx.ui.notify(
-						`No fast model configured for ${ctx.model ? modelKey(ctx.model) : "the current model"}.`,
-						"warning",
+						capable ? `Fast mode is off; ${key} offers it.` : `No fast mode configured for ${key}.`,
+						capable ? "info" : "warning",
 					);
 				}
 				return;
 			}
 
 			if (action === "on" || action === "off") {
-				await requestFastMode(pi, state, ctx, action === "on");
+				setFastMode(state, ctx, action === "on");
 				return;
 			}
 
@@ -257,7 +249,7 @@ export default function modelProfileExtension(pi: ExtensionAPI): void {
 				return;
 			}
 
-			await requestFastMode(pi, state, ctx, !state.fastActive);
+			setFastMode(state, ctx, !state.fastEnabled);
 		},
 	});
 }

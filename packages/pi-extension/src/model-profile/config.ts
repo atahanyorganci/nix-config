@@ -15,15 +15,6 @@ import type { KeyId } from "@earendil-works/pi-tui";
 
 export const CONFIG_FILE_NAME = "model-profile.json";
 
-/**
- * Mirrors `ThinkingLevel` from `@earendil-works/pi-agent-core`, which the
- * extension API uses but neither pi-coding-agent nor pi-ai re-exports. Note
- * pi-ai declares a same-named type that omits `"off"`; this is the other one.
- */
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-
-const THINKING_LEVELS: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
-
 /** Pi's own fallback when `compaction.reserveTokens` is unset. */
 export const FALLBACK_RESERVE_TOKENS = 16_384;
 
@@ -35,20 +26,15 @@ const RESERVED_PROFILE_NAMES = new Set(["status", "on", "off", "toggle"]);
 
 const PROFILE_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 
-export interface FastModeConfig {
-	/** Defaults to the primary model's provider. */
-	provider?: string | undefined;
-	model: string;
-	/** Left at the primary's level when unset. */
-	thinkingLevel?: ThinkingLevel | undefined;
-}
-
 export interface ModelProfileConfig {
 	/** Name of the context profile new sessions start on. */
 	defaultContext?: string | undefined;
 	/** Context-window budgets in tokens, keyed by profile name. */
 	context?: Record<string, number> | undefined;
-	fast?: FastModeConfig | undefined;
+	/** Whether the model offers the provider's fast path, requested with `service_tier: "priority"`. */
+	fast: boolean;
+	/** How much more a fast request costs than a standard one; only set with `fast`. */
+	fastCostMultiplier?: number | undefined;
 }
 
 export interface Shortcuts {
@@ -165,37 +151,36 @@ function parseContextProfiles(key: string, raw: unknown, reserveTokens: number):
 	return profiles;
 }
 
-function parseFastMode(key: string, raw: unknown): FastModeConfig {
-	if (!isRecord(raw)) throw new Error(`model "${key}": "fast" must be an object`);
-
-	const model = typeof raw.model === "string" ? raw.model.trim() : "";
-	if (!model) throw new Error(`model "${key}": "fast.model" must be a non-empty string`);
-
-	const provider = raw.provider === undefined ? undefined : raw.provider;
-	if (provider !== undefined && (typeof provider !== "string" || !provider.trim())) {
-		throw new Error(`model "${key}": "fast.provider" must be a non-empty string when set`);
+function parseFastMode(key: string, raw: unknown): boolean {
+	if (raw === undefined) return false;
+	if (typeof raw === "boolean") return raw;
+	// The object form named a model to switch to. Fast mode now keeps the model
+	// and asks the provider for its fast path, so a target has nowhere to go.
+	if (isRecord(raw)) {
+		throw new Error(
+			`model "${key}": "fast" is now a boolean; fast mode keeps the model instead of switching to another one`,
+		);
 	}
-
-	const level = raw.thinkingLevel;
-	if (level !== undefined && !THINKING_LEVELS.includes(level as ThinkingLevel)) {
-		throw new Error(`model "${key}": "fast.thinkingLevel" must be one of ${THINKING_LEVELS.join(", ")}`);
-	}
-
-	return {
-		model,
-		provider: typeof provider === "string" ? provider.trim() : undefined,
-		thinkingLevel: level as ThinkingLevel | undefined,
-	};
+	throw new Error(`model "${key}": "fast" must be a boolean`);
 }
 
 function parseModel(key: string, raw: unknown, reserveTokens: number): ModelProfileConfig {
 	if (!isRecord(raw)) throw new Error(`model "${key}" must be an object`);
 
 	const context = raw.context === undefined ? undefined : parseContextProfiles(key, raw.context, reserveTokens);
-	const fast = raw.fast === undefined ? undefined : parseFastMode(key, raw.fast);
+	const fast = parseFastMode(key, raw.fast);
+
+	let fastCostMultiplier: number | undefined;
+	if (raw.fastCostMultiplier !== undefined) {
+		if (!fast) throw new Error(`model "${key}": "fastCostMultiplier" needs "fast": true`);
+		if (typeof raw.fastCostMultiplier !== "number" || !(raw.fastCostMultiplier >= 1)) {
+			throw new Error(`model "${key}": "fastCostMultiplier" must be a number of at least 1`);
+		}
+		fastCostMultiplier = raw.fastCostMultiplier;
+	}
 
 	if (!context && !fast) {
-		throw new Error(`model "${key}" must define "context", "fast", or both`);
+		throw new Error(`model "${key}" must define "context", set "fast" to true, or both`);
 	}
 
 	let defaultContext: string | undefined;
@@ -211,7 +196,7 @@ function parseModel(key: string, raw: unknown, reserveTokens: number): ModelProf
 		defaultContext = Object.keys(context)[0]!;
 	}
 
-	return { defaultContext, context, fast };
+	return { defaultContext, context, fast, fastCostMultiplier };
 }
 
 /**

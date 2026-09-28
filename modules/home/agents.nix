@@ -58,12 +58,13 @@
         "mkCost: every cost entry after the first needs inputTokensAbove"
         (base // lib.optionalAttrs (tiers != []) {inherit tiers;});
 
-    gatewayModels = map mkModel [
+    gatewayModels = [
       {
         id = "codex/gpt-5.6-terra";
         name = "GPT-5.6-Terra";
         contextWindow = 1050000;
         maxTokens = 128000;
+        fast = true;
         cost = mkCost [
           {
             input = 2;
@@ -85,6 +86,7 @@
         name = "GPT-5.6-Luna";
         contextWindow = 1050000;
         maxTokens = 128000;
+        fast = true;
         cost = mkCost [
           {
             input = 0.2;
@@ -106,6 +108,7 @@
         name = "GPT-5.6-Sol";
         contextWindow = 1050000;
         maxTokens = 128000;
+        fast = true;
         # Promotional rates, which OpenAI guarantees through 2026-11-21.
         cost = mkCost [
           {
@@ -128,6 +131,9 @@
         name = "GPT-5.5";
         contextWindow = 1050000;
         maxTokens = 128000;
+        fast = true;
+        # The only model whose fast mode is not billed at 2x.
+        fastCostMultiplier = 2.5;
         cost = mkCost [
           {
             input = 5;
@@ -150,6 +156,7 @@
         contextWindow = 1050000;
         maxTokens = 128000;
         efforts = lib.remove "none" allEfforts;
+        fast = true;
         cost = mkCost [
           {
             input = 10;
@@ -171,6 +178,7 @@
         name = "GPT-6-Sol";
         contextWindow = 1050000;
         maxTokens = 128000;
+        fast = true;
         cost = mkCost [
           {
             input = 2;
@@ -192,6 +200,7 @@
         name = "GPT-6-Luna";
         contextWindow = 1050000;
         maxTokens = 128000;
+        fast = true;
         cost = mkCost [
           {
             input = 0.1;
@@ -225,6 +234,7 @@
         name = "Claude Opus 5.5";
         contextWindow = 1000000;
         maxTokens = 128000;
+        fast = true;
         cost = mkCost {
           input = 4;
           output = 20;
@@ -237,6 +247,7 @@
         name = "Claude Opus 5";
         contextWindow = 1000000;
         maxTokens = 128000;
+        fast = true;
         cost = mkCost {
           input = 5;
           output = 25;
@@ -273,6 +284,7 @@
         name = "Claude Opus 4.8";
         contextWindow = 1000000;
         maxTokens = 128000;
+        fast = true;
         cost = mkCost {
           input = 5;
           output = 25;
@@ -359,65 +371,32 @@
       }
     ];
 
-    # Both the long-context OpenAI models and the Claude ones price a request
-    # by its total input tokens, so a session that drifts past a tier boundary
-    # silently costs multiples for every later turn. Capping the window makes
-    # pi compact before that happens; `full` opts back in when the work
-    # genuinely needs the room.
+    # A model-profile entry, built from the same spec as the model. The pi
+    # module drops unset fields and empty entries, so a model with nothing to
+    # configure writes nothing.
     #
-    # Thresholds come from the `inputTokensAbove` tiers declared above, so the
-    # budget and the price break stay the same number.
-    shortContextTokens = 272000;
-
-    # Fast mode targets for the models worth pairing. Keyed by primary model
-    # id, so an entry that outlives its model fails the assertion below rather
-    # than silently never applying.
-    fastModels = {
-      "claude-code/claude-opus-5-5" = "claude-code/claude-sonnet-5";
-      "claude-code/claude-opus-5" = "claude-code/claude-sonnet-5";
-      "claude-code/claude-opus-4-8" = "claude-code/claude-sonnet-4-6";
-      "claude-code/claude-sonnet-5" = "claude-code/claude-haiku-4-5-20251001";
-      "codex/gpt-5.6-sol" = "codex/gpt-5.6-luna";
-      "codex/gpt-6-astra" = "codex/gpt-5.6-terra";
-      "codex/gpt-6-sol" = "codex/gpt-6-luna";
+    # `fast` marks the models whose `/v1/models` entry lists the `priority`
+    # service tier: while `/fast` is on, their requests ask for it, and
+    # `fastCostMultiplier` is how much more those requests cost.
+    mkProfile = {
+      contextWindow,
+      fast ? false,
+      fastCostMultiplier ? 2,
+      ...
+    }: let
+      capped = contextWindow > 272000;
+    in {
+      context = lib.mkIf capped {
+        short = 272000;
+        full = contextWindow;
+      };
+      defaultContext = lib.mkIf capped "short";
+      inherit fast;
+      fastCostMultiplier = lib.mkIf fast fastCostMultiplier;
     };
-
-    # Derived from `gatewayModels` rather than written out again: a model that
-    # gains a tier or changes its window updates both files at once.
-    modelProfiles = lib.listToAttrs (lib.concatMap (
-        model: let
-          fast = fastModels.${model.id} or null;
-          # Only models roomy enough for the cap to bite get a context axis;
-          # below it `short` and `full` would be the same number.
-          context = lib.optionalAttrs (model.contextWindow > shortContextTokens) {
-            short = shortContextTokens;
-            full = model.contextWindow;
-          };
-          profile =
-            lib.optionalAttrs (context != {}) {
-              inherit context;
-              defaultContext = "short";
-            }
-            // lib.optionalAttrs (fast != null) {fast.model = fast;};
-        in
-          lib.optional (profile != {}) (lib.nameValuePair "llm-gateway/${model.id}" profile)
-      )
-      gatewayModels);
   in {
     options.agents.enable = lib.mkEnableOption "Agent harnesses";
     config = lib.mkIf config.agents.enable {
-      # A fast target naming a model the gateway does not serve would only
-      # surface as a warning at session start, long after the typo.
-      assertions = let
-        ids = map (model: model.id) gatewayModels;
-        missing = lib.filter (target: !(lib.elem target ids)) (lib.attrValues fastModels);
-      in [
-        {
-          assertion = missing == [];
-          message = "agents: fast-mode targets not served by llm-gateway: ${lib.concatStringsSep ", " missing}.";
-        }
-      ];
-
       programs.pi = {
         enable = true;
         settings = {
@@ -470,7 +449,7 @@
           }
         ];
 
-        modelProfiles.models = modelProfiles;
+        modelProfiles.models = lib.listToAttrs (map (model: lib.nameValuePair "llm-gateway/${model.id}" (mkProfile model)) gatewayModels);
 
         models.providers.llm-gateway = {
           baseUrl = "http://localhost:${toString gatewayPort}/v1";
@@ -483,7 +462,8 @@
             supportsReasoningEffort = true;
             supportsUsageInStreaming = true;
           };
-          models = gatewayModels;
+          # `fast` belongs to the profile; pi's model schema has no such field.
+          models = map (model: mkModel (removeAttrs model ["fast" "fastCostMultiplier"])) gatewayModels;
         };
       };
     };

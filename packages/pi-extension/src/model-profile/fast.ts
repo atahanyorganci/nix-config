@@ -1,165 +1,140 @@
 /**
- * The fast-mode axis: swapping the active model for a cheaper, quicker
- * alternative and back.
+ * The fast-mode axis: asking the provider for its faster, pricier path on the
+ * same model.
  *
- * Unlike the context axis this changes real routing, so it is applied only
- * while idle and always through `pi.setModel()`, which reports whether the
- * target provider is actually authenticated.
+ * The switch is one session-wide flag. While it is on, every request to a
+ * model configured with `fast: true` carries OpenAI's `service_tier:
+ * "priority"`, which the gateway maps to each provider's own fast path (Codex
+ * priority processing, Claude `speed: "fast"`). Routing never changes, so a
+ * toggle takes effect from the next request, even mid-turn, and needs no
+ * deferral.
+ *
+ * Pi does not price service tiers, so the finalized message's cost is scaled
+ * here, by the model's `fastCostMultiplier`. Fast-mode failures are recognised by the code the gateway puts at the
+ * start of the error message: pi keeps nothing else of a streamed error.
  */
 
-import { type State, modelKey, renderStatus } from "./state.ts";
-import type { FastModeConfig } from "./config.ts";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { type AnyModel, type State, modelKey, renderStatus } from "./state.ts";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-/** Resolves the configured fast target for the active model. */
-export function resolveFastTarget(
-	state: State,
-	ctx: ExtensionContext,
-): { config: FastModeConfig; model: ReturnType<ExtensionContext["modelRegistry"]["find"]> } | undefined {
-	const model = ctx.model;
-	const config = state.configFor(model)?.fast;
-	if (!model || !config) return undefined;
+/**
+ * How much more a fast request costs than a standard one, for a model whose
+ * config does not say.
+ *
+ * Anthropic prices fast mode at 2x on every model that offers it, and so does
+ * OpenAI on GPT-5.6 and GPT-6; GPT-5.5 is 2.5x, which its config states. Codex
+ * subscriptions burn their included limits at their own rates, but that is
+ * plan usage, not dollars: the cost pi shows is the API-equivalent price.
+ */
+export const DEFAULT_FAST_COST_MULTIPLIER = 2;
 
-	// An unqualified target means "same provider", which keeps same-gateway
-	// pairs terse and avoids repeating the provider on every entry.
-	const provider = config.provider ?? model.provider;
-	return { config, model: ctx.modelRegistry.find(provider, config.model) };
+/** Error codes the gateway prefixes fast-mode failures with. */
+const UNSUPPORTED = "fast_mode_unsupported";
+const CREDITS_REQUIRED = "fast_mode_credits_required";
+const RATE_LIMITED = "fast_mode_rate_limited";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function describe(model: AnyModel | undefined): string {
+	return model ? modelKey(model) : "the current model";
 }
 
 /**
- * Enables or disables fast mode.
+ * Turns fast mode on or off for the session. Returns whether the switch ended
+ * up in the requested position.
  *
- * `pi.setModel()` emits `model_select`, whose handler restores the incoming
- * model's context profile. `state.switching` marks those emissions as
- * self-inflicted so the handler does not treat them as a user model change
- * and clobber the state being set up here.
+ * Enabling is refused on a model that cannot use it, since the switch would
+ * otherwise sit on without changing anything. Once on, it stays on across
+ * model changes and applies wherever the active model offers it.
  */
-export async function applyFastMode(
-	pi: ExtensionAPI,
-	state: State,
-	ctx: ExtensionContext,
-	enabled: boolean,
-): Promise<boolean> {
-	if (enabled === state.fastActive) return true;
+export function setFastMode(state: State, ctx: ExtensionContext, enabled: boolean): boolean {
+	if (enabled === state.fastEnabled) return true;
 
-	return enabled ? await enableFast(pi, state, ctx) : await disableFast(pi, state, ctx);
-}
-
-async function enableFast(pi: ExtensionAPI, state: State, ctx: ExtensionContext): Promise<boolean> {
-	const model = ctx.model;
-	const target = resolveFastTarget(state, ctx);
-	if (!model || !target) {
-		ctx.ui.notify(`No fast model configured for ${model ? modelKey(model) : "the current model"}.`, "warning");
-		return false;
-	}
-
-	const config = target.config;
-	if (!target.model) {
-		const provider = config.provider ?? model.provider;
-		ctx.ui.notify(`Fast model ${provider}/${config.model} is not available.`, "error");
-		return false;
-	}
-
-	// Capture before switching: once setModel lands, ctx.model is the target
-	// and the original is unrecoverable.
-	const primary = { model, thinkingLevel: ctx.thinkingLevel };
-
-	state.switching = true;
-	try {
-		if (!(await pi.setModel(target.model))) {
-			ctx.ui.notify(
-				`Cannot switch to ${modelKey(target.model)}: no credentials for provider "${target.model.provider}".`,
-				"error",
-			);
+	if (enabled) {
+		const model = ctx.model;
+		if (!state.configFor(model)?.fast) {
+			ctx.ui.notify(`No fast mode configured for ${describe(model)}.`, "warning");
 			return false;
 		}
-	} finally {
-		state.switching = false;
-	}
-
-	// Only commit once the switch actually succeeded, so a failed setModel
-	// leaves fast mode off rather than half-applied.
-	state.fastPrimary = primary;
-	if (config.thinkingLevel) pi.setThinkingLevel(config.thinkingLevel);
-
-	// The fast model may carry its own context profile.
-	applyContextForCurrentModel(state, ctx);
-	renderStatus(state, ctx);
-	return true;
-}
-
-async function disableFast(pi: ExtensionAPI, state: State, ctx: ExtensionContext): Promise<boolean> {
-	const primary = state.fastPrimary;
-	if (!primary) return true;
-
-	state.switching = true;
-	try {
-		if (!(await pi.setModel(primary.model))) {
-			ctx.ui.notify(
-				`Cannot restore ${modelKey(primary.model)}: no credentials for provider "${primary.model.provider}".`,
-				"error",
-			);
+		if (!state.fastCapable(model)) {
+			ctx.ui.notify(`${describe(model)} uses the ${model?.api} API, which cannot request fast mode.`, "warning");
 			return false;
 		}
-	} finally {
-		state.switching = false;
 	}
 
-	state.fastPrimary = undefined;
-	if (primary.thinkingLevel) pi.setThinkingLevel(primary.thinkingLevel);
-
-	applyContextForCurrentModel(state, ctx);
+	state.fastEnabled = enabled;
 	renderStatus(state, ctx);
 	return true;
 }
 
 /**
- * Re-applies the context profile belonging to whatever model is now active,
- * without persisting: the model switch is the event worth recording, and the
- * profile it implies is derived from config rather than chosen by the user.
+ * The provider payload with the fast path requested, or `undefined` to leave
+ * it unchanged. Also records whether this request went out fast, which
+ * {@link settleFastResponse} reads once the response is finalized.
+ *
+ * The hook carries no model, so the payload's own `model` is matched against
+ * the active model: a request built for anything else is left alone.
  */
-function applyContextForCurrentModel(state: State, ctx: ExtensionContext): void {
+export function withFastPath(state: State, ctx: ExtensionContext, payload: unknown): unknown {
+	state.fastRequest = undefined;
+
 	const model = ctx.model;
-	const config = state.configFor(model);
-	if (!model || !config?.context) return;
+	if (!state.fastApplies(model) || !isRecord(payload) || payload.model !== model!.id) return undefined;
 
-	const key = modelKey(model);
-	const profile = state.contextProfiles.get(key) ?? config.defaultContext;
-	if (!profile) return;
-
-	const budget = config.context[profile];
-	if (budget === undefined) return;
-
-	model.contextWindow = budget;
-	state.contextProfiles.set(key, profile);
+	state.fastRequest = modelKey(model!);
+	return { ...payload, service_tier: "priority" };
 }
 
 /**
- * Toggles now, or records the request as pending when pi is streaming.
- * Switching models mid-turn would change routing for a request already in
- * flight, so this always waits for `agent_settled`.
+ * Settles one finalized message: scales the cost of a response that was sent
+ * fast, and reacts to fast-mode failures. Returns the replacement message, or
+ * `undefined` to keep it.
  */
-export async function requestFastMode(
-	pi: ExtensionAPI,
-	state: State,
-	ctx: ExtensionContext,
-	enabled: boolean,
-): Promise<void> {
-	const model = ctx.model;
-	if (!model) return;
+export function settleFastResponse(state: State, ctx: ExtensionContext, message: unknown): unknown {
+	if (!isRecord(message) || message.role !== "assistant") return undefined;
 
-	// Disabling must stay available even when the current (fast) model has no
-	// fast config of its own — otherwise fast mode could not be turned off.
-	if (enabled && !state.configFor(model)?.fast) {
-		ctx.ui.notify(`No fast model configured for ${modelKey(model)}.`, "warning");
+	const key = `${String(message.provider)}/${String(message.model)}`;
+	const sentFast = state.fastRequest === key;
+	if (sentFast) state.fastRequest = undefined;
+
+	if (message.stopReason === "error") {
+		handleFastError(state, ctx, typeof message.errorMessage === "string" ? message.errorMessage : "");
+		return undefined;
+	}
+
+	// Aborted responses are billed for what they produced, so they are scaled
+	// like completed ones.
+	if (!sentFast || !isRecord(message.usage) || !isRecord(message.usage.cost)) return undefined;
+
+	const multiplier = state.config.models[key]?.fastCostMultiplier ?? DEFAULT_FAST_COST_MULTIPLIER;
+	const cost = message.usage.cost as Record<string, number>;
+	const scaled = Object.fromEntries(
+		Object.entries(cost).map(([name, value]) => [name, typeof value === "number" ? value * multiplier : value]),
+	);
+	return { ...message, usage: { ...message.usage, cost: scaled } };
+}
+
+/**
+ * Turns fast mode off when the gateway says it cannot be had, rather than
+ * letting every later request fail the same way. A rate limit is transient:
+ * pi retries it on its own, so the switch stays on.
+ */
+function handleFastError(state: State, ctx: ExtensionContext, error: string): void {
+	if (error.includes(UNSUPPORTED) || error.includes(CREDITS_REQUIRED)) {
+		const reason = error.includes(UNSUPPORTED)
+			? `${describe(ctx.model)} does not offer it`
+			: "the account has no fast-mode credits";
+		if (state.fastEnabled) {
+			state.fastEnabled = false;
+			renderStatus(state, ctx);
+		}
+		ctx.ui.notify(`Fast mode turned off: ${reason}.`, "error");
 		return;
 	}
 
-	if (!ctx.isIdle()) {
-		state.pending = { ...state.pending, model: modelKey(model), fast: enabled };
-		renderStatus(state, ctx, enabled ? "→ fast pending" : "→ normal pending");
-		return;
+	if (error.includes(RATE_LIMITED) && state.fastEnabled) {
+		ctx.ui.notify("Fast mode is rate limited. Pi will retry; /fast off continues at standard speed.", "warning");
 	}
-
-	await applyFastMode(pi, state, ctx, enabled);
 }

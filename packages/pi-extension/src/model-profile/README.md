@@ -1,6 +1,6 @@
 # model-profile
 
-Per-model context budgets and fast-mode alternatives for pi.
+Per-model context budgets and the provider's fast path for pi.
 
 Replaces [`magoz/pi-context-budget`](https://github.com/magoz/pi-context-budget),
 adding a second axis and taking its configuration from Nix rather than a
@@ -10,12 +10,12 @@ established.
 
 ## Two axes
 
-|                         | `/context`            | `/fast`                                             |
-| ----------------------- | --------------------- | --------------------------------------------------- |
-| Changes                 | `model.contextWindow` | the active model, and optionally its thinking level |
-| Visible to the provider | no                    | yes                                                 |
-| Scope                   | per model             | per session                                         |
-| Persisted               | yes, per branch       | no                                                  |
+|                         | `/context`            | `/fast`                                                |
+| ----------------------- | --------------------- | ------------------------------------------------------ |
+| Changes                 | `model.contextWindow` | `service_tier: "priority"` on each request, same model |
+| Visible to the provider | no                    | yes                                                    |
+| Scope                   | per model             | per session, applied to every model configured for it  |
+| Persisted               | yes, per branch       | no                                                     |
 
 `contextWindow` is local pi metadata: it drives footer reporting, overflow
 handling, and the auto-compaction threshold (`contextTokens > contextWindow -
@@ -23,8 +23,14 @@ reserveTokens`), while requests still carry the unchanged model id. Lowering it
 makes pi compact earlier, which is how you stay under a provider's long-context
 pricing tier.
 
-The axes are independent. Toggling fast mode preserves each model's context
-profile, and changing the budget never alters routing.
+Fast mode asks the provider for its faster, pricier path on the same model.
+The `llm-gateway` maps `service_tier: "priority"` to Codex priority processing
+and Claude `speed: "fast"`. Only models the config marks with `fast: true`
+get it, and only over the `openai-completions` and `openai-responses` APIs,
+whose request body has that field.
+
+The axes are independent: neither changes the model, and each leaves the
+other's setting alone.
 
 ## Commands
 
@@ -41,17 +47,38 @@ profile, and changing the budget never alters routing.
 `--fast` starts a session in fast mode. Both keys are configurable.
 
 The footer shows `ctx:272k` when a model has profiles to switch between, plus
-`⚡` while fast mode is on. A model with only a `fast` entry shows nothing until
-fast mode is enabled — pi's own footer already reports context usage, so
-repeating a fixed window would imply a control that does not exist.
+`⚡` while fast mode applies, or `⚡ n/a` while it is on but the active model has
+no fast path. A model with only `fast: true` shows nothing until fast mode is
+enabled — pi's own footer already reports context usage, so repeating a fixed
+window would imply a control that does not exist.
 
 ## Behaviour
 
-**Changes made while pi is streaming are deferred** to `agent_settled` and shown
-as `pending`. Mutating `contextWindow` mid-turn would move the compaction
-threshold under a request already in flight; switching models mid-turn would
-change routing for one. Only the latest pending selection is applied, and it is
-dropped if the model changed in the meantime.
+**Context changes made while pi is streaming are deferred** to `agent_settled`
+and shown as `pending`. Mutating `contextWindow` mid-turn would move the
+compaction threshold under a request already in flight. Only the latest pending
+selection is applied, and it is dropped if the model changed in the meantime.
+
+**Fast mode takes effect from the next request**, even mid-turn: the tier is
+added to each request as it is sent, so nothing in flight changes. On Claude,
+switching speed invalidates the prompt cache, so toggling mid-session costs one
+cache rebuild. Compaction and branch summaries are always sent at standard
+speed: pi does not route them through the request hook.
+
+**Fast responses are priced at the model's fast rate.** Pi prices responses
+from the model's standard rates, so the extension scales the recorded cost of
+every response sent fast by `fastCostMultiplier`, 2 unless the model says
+otherwise. Anthropic's fast mode and OpenAI's on GPT-5.6 and GPT-6 are 2× the
+standard rate; GPT-5.5's is 2.5×. Codex subscriptions burn their included limits
+at their own rates, which the `usage` widget shows.
+
+**Fast-mode failures are read from the error message.** The gateway starts
+each one with its code, the only part of a streamed error pi keeps:
+
+- `fast_mode_unsupported` and `fast_mode_credits_required` turn fast mode off,
+  since every later request would fail the same way.
+- `fast_mode_rate_limited` leaves it on with a warning. Pi retries it by
+  itself, and `/fast off` continues at standard speed.
 
 **Shrinking past the threshold compacts automatically.** When a smaller budget
 puts current usage above `contextWindow - reserveTokens`, compaction starts
@@ -60,12 +87,13 @@ turn, which the provider would then reject.
 
 **Context profiles are branch-aware.** They are stored as custom session
 entries, so they survive compaction, follow `/tree` navigation, and are excluded
-from LLM context. Fast mode deliberately is not persisted: it is a transient
-"be cheap for this next bit" switch, and restoring it on resume would route work
-to the cheap model long after the reason had passed.
+from LLM context. Fast mode deliberately is not persisted: it costs a multiple
+of the standard rate, and restoring it on resume would keep paying that long
+after the reason had passed.
 
-**A user-driven model change clears the fast restore target**, so `/fast off`
-cannot yank you back to a model you deliberately navigated away from.
+**Fast mode follows the session across model changes.** It can only be turned
+on while the active model offers it, and it then applies to whichever active
+model does.
 
 ## Configuration
 
@@ -80,17 +108,19 @@ The file itself:
 {
 	"shortcuts": { "context": "alt+shift+c", "fast": "alt+shift+f" },
 	"models": {
-		"llm-gateway/claude-code/claude-opus-5": {
+		"llm-gateway/codex/gpt-5.5": {
 			"defaultContext": "short",
-			"context": { "short": 272000, "full": 1000000 },
-			"fast": { "model": "claude-code/claude-sonnet-5", "thinkingLevel": "low" }
+			"context": { "short": 272000, "full": 1050000 },
+			"fast": true,
+			"fastCostMultiplier": 2.5
 		}
 	}
 }
 ```
 
-Models are keyed `"provider/modelId"`. `fast.provider` defaults to the primary's
-provider. Each entry needs a `context` map, a `fast` entry, or both; a `context`
+Models are keyed `"provider/modelId"`. Each entry needs a `context` map,
+`"fast": true`, or both; `fastCostMultiplier` (at least 1) is only allowed with
+`"fast": true`; a `context`
 map needs at least two profiles, each an integer above `reserveTokens`, named
 with lowercase letters, digits, dashes, or underscores, and not one of
 `status`, `on`, `off`, or `toggle`.
