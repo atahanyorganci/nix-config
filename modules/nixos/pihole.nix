@@ -72,8 +72,22 @@
 
       LoginAPI
 
+      # The API answers before FTL finishes loading its databases; until then
+      # GetFTLData prints the HTTP status code instead of JSON.
+      have=""
+      for _ in $(seq 60); do
+        if have=$(GetFTLData "lists" | ${jq} -ce '[.lists[]?.address]' 2>/dev/null); then
+          break
+        fi
+        have=""
+        sleep 1
+      done
+      if [ -z "$have" ]; then
+        echo "pihole-ftl-setup: FTL lists API not ready after 60s; leaving lists as they are" >&2
+        exit 0
+      fi
+
       want=${lib.escapeShellArg desiredLists}
-      have=$(GetFTLData "lists" | ${jq} -c '[.lists[]?.address]')
       changed=0
       while IFS= read -r entry; do
         address=$(${jq} -r '.address' <<<"$entry")
