@@ -61,7 +61,8 @@
         enableBashIntegration = cfg.bash.enable;
         enableZshIntegration = cfg.zsh.enable;
         enableFishIntegration = cfg.fish.enable;
-        historyWidget.options = ["--prompt='History> '"];
+        # Empty command stops fzf from binding Ctrl-R; Atuin owns it.
+        historyWidget.command = "";
       };
       # zoxide - A smarter cd command.
       # GitHub Repository: https://github.com/ajeetdsouza/zoxide
@@ -99,11 +100,25 @@
         enableZshIntegration = cfg.zsh.enable;
         flags = [
           "--disable-up-arrow"
-          "--disable-ctrl-r"
+          "--disable-ai"
         ];
         forceOverwriteSettings = true;
         settings = {
           sync_address = "https://atuin.yorganci.dev";
+          auto_sync = true;
+          sync_frequency = "5m";
+          update_check = false;
+          search_mode = "daemon-fuzzy";
+          enter_accept = false;
+          invert = true;
+          show_help = false;
+          # Not `programs.atuin.daemon`: its systemd socket mode is incompatible with autostart.
+          daemon = {
+            enabled = true;
+            autostart = true;
+            sync_frequency = 300;
+          };
+          logs.dir = "${config.xdg.stateHome}/atuin/logs";
         };
       };
       programs.delta = {
