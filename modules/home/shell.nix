@@ -98,6 +98,15 @@
         enableNushellIntegration = cfg.nushell.enable;
         enableZshIntegration = cfg.zsh.enable;
       };
+      # zoxide passes this to fzf in place of FZF_DEFAULT_OPTS; entries are `score<TAB>path`.
+      home.sessionVariables._ZO_FZF_OPTS = lib.concatStringsSep " " [
+        config.home.sessionVariables.FZF_DEFAULT_OPTS
+        "--prompt='cd '"
+        "--preview='fzf-preview {2..}'"
+        "--bind=ctrl-z:ignore"
+        "--tabstop=1"
+        "--exit-0"
+      ];
       # eza - A modern alternative to ls
       # GitHub Repository: https://github.com/eza-community/eza
       programs.eza = {
