@@ -64,6 +64,7 @@
       hostName = "${networking.hostName}.netbird.selfhosted";
     };
     searx.enable = true;
+    atuin-server.enable = true;
     "9router" = {
       enable = true;
       # The reverse proxy dials mars's mesh address, so the listener has to exist
