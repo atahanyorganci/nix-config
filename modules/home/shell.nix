@@ -15,6 +15,17 @@
       # `nd` - activate a development shell with default shell
       nd = "nix develop --command ${user.shell}";
     };
+    fzfPreview = pkgs.writeShellApplication {
+      name = "fzf-preview";
+      runtimeInputs = [pkgs.eza pkgs.bat];
+      text = ''
+        if [ -d "$1" ]; then
+          exec eza --icons always --git-ignore "$1"
+        fi
+        exec bat --color=always --style=numbers "$1"
+      '';
+    };
+    fdFiles = "fd --hidden --follow --exclude .git";
   in {
     options = {
       shell = {
@@ -61,9 +72,23 @@
         enableBashIntegration = cfg.bash.enable;
         enableZshIntegration = cfg.zsh.enable;
         enableFishIntegration = cfg.fish.enable;
-        # Empty command stops fzf from binding Ctrl-R; Atuin owns it.
+        # Full screen with the prompt at the bottom; the widgets force `--reverse --height 40%`.
+        defaultOptions = ["--layout=default" "--no-height"];
+        fileWidget = {
+          command = fdFiles;
+          # `$dir` is the path typed before Ctrl-T; fd prefixes results with `./` if given `.`.
+          fish.command = "${fdFiles} . (string match -v -- . $dir)";
+          options = ["--preview 'fzf-preview {}'"];
+        };
+        # Empty commands stop fzf from binding Alt-C and Ctrl-R.
+        changeDirWidget.command = "";
         historyWidget.command = "";
       };
+      # fzf's fish integration always binds Shift-Tab to its completion picker.
+      programs.fish.interactiveShellInit = lib.mkIf cfg.fish.enable (lib.mkOrder 201 ''
+        bind --erase shift-tab
+        bind --erase -M insert shift-tab
+      '');
       # zoxide - A smarter cd command.
       # GitHub Repository: https://github.com/ajeetdsouza/zoxide
       programs.zoxide = {
@@ -134,6 +159,7 @@
         sd
         ripgrep
         jq
+        fzfPreview
       ];
     };
   };
