@@ -439,10 +439,9 @@
               default = {};
               example = lib.literalExpression ''
                 {
-                  "llm-gateway/codex/gpt-5.5" = {
+                  "llm-gateway/codex/gpt-6.1-sol" = {
                     context = { "272k" = 272000; full = 1050000; };
                     fast = true;
-                    fastCostMultiplier = 2.5;
                   };
                 }
               '';

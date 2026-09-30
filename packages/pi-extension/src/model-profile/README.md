@@ -36,7 +36,7 @@ other's setting alone.
 
 ```text
 /context              # picker
-/context short        # select a profile
+/context 272k         # select a profile
 /context status       # active profile and effective window
 /fast                 # toggle
 /fast on | off
@@ -68,9 +68,9 @@ speed: pi does not route them through the request hook.
 **Fast responses are priced at the model's fast rate.** Pi prices responses
 from the model's standard rates, so the extension scales the recorded cost of
 every response sent fast by `fastCostMultiplier`, 2 unless the model says
-otherwise. Anthropic's fast mode and OpenAI's on GPT-5.6 and GPT-6 are 2× the
-standard rate; GPT-5.5's is 2.5×. Codex subscriptions burn their included limits
-at their own rates, which the `usage` widget shows.
+otherwise. Anthropic and OpenAI both price fast mode at 2× the standard rate on
+every model configured here, so none sets it. Codex subscriptions burn their
+included limits at their own rates, which the `usage` widget shows.
 
 **Fast-mode failures are read from the error message.** The gateway starts
 each one with its code, the only part of a streamed error pi keeps:
@@ -110,11 +110,10 @@ The file itself:
 {
 	"shortcuts": { "context": "alt+shift+c", "fast": "alt+shift+f" },
 	"models": {
-		"llm-gateway/codex/gpt-5.5": {
+		"llm-gateway/codex/gpt-6.1-sol": {
 			"defaultContext": "272k",
 			"context": { "272k": 272000, "full": 1050000 },
-			"fast": true,
-			"fastCostMultiplier": 2.5
+			"fast": true
 		}
 	}
 }

@@ -27,7 +27,7 @@ Add the flake that provides this module as an input and import
 
             settings = {
               defaultProvider = "anthropic";
-              defaultModel = "claude-sonnet-4-20250514";
+              defaultModel = "claude-sonnet-5-5";
               defaultThinkingLevel = "medium";
               theme = "dark";
 
@@ -76,7 +76,7 @@ Add the flake that provides this module as an input and import
 | `models`        | Free-form custom providers and models written to `models.json`.                                                      |
 | `extensions`    | Extensions linked into `configDir/extensions`, each `{ name; src; }`.                                                |
 | `context`       | Global agent context written to `AGENTS.md`; inline text or a path.                                                  |
-| `modelProfiles` | Context budgets and fast-mode pairs for the `model-profile` extension, written to `model-profile.json`.              |
+| `modelProfiles` | Context budgets and fast-mode flags for the `model-profile` extension, written to `model-profile.json`.              |
 
 ## Extensions
 
@@ -109,8 +109,9 @@ point `src` at the file itself instead.
 ### model-profile
 
 `modelProfiles` configures the in-tree `model-profile` extension, which adds
-switchable context budgets and a fast-mode model per model. It only writes the
-configuration; the extension still has to be listed in `extensions`:
+switchable context budgets per model and a session-wide fast-mode toggle. It
+only writes the configuration; the extension still has to be listed in
+`extensions`:
 
 ```nix
 programs.pi = {
@@ -121,13 +122,13 @@ programs.pi = {
     }
   ];
 
-  modelProfiles.models."llm-gateway/claude-code/claude-opus-5" = {
+  modelProfiles.models."llm-gateway/codex/gpt-6.1-sol" = {
     context = {
-      short = 272000;
-      full = 1000000;
+      "272k" = 272000;
+      full = 1050000;
     };
-    defaultContext = "short";
-    fast.model = "claude-code/claude-sonnet-5";
+    defaultContext = "272k";
+    fast = true;
   };
 };
 ```

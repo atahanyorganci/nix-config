@@ -18,16 +18,16 @@ const base: Config = {
 
 const config = mergeConfig(base, {
 	models: {
-		"llm-gateway/claude-code/claude-opus-5": {
+		"llm-gateway/claude-code/claude-opus-5-5": {
 			defaultContext: "272k",
 			context: { "272k": 272_000, full: 1_000_000 },
 			fast: true,
 		},
-		"llm-gateway/claude-code/claude-sonnet-5": {
+		"llm-gateway/claude-code/claude-sonnet-5-5": {
 			context: { "272k": 272_000, full: 1_000_000 },
 		},
-		"llm-gateway/codex/gpt-5.5": { fast: true, fastCostMultiplier: 2.5 },
-		"anthropic/claude-opus-5": { fast: true },
+		"llm-gateway/codex/gpt-6.1-sol": { fast: true, fastCostMultiplier: 3 },
+		"anthropic/claude-opus-5-5": { fast: true },
 	},
 });
 
@@ -35,10 +35,10 @@ function model(provider: string, id: string, api = "openai-completions"): AnyMod
 	return { provider, id, api, contextWindow: 272_000 } as unknown as AnyModel;
 }
 
-const opus = model("llm-gateway", "claude-code/claude-opus-5");
-const sonnet = model("llm-gateway", "claude-code/claude-sonnet-5");
-const anthropicOpus = model("anthropic", "claude-opus-5", "anthropic-messages");
-const gpt55 = model("llm-gateway", "codex/gpt-5.5");
+const opus = model("llm-gateway", "claude-code/claude-opus-5-5");
+const sonnet = model("llm-gateway", "claude-code/claude-sonnet-5-5");
+const anthropicOpus = model("anthropic", "claude-opus-5-5", "anthropic-messages");
+const sol = model("llm-gateway", "codex/gpt-6.1-sol");
 
 interface Notice {
 	message: string;
@@ -73,8 +73,8 @@ function assistant(target: AnyModel, fields: Record<string, unknown> = {}) {
 
 describe("config", () => {
 	it("reads fast as a boolean, defaulting to false", () => {
-		expect(config.models["llm-gateway/claude-code/claude-opus-5"]?.fast).toBe(true);
-		expect(config.models["llm-gateway/claude-code/claude-sonnet-5"]?.fast).toBe(false);
+		expect(config.models["llm-gateway/claude-code/claude-opus-5-5"]?.fast).toBe(true);
+		expect(config.models["llm-gateway/claude-code/claude-sonnet-5-5"]?.fast).toBe(false);
 	});
 
 	it("rejects the old fast-target object with a migration hint", () => {
@@ -84,8 +84,8 @@ describe("config", () => {
 	});
 
 	it("reads a per-model fast cost multiplier", () => {
-		expect(config.models["llm-gateway/codex/gpt-5.5"]?.fastCostMultiplier).toBe(2.5);
-		expect(config.models["llm-gateway/claude-code/claude-opus-5"]?.fastCostMultiplier).toBeUndefined();
+		expect(config.models["llm-gateway/codex/gpt-6.1-sol"]?.fastCostMultiplier).toBe(3);
+		expect(config.models["llm-gateway/claude-code/claude-opus-5-5"]?.fastCostMultiplier).toBeUndefined();
 	});
 
 	it.each([
@@ -143,7 +143,7 @@ describe("requests", () => {
 		state.fastEnabled = true;
 		const { ctx } = context(opus);
 		expect(withFastPath(state, ctx, payload)).toEqual({ ...payload, service_tier: "priority" });
-		expect(state.fastRequest).toBe("llm-gateway/claude-code/claude-opus-5");
+		expect(state.fastRequest).toBe("llm-gateway/claude-code/claude-opus-5-5");
 	});
 
 	it("leaves the payload alone when fast mode is off or does not apply", () => {
@@ -166,7 +166,7 @@ describe("requests", () => {
 describe("responses", () => {
 	it("scales the cost of a response that was sent fast", () => {
 		const state = new State(config);
-		state.fastRequest = "llm-gateway/claude-code/claude-opus-5";
+		state.fastRequest = "llm-gateway/claude-code/claude-opus-5-5";
 		const settled = settleFastResponse(state, context(opus).ctx, assistant(opus)) as ReturnType<typeof assistant>;
 		expect(settled.usage.cost).toEqual({
 			input: 1 * DEFAULT_FAST_COST_MULTIPLIER,
@@ -181,9 +181,9 @@ describe("responses", () => {
 
 	it("scales by the model's own multiplier when it has one", () => {
 		const state = new State(config);
-		state.fastRequest = "llm-gateway/codex/gpt-5.5";
-		const settled = settleFastResponse(state, context(gpt55).ctx, assistant(gpt55)) as ReturnType<typeof assistant>;
-		expect(settled.usage.cost.total).toBe(3.75 * 2.5);
+		state.fastRequest = "llm-gateway/codex/gpt-6.1-sol";
+		const settled = settleFastResponse(state, context(sol).ctx, assistant(sol)) as ReturnType<typeof assistant>;
+		expect(settled.usage.cost.total).toBe(3.75 * 3);
 	});
 
 	it("keeps the cost of a standard response", () => {
@@ -193,18 +193,18 @@ describe("responses", () => {
 
 	it("ignores messages other than assistant responses", () => {
 		const state = new State(config);
-		state.fastRequest = "llm-gateway/claude-code/claude-opus-5";
+		state.fastRequest = "llm-gateway/claude-code/claude-opus-5-5";
 		expect(settleFastResponse(state, context(opus).ctx, { role: "user", content: "hi" })).toBeUndefined();
-		expect(state.fastRequest).toBe("llm-gateway/claude-code/claude-opus-5");
+		expect(state.fastRequest).toBe("llm-gateway/claude-code/claude-opus-5-5");
 	});
 
 	it.each([
 		["fast_mode_credits_required: Usage credits are required for fast mode.", /no fast-mode credits/],
-		["fast_mode_unsupported: `claude-code/claude-opus-5` does not offer fast mode.", /does not offer it/],
+		["fast_mode_unsupported: `claude-code/claude-opus-5-5` does not offer fast mode.", /does not offer it/],
 	])("turns fast mode off on %s", (errorMessage, reason) => {
 		const state = new State(config);
 		state.fastEnabled = true;
-		state.fastRequest = "llm-gateway/claude-code/claude-opus-5";
+		state.fastRequest = "llm-gateway/claude-code/claude-opus-5-5";
 		const { ctx, notices } = context(opus);
 		expect(settleFastResponse(state, ctx, assistant(opus, { stopReason: "error", errorMessage }))).toBeUndefined();
 		expect(state.fastEnabled).toBe(false);

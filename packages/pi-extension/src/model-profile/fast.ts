@@ -21,8 +21,8 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
  * How much more a fast request costs than a standard one, for a model whose
  * config does not say.
  *
- * Anthropic prices fast mode at 2x on every model that offers it, and so does
- * OpenAI on GPT-5.6 and GPT-6; GPT-5.5 is 2.5x, which its config states. Codex
+ * Anthropic and OpenAI both price fast mode at 2x on every model this repo
+ * configures; a model priced otherwise states its own multiplier. Codex
  * subscriptions burn their included limits at their own rates, but that is
  * plan usage, not dollars: the cost pi shows is the API-equivalent price.
  */
