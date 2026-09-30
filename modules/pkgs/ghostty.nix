@@ -10,8 +10,9 @@
   # missing `meta.mainProgram`.
   #
   # Done as an overlay rather than at each use site so the Home Manager module
-  # and the dock entry in `modules/darwin/system.nix` resolve to the same store
-  # path; overriding separately would put two ~62M copies in the closure.
+  # and `environment.systemPackages` in `modules/darwin/system.nix` resolve to
+  # the same store path; overriding separately would put two ~62M copies in the
+  # closure.
   flake.overlays.ghostty = final: prev:
     prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
       ghostty = let
