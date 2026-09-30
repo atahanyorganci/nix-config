@@ -151,6 +151,9 @@
             enabled = true;
             autostart = true;
             sync_frequency = 300;
+            # The default lives under `$TMPDIR`, which `nix develop` changes: clients there miss the
+            # daemon, try to autostart one, and block every command on its pidfile lock.
+            socket_path = "${config.xdg.dataHome}/atuin/atuin.sock";
           };
           logs.dir = "${config.xdg.stateHome}/atuin/logs";
         };
