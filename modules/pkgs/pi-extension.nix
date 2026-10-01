@@ -57,8 +57,14 @@
         # restricts the install to the extension and its workspace
         # dependencies, so unrelated packages (stack, netbird-alchemy, ...)
         # stay out of the hash and do not trigger a refetch when they change.
+        #
+        # `pnpm` is pinned to match `nativeBuildInputs`. Left unset, the fetcher
+        # uses nixpkgs' default `pnpm`, which tracks the newest major: when
+        # that moved to 12 the fetched store changed and the hash broke, while
+        # the cached output hid it on machines that had already built it.
         pnpmDeps = final.fetchPnpmDeps {
           inherit (finalAttrs) pname version src;
+          pnpm = final.pnpm_11;
           fetcherVersion = 4;
           hash = "sha256-IItBK9nbYmkm9Mf1TIABu2B8faqYbE3uYM1mMV0ycEM=";
         };
