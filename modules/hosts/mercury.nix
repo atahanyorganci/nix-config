@@ -5,6 +5,7 @@
 }: let
   user = config.flake.me;
   mercuryHomeConfiguration = {user, ...}: {
+    agents.enable = true;
     home = {
       username = user.username;
       homeDirectory = "/home/${user.username}";
