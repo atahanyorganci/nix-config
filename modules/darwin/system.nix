@@ -27,8 +27,7 @@
       ];
       environment.systemPackages = with casks; [
         helium-browser
-        visual-studio-code
-        cursor
+        pkgs.zed-editor
         ghostty
         slack
         whatsapp
@@ -44,7 +43,7 @@
           mru-spaces = false;
           persistent-apps = [
             (nixApp "Helium")
-            (nixApp "Cursor")
+            (nixApp "Zed")
             (nixApp "Ghostty")
             (nixApp "Slack")
             (nixApp "WhatsApp")

@@ -114,7 +114,6 @@
             };
             init.defaultBranch = "main";
             merge.conflictStyle = "zdiff3";
-            core.editor = "cursor --wait";
             help.autocorrect = "prompt";
             rebase = {
               autoStash = true;

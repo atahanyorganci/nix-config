@@ -31,6 +31,8 @@
     uutils.enable = true;
     node.enable = true;
     wget.enable = true;
+    # Zed remote server, matching the Zed on sol and venus.
+    zed.remoteServer.enable = true;
   };
   mercuryHardwareModule = {
     config,
@@ -109,8 +111,6 @@
       rssh.enable = true;
       services.sudo.rssh = true;
     };
-    # Enable VSCode Server
-    services.vscode-server.enable = true;
     # Self-hosted NetBird mesh
     netbird = {
       enable = true;
