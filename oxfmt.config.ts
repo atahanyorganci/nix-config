@@ -3,5 +3,5 @@ import { defineConfig } from "oxfmt";
 
 export default defineConfig({
 	...base,
-	ignorePatterns: ["infra/**", "modules/**", "vendor/**"],
+	ignorePatterns: ["packages/**", "modules/**", "vendor/**"],
 });

@@ -43,7 +43,7 @@ const infraExpr = Effect.gen(function* () {
 });
 
 /**
- * Paths assume Alchemy is launched from `infra/stack` (package scripts).
+ * Paths assume Alchemy is launched from `packages/stack` (package scripts).
  * Nix eval uses the repository root as `cwd`.
  */
 const REPO_ROOT = "../..";
