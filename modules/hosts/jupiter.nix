@@ -28,6 +28,8 @@
     headless = true;
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Agents";
+    # Verified over the public IP and the NetBird mesh on 2026-10-02.
+    hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBC1Os2v/8NJGg/NXZHcnqMLWePQyej4iiZx6bnIW3JA";
     hetzner = {
       enable = true;
       consoleAutologin = true;

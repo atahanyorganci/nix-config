@@ -32,6 +32,18 @@
           defaultText = lib.literalExpression "user.username";
           description = "SSH login user";
         };
+        hostKey = lib.mkOption {
+          type = lib.types.nullOr (lib.types.strMatching "ssh-ed25519 [A-Za-z0-9+/]+=*");
+          default = null;
+          example = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...";
+          description = ''
+            Pinned ed25519 SSH host key (`/etc/ssh/ssh_host_ed25519_key.pub`,
+            without the comment). `nixos-deploy` refuses a target that
+            presents any other key, and `nixos-bootstrap` refuses to reinstall
+            a machine that presents a pinned key. Update it after reinstalling
+            the host, since installation generates a new key.
+          '';
+        };
       };
       netbird = {
         group = lib.mkOption {

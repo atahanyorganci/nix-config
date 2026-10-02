@@ -24,6 +24,8 @@
     headless = true;
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Servers";
+    # Verified over the public IP and the NetBird mesh on 2026-10-02.
+    hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC7mbXvWy/PXRldSlle2YRiJYuu8rQK36ai4m/4+nond";
     hetzner.enable = true;
     networking.hostName = "mars";
     time.timeZone = "Europe/Istanbul";
