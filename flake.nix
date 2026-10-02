@@ -74,6 +74,15 @@
       url = "github:NousResearch/hermes-agent/v2026.7.20";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    agent = {
+      url = "github:atahanyorganci/agent";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.import-tree.follows = "import-tree";
+      inputs.treefmt-nix.follows = "treefmt-nix";
+      inputs.bun2nix.inputs.flake-parts.follows = "flake-parts";
+      inputs.bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
+    };
   };
   outputs = inputs:
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
