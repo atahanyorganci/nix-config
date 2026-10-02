@@ -2,8 +2,6 @@
   cacheName = "atahanyorganci";
   cachePublicKey = "atahanyorganci.cachix.org-1:r9ZNvFHFKPxydR+do9PhRGHk2x/MuxG5U8ilm7t9mWs=";
   cacheUrl = "https://${cacheName}.cachix.org";
-  nixosCacheUrl = "https://cache.nixos.org/";
-  nixosCachePublicKey = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
 in {
   options.flake.cachix = lib.mkOption {
     type = lib.types.submodule {
@@ -32,10 +30,12 @@ in {
       };
     };
 
+    # Determinate Nix runs the daemon on Darwin, so `nix.settings` would be
+    # ignored; the daemon reads these from `/etc/nix/nix.custom.conf`.
     flake.modules.darwin.cachix = {
-      nix.settings = {
-        substituters = [nixosCacheUrl cacheUrl];
-        trusted-public-keys = [nixosCachePublicKey cachePublicKey];
+      determinateNix.customSettings = {
+        extra-substituters = [cacheUrl];
+        extra-trusted-public-keys = [cachePublicKey];
       };
     };
   };

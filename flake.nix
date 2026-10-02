@@ -6,6 +6,10 @@
       url = "github:LnL7/nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    determinate = {
+      url = "https://flakehub.com/f/DeterminateSystems/determinate/3";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     firefox-nix-darwin = {
       url = "github:atahanyorganci/firefox-nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";

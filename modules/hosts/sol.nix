@@ -42,8 +42,6 @@
     # Work around nix-darwin manual generation failing with newer nixos-render-docs.
     # The uninstaller builds its own default Darwin system, which still enables docs.
     system.tools.darwin-uninstaller.enable = false;
-    # Disable `nix-darwin` to manage Nix because of Determinate Systems Nix
-    nix.enable = false;
     # Enable entering sudo mode with Touch ID.
     security.pam.services.sudo_local.touchIdAuth = true;
     # Set Git commit hash for darwin-version.
