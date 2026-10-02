@@ -25,6 +25,7 @@
     pkgs,
     ...
   }: {
+    headless = true;
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Agents";
     hetzner = {

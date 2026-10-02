@@ -21,6 +21,7 @@
     };
   };
   marsNixosModule = {user, ...}: rec {
+    headless = true;
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Servers";
     hetzner.enable = true;

@@ -21,6 +21,7 @@
     };
   };
   saturnNixosModule = {user, ...}: {
+    headless = true;
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Servers";
     aws.enable = true;

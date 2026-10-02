@@ -62,6 +62,7 @@
     hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
   };
   mercuryNixosModule = {user, ...}: {
+    headless = true;
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Servers";
     hostInventory.ssh.localHostName.enable = true;
