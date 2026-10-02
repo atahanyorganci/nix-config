@@ -18,10 +18,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import { Credentials, type CredentialsConfig } from "./credentials.ts";
-import { UnknownNetbirdError, type DefaultErrors } from "./errors.ts";
+import { NetbirdParseError, UnknownNetbirdError, type DefaultErrors } from "./errors.ts";
+import type * as HttpClient from "effect/http/HttpClient";
+import type * as HttpClientError from "effect/http/HttpClientError";
 import type * as AST from "effect/SchemaAST";
-import type * as HttpClient from "effect/unstable/http/HttpClient";
-import type * as HttpClientError from "effect/unstable/http/HttpClientError";
 
 /** Error channel shared by every generated NetBird operation. */
 export type NetbirdOpError = DefaultErrors | ConfigError | HttpClientError.HttpClientError;
@@ -59,6 +59,9 @@ const restProtocol = makeRestProtocol<CredentialsConfig>({
 			...(message ? { message } : {}),
 			body,
 		}),
+	// Only raised when strict response validation is enabled; a 2xx body that
+	// fails its schema surfaces as the parse error already in `ClientErrors`.
+	parseError: ({ body, cause }) => new NetbirdParseError({ body, cause }),
 });
 
 /**

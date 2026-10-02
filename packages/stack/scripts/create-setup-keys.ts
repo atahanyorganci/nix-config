@@ -5,25 +5,26 @@ import { setupKeysPost } from "@yorganci/netbird-api/setup_keys";
 import { AlchemyContextLive } from "alchemy/AlchemyContext";
 import { ArtifactStore, createArtifactStore } from "alchemy/Artifacts";
 import { AuthProviders } from "alchemy/Auth/AuthProvider";
-import { ProfileLive, withProfileOverride } from "alchemy/Auth/Profile";
+import { ProfileStoreLive } from "alchemy/Auth/Profile";
+import { withProfileOverride } from "alchemy/Auth/Resolve";
 import { Stage } from "alchemy/Stage";
 import * as State from "alchemy/State";
 import { loadConfigProvider } from "alchemy/Util/ConfigProvider";
 import { PlatformServices } from "alchemy/Util/PlatformServices";
+import * as Argument from "effect/cli/Argument";
+import * as Command from "effect/cli/Command";
+import * as Flag from "effect/cli/Flag";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as Schema from "effect/Schema";
-import * as Argument from "effect/unstable/cli/Argument";
-import * as Command from "effect/unstable/cli/Command";
-import * as Flag from "effect/unstable/cli/Flag";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { readHomeInfraGroupId } from "../src/home-infra-state.ts";
 import * as Inventory from "../src/inventory.ts";
 import { netbirdCredentialsFromConfig } from "../src/netbird-credentials.ts";
@@ -48,18 +49,21 @@ const evalInventory = Effect.gen(function* () {
 const groupIdFromState = (state: State.StateService, stage: string, groupName: Inventory.NetBirdGroupName) =>
 	readHomeInfraGroupId(stage, groupName).pipe(Effect.provide(Layer.succeed(State.State, Effect.succeed(state))));
 
-const USER = Config.string("USER").pipe(
-	Config.orElse(() => Config.string("USERNAME")),
+const USER = Config.String("USER").pipe(
+	Config.orElse(() => Config.String("USERNAME")),
 	Config.withDefault("unknown"),
 );
 
+// Same precedence as the Alchemy CLI: `--stage`, then `$ALCHEMY_STAGE`. The
+// fallback stays `dev_${USER}` (not the CLI's `live_${USER}`) because that is
+// where the existing stacks' state lives.
 const defaultStage = USER.pipe(
-	Effect.flatMap(user => Config.string("stage").pipe(Config.withDefault(`dev_${user}`))),
+	Effect.flatMap(user => Config.String("ALCHEMY_STAGE").pipe(Config.withDefault(`dev_${user}`))),
 	Effect.orDie,
 );
 
-const stageFlag = Flag.string("stage").pipe(
-	Flag.withDescription("Alchemy stage for the NetbirdServer stack (defaults to dev_${USER})"),
+const stageFlag = Flag.String("stage").pipe(
+	Flag.withDescription("Alchemy stage for the NetbirdServer stack (defaults to $ALCHEMY_STAGE or dev_${USER})"),
 	Flag.optional,
 	Flag.mapEffect(
 		Effect.fn(function* (stage) {
@@ -71,7 +75,7 @@ const stageFlag = Flag.string("stage").pipe(
 	),
 );
 
-const profileFlag = Flag.string("profile").pipe(
+const profileFlag = Flag.String("profile").pipe(
 	Flag.withDescription("Alchemy auth profile (defaults to $ALCHEMY_PROFILE or 'default')"),
 	Flag.optional,
 	Flag.mapEffect(
@@ -79,12 +83,12 @@ const profileFlag = Flag.string("profile").pipe(
 			if (Option.isSome(profile)) {
 				return profile.value;
 			}
-			return yield* Config.string("ALCHEMY_PROFILE").pipe(Config.withDefault("default"), Effect.orDie);
+			return yield* Config.String("ALCHEMY_PROFILE").pipe(Config.withDefault("default"), Effect.orDie);
 		}),
 	),
 );
 
-const envFileFlag = Flag.file("env-file").pipe(
+const envFileFlag = Flag.File("env-file").pipe(
 	Flag.optional,
 	Flag.withDescription("Environment file to load (defaults to .env when present)"),
 );
@@ -106,7 +110,7 @@ const withAlchemyState = <A, E>(
 
 		const services = Layer.mergeAll(
 			Layer.provideMerge(AlchemyContextLive, PlatformServices),
-			Layer.provide(ProfileLive, PlatformServices),
+			Layer.provide(ProfileStoreLive, PlatformServices),
 			Layer.succeed(ArtifactStore, createArtifactStore()),
 			Layer.succeed(AuthProviders, {}),
 			ConfigProvider.layer(withProfileOverride(yield* loadConfigProvider(options.envFile), options.profile)),
@@ -125,7 +129,7 @@ const withAlchemyState = <A, E>(
 		}).pipe(Effect.provide(services), Effect.scoped);
 	});
 
-const hostsArg = Argument.string("host").pipe(
+const hostsArg = Argument.String("host").pipe(
 	Argument.withDescription("Host name (NetBird peer dns_label, e.g. mars, venus)"),
 	Argument.variadic({ min: 1 }),
 );

@@ -15,27 +15,27 @@ allowBuilds:
   workerd: false
 overrides:
   # `@effect/platform-node` depends on `@effect/platform-node-shared` with a
-  # floating `^4.0.0-rc.112`, which resolves to a build that needs a newer
+  # floating `^4.0.0`, which can resolve to a build that needs a newer
   # `effect` than the catalog pins. Pin it so the two stay in step.
-  "@effect/platform-node-shared": "4.0.0-rc.112"
+  "@effect/platform-node-shared": "4.0.0"
 catalog:
   # Cobalt is consumed as a library rather than as a service: its extractors are
   # called in process, and it is patched so it bundles (see patchedDependencies).
   # Pinned to a rev because `api/` has no published release and its internal
   # layout is not covered by `exports`.
   "@imput/cobalt-api": "github:imputnet/cobalt#path:/api&a636575b09de1fc55d9b8cd98cac88f5f2f16b42"
-  "@distilled.cloud/aws": "1.0.0-rc.8"
-  "@distilled.cloud/core": "1.0.0-rc.8"
+  "@distilled.cloud/aws": "1.0.0-rc.13"
+  "@distilled.cloud/core": "1.0.0-rc.13"
   "@earendil-works/pi-ai": "0.86.0"
   "@earendil-works/pi-coding-agent": "0.86.0"
   "@earendil-works/pi-tui": "0.86.0"
-  "@effect/language-service": "0.87.2"
-  "@effect/platform-node": "4.0.0-rc.112"
-  "@effect/platform-node-shared": "4.0.0-rc.112"
-  "@effect/vitest": "4.0.0-rc.112"
+  "@effect/language-service": "0.87.3"
+  "@effect/platform-node": "4.0.0"
+  "@effect/platform-node-shared": "4.0.0"
+  "@effect/vitest": "4.0.0"
   "@types/node": "^24.10.1"
-  "alchemy": "2.0.0-beta.75"
-  "effect": "4.0.0-rc.112"
+  "alchemy": "2.0.0-beta.80"
+  "effect": "4.0.0"
   "oxfmt": "^0.51.0"
   "oxlint": "^1.66.0"
   "oxlint-tsgolint": "^0.23.0"
@@ -53,6 +53,28 @@ catalog:
   # DOM implementation that nothing shares.
   "linkedom": "^0.18.13"
   "unpdf": "^1.8.1"
-  "vitest": "^4.1.8"
+  # 5.x is required by `@effect/vitest` 4.0.0 (`vitest >=5.0.0 <6.0.0`).
+  "vitest": "^5.0.3"
 patchedDependencies:
   "@imput/cobalt-api@11.7.1": patches/@imput__cobalt-api@11.7.1.patch
+minimumReleaseAgeExclude:
+  - "@alchemy.run/cloudflare-runtime@2.0.0-beta.80"
+  - "@alchemy.run/floci@2.0.0-beta.80"
+  - "@alchemy.run/node-utils@2.0.0-beta.80"
+  - "@distilled.cloud/acme@1.0.0-rc.13"
+  - "@distilled.cloud/aws@1.0.0-rc.13"
+  - "@distilled.cloud/axiom@1.0.0-rc.13"
+  - "@distilled.cloud/cloudflare@1.0.0-rc.13"
+  - "@distilled.cloud/core@1.0.0-rc.13"
+  - "@distilled.cloud/doppler@1.0.0-rc.13"
+  - "@distilled.cloud/fly-io@1.0.0-rc.13"
+  - "@distilled.cloud/gcp@1.0.0-rc.13"
+  - "@distilled.cloud/hetzner@1.0.0-rc.13"
+  - "@distilled.cloud/infisical@1.0.0-rc.13"
+  - "@distilled.cloud/neon@1.0.0-rc.13"
+  - "@distilled.cloud/planetscale@1.0.0-rc.13"
+  - "@distilled.cloud/prisma@1.0.0-rc.13"
+  - "@distilled.cloud/railway@1.0.0-rc.13"
+  - "@distilled.cloud/stripe@1.0.0-rc.13"
+  - "@distilled.cloud/zerossl@1.0.0-rc.13"
+  - alchemy@2.0.0-beta.80

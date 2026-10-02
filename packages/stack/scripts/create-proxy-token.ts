@@ -2,25 +2,26 @@ import { NodeRuntime } from "@effect/platform-node";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
 import { reverseProxiesProxyTokensPost } from "@yorganci/netbird-api/self_hosted_proxies";
-import { ProfileLive, withProfileOverride } from "alchemy/Auth/Profile";
+import { ProfileStoreLive } from "alchemy/Auth/Profile";
+import { withProfileOverride } from "alchemy/Auth/Resolve";
 import { loadConfigProvider } from "alchemy/Util/ConfigProvider";
 import { PlatformServices } from "alchemy/Util/PlatformServices";
+import * as Argument from "effect/cli/Argument";
+import * as Command from "effect/cli/Command";
+import * as Flag from "effect/cli/Flag";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
-import * as Argument from "effect/unstable/cli/Argument";
-import * as Command from "effect/unstable/cli/Command";
-import * as Flag from "effect/unstable/cli/Flag";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import { netbirdCredentialsFromConfig } from "../src/netbird-credentials.ts";
 
 const PROXY_TOKEN_EXPIRES_IN_SECONDS = 365 * 86_400;
 
-const profileFlag = Flag.string("profile").pipe(
+const profileFlag = Flag.String("profile").pipe(
 	Flag.withDescription("Alchemy auth profile (defaults to $ALCHEMY_PROFILE or 'default')"),
 	Flag.optional,
 	Flag.mapEffect(
@@ -28,12 +29,12 @@ const profileFlag = Flag.string("profile").pipe(
 			if (Option.isSome(profile)) {
 				return profile.value;
 			}
-			return yield* Config.string("ALCHEMY_PROFILE").pipe(Config.withDefault("default"), Effect.orDie);
+			return yield* Config.String("ALCHEMY_PROFILE").pipe(Config.withDefault("default"), Effect.orDie);
 		}),
 	),
 );
 
-const envFileFlag = Flag.file("env-file").pipe(
+const envFileFlag = Flag.File("env-file").pipe(
 	Flag.optional,
 	Flag.withDescription("Environment file to load (defaults to .env when present)"),
 );
@@ -56,7 +57,7 @@ const withScriptConfig = <A, E>(
 			Effect.provide(
 				Layer.mergeAll(
 					ConfigProvider.layer(configProvider),
-					Layer.provide(ProfileLive, PlatformServices),
+					Layer.provide(ProfileStoreLive, PlatformServices),
 					Logger.layer([], { mergeWithExisting: true }),
 					FetchHttpClient.layer,
 				),
@@ -64,7 +65,7 @@ const withScriptConfig = <A, E>(
 		);
 	}).pipe(Effect.provide(PlatformServices), Effect.scoped);
 
-const nameArg = Argument.string("name").pipe(
+const nameArg = Argument.String("name").pipe(
 	Argument.withDescription("Proxy token name (e.g. mars-proxy)"),
 	Argument.variadic({ min: 1 }),
 );

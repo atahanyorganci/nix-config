@@ -2,13 +2,13 @@ import * as Docker from "alchemy/Docker";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import { FileSystem } from "effect/FileSystem";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { Path } from "effect/Path";
 import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
-import * as HttpClient from "effect/unstable/http/HttpClient";
-import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import { findAvailablePort } from "./Runtime.ts";
 
 export const NETBIRD_SERVER_IMAGE = "netbirdio/netbird-server";

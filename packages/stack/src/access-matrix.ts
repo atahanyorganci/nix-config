@@ -96,7 +96,7 @@ export const AccessMatrixFromFlake = Schema.Struct({
 	nameServers: NameServers,
 }).pipe(
 	Schema.decodeTo(AccessMatrix, {
-		decode: SchemaGetter.transformOrFail(({ httpServices, nameServers }) =>
+		decode: SchemaGetter.transformEffect(({ httpServices, nameServers }) =>
 			Effect.gen(function* () {
 				const entries: Array<AccessMatrixEntry> = [];
 

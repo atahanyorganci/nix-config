@@ -66,7 +66,7 @@
           inherit (finalAttrs) pname version src;
           pnpm = final.pnpm_11;
           fetcherVersion = 4;
-          hash = "sha256-IItBK9nbYmkm9Mf1TIABu2B8faqYbE3uYM1mMV0ycEM=";
+          hash = "sha256-SCd2iJDV3Rmkeo/Rqscvi5XnELp4K0KrrJEwaGr0Rvc=";
         };
 
         pnpmWorkspaces = [

@@ -35,7 +35,7 @@ const encodeForbidden = <T, E>(message: string) => SchemaGetter.forbidden<T, E>(
 
 export const NameServerPlansFromNameServers = NameServers.pipe(
 	Schema.decodeTo(Schema.Array(NameServerPlan), {
-		decode: SchemaGetter.transformOrFail(nameServers =>
+		decode: SchemaGetter.transformEffect(nameServers =>
 			Effect.gen(function* () {
 				const plans: Array<typeof NameServerPlan.Type> = [];
 				for (const [hostKey, host] of Object.entries(nameServers) as Array<[string, typeof NameServerHost.Type]>) {

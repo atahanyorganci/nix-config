@@ -8,12 +8,12 @@ import { isResourceState } from "alchemy/State";
 import * as State from "alchemy/State";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import { Hex } from "effect/encoding";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Schema from "effect/Schema";
-import * as ChildProcess from "effect/unstable/process/ChildProcess";
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 
 export interface NixExprProps {
 	/**
@@ -41,7 +41,7 @@ const hashJson = (json: string) =>
 	Effect.gen(function* () {
 		const crypto = yield* Crypto.Crypto;
 		const digest = yield* crypto.digest("SHA-256", new TextEncoder().encode(json));
-		return Encoding.encodeHex(digest);
+		return Hex.encode(digest);
 	});
 
 const HASH_APPLY = 'x: builtins.hashString "sha256" (builtins.toJSON x)';

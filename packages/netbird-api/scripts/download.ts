@@ -2,7 +2,7 @@
 
 import { NodeCrypto, NodeFileSystem, NodeHttpClient, NodePath, NodeRuntime } from "@effect/platform-node";
 import { Console, Crypto, Effect, FileSystem, Layer, Path } from "effect";
-import { HttpClient, HttpClientResponse } from "effect/unstable/http";
+import { HttpClient, HttpClientResponse } from "effect/http";
 import * as Yaml from "yaml";
 import pkg from "../package.json" with { type: "json" };
 

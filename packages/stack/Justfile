@@ -1,8 +1,9 @@
-set export := true
+set export
 set dotenv-filename := ".env.local"
 set dotenv-load
 
 ALCHEMY_PROFILE := "personal"
+ALCHEMY_STAGE := env("ALCHEMY_STAGE", "dev_atahan")
 ALCHEMY_NO_TUI := "1"
 ALCHEMY_PLAIN := "1"
 
@@ -27,8 +28,8 @@ verify *args:
 test *args:
     {{ node }} scripts/test-netbird-network.ts {{ args }}
 
-bootstrap:
-    {{ pnpm }} exec alchemy cloudflare bootstrap
+bootstrap *args:
+    {{ pnpm }} exec alchemy provider cloudflare bootstrap {{ args }}
 
-configure:
-    {{ pnpm }} exec alchemy login --configure
+profile *args:
+    {{ pnpm }} exec alchemy profile {{ args }}

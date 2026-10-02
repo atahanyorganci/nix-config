@@ -20,7 +20,7 @@ interface NetbirdCredentials {
  * is never right for this self-hosted account, so it is required here.
  */
 export const netbirdCredentialsFromConfig = Effect.gen(function* () {
-	const apiToken = yield* Config.redacted("NETBIRD_API_TOKEN").pipe(
+	const apiToken = yield* Config.Redacted("NETBIRD_API_TOKEN").pipe(
 		Config.orElse(() => Config.succeed(Redacted.make(""))),
 	);
 	if (Redacted.value(apiToken).length === 0) {
@@ -31,7 +31,7 @@ export const netbirdCredentialsFromConfig = Effect.gen(function* () {
 		);
 	}
 
-	const apiBaseUrl = yield* Config.string("NETBIRD_API_BASE_URL").pipe(Config.orElse(() => Config.succeed("")));
+	const apiBaseUrl = yield* Config.String("NETBIRD_API_BASE_URL").pipe(Config.orElse(() => Config.succeed("")));
 	if (apiBaseUrl.length === 0) {
 		return yield* Effect.die(
 			`NETBIRD_API_BASE_URL is unset — set it to this account's management API ` +

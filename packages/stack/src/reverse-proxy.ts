@@ -91,7 +91,7 @@ const encodeForbidden = <T, E>(message: string) => SchemaGetter.forbidden<T, E>(
 
 const ReverseProxyAuthFromAuth = Auth.pipe(
 	Schema.decodeTo(Schema.UndefinedOr(ReverseProxyAuthSchema), {
-		decode: SchemaGetter.transformOrFail(auth =>
+		decode: SchemaGetter.transformEffect(auth =>
 			Effect.gen(function* () {
 				switch (auth.type) {
 					case "none":
@@ -161,7 +161,7 @@ export const ServicePlansFromHttpServices = Schema.Struct({
 	domain: Schema.String,
 }).pipe(
 	Schema.decodeTo(Schema.Array(ServicePlan), {
-		decode: SchemaGetter.transformOrFail(({ httpServices, domain }) => {
+		decode: SchemaGetter.transformEffect(({ httpServices, domain }) => {
 			const plans: Array<ServicePlan> = [];
 			const serviceHosts = new Map<string, string>();
 

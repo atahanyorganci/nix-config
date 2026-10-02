@@ -1,5 +1,5 @@
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import { ApiKeyProvider } from "./ApiKey/ApiKey.ts";
 import { CredentialsFromEnv, type Credentials } from "./Credentials.ts";
 import { GroupProvider } from "./Group/Group.ts";

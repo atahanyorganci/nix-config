@@ -23,10 +23,10 @@ const credentialsFromProvider = (provider: ConfigProvider.ConfigProvider) =>
 	Layer.succeed(
 		Credentials,
 		Effect.gen(function* () {
-			const apiToken = yield* Config.redacted("NETBIRD_API_TOKEN").pipe(
+			const apiToken = yield* Config.Redacted("NETBIRD_API_TOKEN").pipe(
 				Config.orElse(() => Config.succeed(Redacted.make(""))),
 			);
-			const apiBaseUrl = yield* Config.string("NETBIRD_API_BASE_URL").pipe(Config.withDefault(DEFAULT_API_BASE_URL));
+			const apiBaseUrl = yield* Config.String("NETBIRD_API_BASE_URL").pipe(Config.withDefault(DEFAULT_API_BASE_URL));
 			return { apiToken, apiBaseUrl };
 		}).pipe(Effect.provideService(ConfigProvider.ConfigProvider, provider), Effect.orDie),
 	);
