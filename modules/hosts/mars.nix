@@ -66,10 +66,10 @@
     };
     searx.enable = true;
     atuin-server.enable = true;
-    "9router" = {
+    agent-gateway = {
       enable = true;
       # The reverse proxy dials mars's mesh address, so the listener has to exist
-      # off loopback; the firewall below keeps it off the public NIC.
+      # off loopback; the firewall keeps it off the public NIC.
       host = "0.0.0.0";
       interfaces = ["nb-wt0"];
       expose = {
