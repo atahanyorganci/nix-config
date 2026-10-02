@@ -14,10 +14,14 @@ import * as Option from "effect/Option";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Schema from "effect/Schema";
+import * as NodePath from "node:path";
+import { fileURLToPath } from "node:url";
 
 export interface NixExprProps {
 	/**
-	 * Working directory.
+	 * Working directory. A relative path is resolved against the stack package
+	 * (`packages/stack`), not the process working directory, so evaluation
+	 * does not depend on where Alchemy or a script was launched from.
 	 */
 	cwd: string;
 	/**
@@ -46,13 +50,18 @@ const hashJson = (json: string) =>
 
 const HASH_APPLY = 'x: builtins.hashString "sha256" (builtins.toJSON x)';
 
+// `src/` -> the stack package. The stored prop keeps its relative form, so
+// state written before this resolution existed still compares equal.
+const STACK_PACKAGE_DIR = fileURLToPath(new URL("..", import.meta.url));
+const resolveCwd = (cwd: string) => NodePath.resolve(STACK_PACKAGE_DIR, cwd);
+
 const hashExpression = (props: NixExprProps) =>
 	Effect.gen(function* () {
 		const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 		return yield* spawner
 			.string(
 				ChildProcess.make("nix", ["eval", "--raw", props.expression, "--apply", HASH_APPLY], {
-					cwd: props.cwd,
+					cwd: resolveCwd(props.cwd),
 					extendEnv: true,
 				}),
 			)
@@ -64,7 +73,7 @@ const evalProps = (props: NixExprProps) =>
 		const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 		const stdout = yield* spawner.string(
 			ChildProcess.make("nix", ["eval", "--json", props.expression], {
-				cwd: props.cwd,
+				cwd: resolveCwd(props.cwd),
 				extendEnv: true,
 			}),
 		);

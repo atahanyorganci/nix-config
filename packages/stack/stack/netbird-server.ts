@@ -45,8 +45,10 @@ const infraExpr = Effect.gen(function* () {
 });
 
 /**
- * Paths assume Alchemy is launched from `packages/stack` (package scripts).
- * Nix eval uses the repository root as `cwd`.
+ * The repository root, relative to `packages/stack`. `NixExpr` resolves it
+ * against the stack package itself; `Command.Exec` resolves it against the
+ * working directory, so commands assume Alchemy is launched from
+ * `packages/stack` (as the package scripts and Justfile do).
  */
 const REPO_ROOT = "../..";
 
