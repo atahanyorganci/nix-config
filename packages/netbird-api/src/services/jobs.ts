@@ -54,6 +54,10 @@ export interface BundleParameters {
 	log_file_count: number;
 	/** Whether sensitive data should be anonymized in the bundle. */
 	anonymize: boolean;
+	/** How much the anonymizer redacts. "default" (or empty) keeps internal IP ranges, "strict" also anonymizes them. */
+	anonymize_level?: string;
+	/** Service URL the client requests an upload URL from before uploading the bundle. Empty selects the default upload server. */
+	upload_url?: string;
 }
 export const BundleParameters = /*@__PURE__*/ S.suspend(() =>
 	S.Struct({
@@ -61,6 +65,8 @@ export const BundleParameters = /*@__PURE__*/ S.suspend(() =>
 		bundle_for_time: S.Number,
 		log_file_count: S.Number,
 		anonymize: S.Boolean,
+		anonymize_level: S.optional(S.String),
+		upload_url: S.optional(S.String),
 	}),
 ).annotate({ identifier: "BundleParameters" }) as any as S.Schema<BundleParameters>;
 

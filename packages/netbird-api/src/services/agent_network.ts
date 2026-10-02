@@ -46,6 +46,15 @@ export class NotFound
 		[{ status: 404 }],
 	) {}
 
+export class UnprocessableEntity
+	extends /*@__PURE__*/ T.applyErrorMatchers(
+		/*@__PURE__*/ S.TaggedError<UnprocessableEntity>()("UnprocessableEntity", {
+			code: S.Number,
+			message: S.String,
+		}).pipe(C.withBadRequestError),
+		[{ status: 422 }],
+	) {}
+
 export type AgentNetworkAccessLogSessionsGetRequestSortBy =
 	| "timestamp"
 	| "started_at"
@@ -191,10 +200,24 @@ export interface AgentNetworkAccessLog {
 	input_tokens: number;
 	/** Output (completion) tokens produced. */
 	output_tokens: number;
-	/** Total tokens consumed. */
+	/** Total tokens consumed, including prompt-cache tokens. */
 	total_tokens: number;
+	/** Input tokens read from the provider's prompt cache. Additive to input_tokens for Anthropic-shape providers; a subset of input_tokens for OpenAI. */
+	cached_input_tokens: number;
+	/** Input tokens written to the provider's prompt cache. Zero for providers without a cache-write bucket. */
+	cache_creation_tokens: number;
 	/** Estimated USD cost of the request. */
 	cost_usd: number;
+	/** Cost of the non-cached input tokens. Base component of cost_usd. */
+	input_cost_usd: number;
+	/** Cost of the prompt-cache read tokens. Base component of cost_usd, and part of cache_cost_usd. */
+	cached_input_cost_usd: number;
+	/** Cost of the prompt-cache write tokens. Base component of cost_usd, and part of cache_cost_usd. */
+	cache_creation_cost_usd: number;
+	/** Cost of the output tokens. Base component of cost_usd. */
+	output_cost_usd: number;
+	/** Portion of cost_usd billed for prompt-cache usage. */
+	cache_cost_usd: number;
 	/** Whether the request was a streaming completion. */
 	stream?: boolean;
 	/** NetBird group ids that authorised the request (the caller's groups intersected with the policy's source groups). */
@@ -226,7 +249,14 @@ export const AgentNetworkAccessLog = /*@__PURE__*/ S.suspend(() =>
 		input_tokens: S.Number,
 		output_tokens: S.Number,
 		total_tokens: S.Number,
+		cached_input_tokens: S.Number,
+		cache_creation_tokens: S.Number,
 		cost_usd: S.Number,
+		input_cost_usd: S.Number,
+		cached_input_cost_usd: S.Number,
+		cache_creation_cost_usd: S.Number,
+		output_cost_usd: S.Number,
+		cache_cost_usd: S.Number,
 		stream: S.optional(S.Boolean),
 		group_ids: S.optional(AgentNetworkAccessLogGroupIdsList),
 		request_prompt: S.optional(S.String),
@@ -258,10 +288,24 @@ export interface AgentNetworkAccessLogSession {
 	input_tokens: number;
 	/** Total output (completion) tokens across the session. */
 	output_tokens: number;
-	/** Total tokens across the session. */
+	/** Total tokens across the session, including prompt-cache tokens. */
 	total_tokens: number;
+	/** Total prompt-cache read tokens across the session. */
+	cached_input_tokens: number;
+	/** Total prompt-cache write tokens across the session. */
+	cache_creation_tokens: number;
 	/** Total estimated USD cost across the session. */
 	cost_usd: number;
+	/** Total cost of non-cached input tokens across the session. */
+	input_cost_usd: number;
+	/** Total cost of prompt-cache read tokens across the session. */
+	cached_input_cost_usd: number;
+	/** Total cost of prompt-cache write tokens across the session. */
+	cache_creation_cost_usd: number;
+	/** Total cost of output tokens across the session. */
+	output_cost_usd: number;
+	/** Portion of cost_usd billed for prompt-cache usage across the session. */
+	cache_cost_usd: number;
 	/** Distinct LLM provider vendors seen in the session. */
 	providers?: AgentNetworkAccessLogSessionProvidersList;
 	/** Distinct models seen in the session. */
@@ -282,7 +326,14 @@ export const AgentNetworkAccessLogSession = /*@__PURE__*/ S.suspend(() =>
 		input_tokens: S.Number,
 		output_tokens: S.Number,
 		total_tokens: S.Number,
+		cached_input_tokens: S.Number,
+		cache_creation_tokens: S.Number,
 		cost_usd: S.Number,
+		input_cost_usd: S.Number,
+		cached_input_cost_usd: S.Number,
+		cache_creation_cost_usd: S.Number,
+		output_cost_usd: S.Number,
+		cache_cost_usd: S.Number,
 		providers: S.optional(AgentNetworkAccessLogSessionProvidersList),
 		models: S.optional(AgentNetworkAccessLogSessionModelsList),
 		decision: S.String,
@@ -426,6 +477,63 @@ export const AgentNetworkAccessLogsResponse = /*@__PURE__*/ S.suspend(() =>
 		total_pages: S.Number,
 	}),
 ).annotate({ identifier: "AgentNetworkAccessLogsResponse" }) as any as S.Schema<AgentNetworkAccessLogsResponse>;
+
+export interface AgentNetworkAgentConfigGetRequest {}
+export const AgentNetworkAgentConfigGetRequest = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({}).pipe(T.Http({ method: "GET", uri: "/api/agent-network/agent-config", code: 200 })),
+).annotate({ identifier: "AgentNetworkAgentConfigGetRequest" }) as any as S.Schema<AgentNetworkAgentConfigGetRequest>;
+
+/** The effective model allowlist for the caller (or the declared/catalog models when all_models_allowed is true). */
+export type AgentNetworkAgentConfigProviderModelsList = ReadonlyArray<string>;
+export const AgentNetworkAgentConfigProviderModelsList = /*@__PURE__*/ S.Array(
+	S.String,
+) as any as S.Schema<AgentNetworkAgentConfigProviderModelsList>;
+
+/** One provider the caller may use, reduced to what a local tool needs for configuration. */
+export interface AgentNetworkAgentConfigProvider {
+	/** Operator-assigned provider label. */
+	name: string;
+	/** Catalog entry id naming the provider type. */
+	catalog_id: string;
+	/** Request-body shape the provider speaks ("anthropic", "openai"). Empty when the gateway dispatches it by URL path instead. */
+	api_flavor: string;
+	/** True when no model allowlist restricts this provider for the caller; models then lists the declared or catalog models as a courtesy. */
+	all_models_allowed: boolean;
+	/** The effective model allowlist for the caller (or the declared/catalog models when all_models_allowed is true). */
+	models: AgentNetworkAgentConfigProviderModelsList;
+}
+export const AgentNetworkAgentConfigProvider = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({
+		name: S.String,
+		catalog_id: S.String,
+		api_flavor: S.String,
+		all_models_allowed: S.Boolean,
+		models: AgentNetworkAgentConfigProviderModelsList,
+	}),
+).annotate({ identifier: "AgentNetworkAgentConfigProvider" }) as any as S.Schema<AgentNetworkAgentConfigProvider>;
+
+/** The providers at least one of the caller's policies authorizes, in creation order. Empty when no policy covers the caller. */
+export type AgentNetworkAgentConfigProvidersList = ReadonlyArray<AgentNetworkAgentConfigProvider>;
+export const AgentNetworkAgentConfigProvidersList = /*@__PURE__*/ S.Array(
+	AgentNetworkAgentConfigProvider,
+) as any as S.Schema<AgentNetworkAgentConfigProvidersList>;
+
+/** The caller-scoped Agent Network connection config backing the self-service "Connect your agent" view. Available to every authenticated user; the providers are computed from the caller's own groups and the answer carries display metadata only. */
+export interface AgentNetworkAgentConfig {
+	/** False only when the account has no Agent Network set up. A caller that no policy covers yet still reads as configured, with an empty providers list. */
+	configured: boolean;
+	/** The account's Agent Network base URL, reachable over the NetBird tunnel only. Returned to every member of a configured account - it authorizes nothing on its own, since the gateway still refuses every request no policy permits. Empty when configured is false. */
+	endpoint: string;
+	/** The providers at least one of the caller's policies authorizes, in creation order. Empty when no policy covers the caller. */
+	providers: AgentNetworkAgentConfigProvidersList;
+}
+export const AgentNetworkAgentConfig = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({
+		configured: S.Boolean,
+		endpoint: S.String,
+		providers: AgentNetworkAgentConfigProvidersList,
+	}),
+).annotate({ identifier: "AgentNetworkAgentConfig" }) as any as S.Schema<AgentNetworkAgentConfig>;
 
 export interface AgentNetworkBudgetRulesGetRequest {}
 export const AgentNetworkBudgetRulesGetRequest = /*@__PURE__*/ S.suspend(() =>
@@ -718,6 +826,12 @@ export const AgentNetworkCatalogIdentityInjection = /*@__PURE__*/ S.suspend(() =
 	identifier: "AgentNetworkCatalogIdentityInjection",
 }) as any as S.Schema<AgentNetworkCatalogIdentityInjection>;
 
+/** Cost-meter pricing surfaces this provider's traffic is metered under ("openai", "anthropic", "bedrock"). Tells the dashboard which cache-rate fields apply to this provider's models: "openai" → cached_input_per_1k (cached prompt tokens are a subset of input); "anthropic"/"bedrock" → cache_read_per_1k + cache_creation_per_1k (additive buckets). Absent/empty for gateway and custom entries, whose upstream shape NetBird cannot know ahead of time — surface all cache fields for those. */
+export type AgentNetworkCatalogProviderPricingSurfacesList = ReadonlyArray<string>;
+export const AgentNetworkCatalogProviderPricingSurfacesList = /*@__PURE__*/ S.Array(
+	S.String,
+) as any as S.Schema<AgentNetworkCatalogProviderPricingSurfacesList>;
+
 export interface AgentNetworkCatalogModel {
 	/** Catalog model identifier as exposed by the upstream provider. */
 	id: string;
@@ -727,6 +841,12 @@ export interface AgentNetworkCatalogModel {
 	input_per_1k: number;
 	/** Output token price per 1k tokens, in USD. */
 	output_per_1k: number;
+	/** OpenAI-shape cache rate — default cost per 1k cached prompt tokens (a subset of input tokens), in USD. Absent when the model has no cached-input discount. */
+	cached_input_per_1k?: number;
+	/** Anthropic-shape cache rate — default cost per 1k cache-read tokens (additive to input tokens), in USD. Absent when the model has no cache-read rate. */
+	cache_read_per_1k?: number;
+	/** Anthropic-shape cache rate — default cost per 1k cache-creation tokens (additive to input tokens), in USD. Absent when the model has no cache-creation rate. */
+	cache_creation_per_1k?: number;
 	/** Maximum context window in tokens. */
 	context_window: number;
 }
@@ -736,6 +856,9 @@ export const AgentNetworkCatalogModel = /*@__PURE__*/ S.suspend(() =>
 		label: S.String,
 		input_per_1k: S.Number,
 		output_per_1k: S.Number,
+		cached_input_per_1k: S.optional(S.Number),
+		cache_read_per_1k: S.optional(S.Number),
+		cache_creation_per_1k: S.optional(S.Number),
 		context_window: S.Number,
 	}),
 ).annotate({ identifier: "AgentNetworkCatalogModel" }) as any as S.Schema<AgentNetworkCatalogModel>;
@@ -766,6 +889,8 @@ export interface AgentNetworkCatalogProvider {
 	/** Catalog-declared list of optional per-provider routing/config headers the proxy stamps on every upstream request. Each entry surfaces an input on the dashboard's provider modal (one per item, labeled with `label`). Operators fill any subset; values land on the provider record's `extra_values` map keyed by `name`. Used by gateways like Portkey for `x-portkey-config: pc-...` (saved-config id resolving upstream provider + virtual key). */
 	extra_headers?: AgentNetworkCatalogProviderExtraHeadersList;
 	identity_injection?: AgentNetworkCatalogIdentityInjection;
+	/** Cost-meter pricing surfaces this provider's traffic is metered under ("openai", "anthropic", "bedrock"). Tells the dashboard which cache-rate fields apply to this provider's models: "openai" → cached_input_per_1k (cached prompt tokens are a subset of input); "anthropic"/"bedrock" → cache_read_per_1k + cache_creation_per_1k (additive buckets). Absent/empty for gateway and custom entries, whose upstream shape NetBird cannot know ahead of time — surface all cache fields for those. */
+	pricing_surfaces?: AgentNetworkCatalogProviderPricingSurfacesList;
 	/** Catalog models available for this provider. */
 	models: AgentNetworkCatalogProviderModelsList;
 }
@@ -781,6 +906,7 @@ export const AgentNetworkCatalogProvider = /*@__PURE__*/ S.suspend(() =>
 		kind: AgentNetworkCatalogProviderKind,
 		extra_headers: S.optional(AgentNetworkCatalogProviderExtraHeadersList),
 		identity_injection: S.optional(AgentNetworkCatalogIdentityInjection),
+		pricing_surfaces: S.optional(AgentNetworkCatalogProviderPricingSurfacesList),
 		models: AgentNetworkCatalogProviderModelsList,
 	}),
 ).annotate({ identifier: "AgentNetworkCatalogProvider" }) as any as S.Schema<AgentNetworkCatalogProvider>;
@@ -796,6 +922,74 @@ export const AgentNetworkCatalogProvidersGetResponse = /*@__PURE__*/ S.suspend((
 ).annotate({
 	identifier: "AgentNetworkCatalogProvidersGetResponse",
 }) as any as S.Schema<AgentNetworkCatalogProvidersGetResponse>;
+
+export interface AgentNetworkCatalogProvidersModelsPostRequest {
+	/** Catalog provider to query (AgentNetworkCatalogProvider.id). Determines the listing endpoint, the auth header and the response shape. */
+	catalog_provider_id: string;
+	/** The upstream being configured. Used to reach vendors that serve their listing from the same host as inference, and to read back the region for those whose host embeds one. Sent alongside provider_id, it overrides the stored upstream, so an edit can be listed against the URL on the form before it is saved. */
+	upstream_url?: string;
+	/** Credential to query the vendor with, for a provider that has not been saved yet. Mutually exclusive with provider_id. */
+	api_key?: string | Redacted.Redacted<string>;
+	/** Existing Agent Network provider record to query with. Its stored credential is used, and its upstream unless upstream_url overrides it, so the form can refresh the list without the client holding the key. */
+	provider_id?: string;
+}
+export const AgentNetworkCatalogProvidersModelsPostRequest = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({
+		catalog_provider_id: S.String,
+		upstream_url: S.optional(S.String),
+		api_key: S.optional(S.String.pipe(T.SensitiveValue({}))),
+		provider_id: S.optional(S.String),
+	}).pipe(T.Http({ method: "POST", uri: "/api/agent-network/catalog/providers/models", code: 200 })),
+).annotate({
+	identifier: "AgentNetworkCatalogProvidersModelsPostRequest",
+}) as any as S.Schema<AgentNetworkCatalogProvidersModelsPostRequest>;
+
+export interface AgentNetworkDiscoveredModel {
+	/** Identifier to register on the provider record, in the form the vendor issues it. For Bedrock this is the region-prefixed inference-profile id, which is the only form AWS accepts at invoke time. */
+	id: string;
+	/** Vendor-supplied display name, where the vendor supplies one. */
+	label?: string;
+	/** Whether NetBird's shipped pricing table can price this model. When false the rates below are all zero and the operator must set them, or requests to this model would record a cost of zero. */
+	pricing_known: boolean;
+	/** Default input token price per 1k tokens, in USD, from the same table the proxy bills with. Zero when pricing_known is false. */
+	input_per_1k: number;
+	/** Default output token price per 1k tokens, in USD. Zero when pricing_known is false. */
+	output_per_1k: number;
+	/** OpenAI-shape cache rate — default cost per 1k cached prompt tokens (a subset of input tokens), in USD. Absent when the model has no cached-input discount. */
+	cached_input_per_1k?: number;
+	/** Anthropic-shape cache rate — default cost per 1k cache-read tokens (additive to input tokens), in USD. Absent when the model has no cache-read rate. */
+	cache_read_per_1k?: number;
+	/** Anthropic-shape cache rate — default cost per 1k cache-creation tokens (additive to input tokens), in USD. Absent when the model has no cache-creation rate. */
+	cache_creation_per_1k?: number;
+}
+export const AgentNetworkDiscoveredModel = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({
+		id: S.String,
+		label: S.optional(S.String),
+		pricing_known: S.Boolean,
+		input_per_1k: S.Number,
+		output_per_1k: S.Number,
+		cached_input_per_1k: S.optional(S.Number),
+		cache_read_per_1k: S.optional(S.Number),
+		cache_creation_per_1k: S.optional(S.Number),
+	}),
+).annotate({ identifier: "AgentNetworkDiscoveredModel" }) as any as S.Schema<AgentNetworkDiscoveredModel>;
+
+/** Models the credential can reach, in the order the vendor returned them. */
+export type AgentNetworkModelDiscoveryResponseModelsList = ReadonlyArray<AgentNetworkDiscoveredModel>;
+export const AgentNetworkModelDiscoveryResponseModelsList = /*@__PURE__*/ S.Array(
+	AgentNetworkDiscoveredModel,
+) as any as S.Schema<AgentNetworkModelDiscoveryResponseModelsList>;
+
+export interface AgentNetworkModelDiscoveryResponse {
+	/** Models the credential can reach, in the order the vendor returned them. */
+	models: AgentNetworkModelDiscoveryResponseModelsList;
+}
+export const AgentNetworkModelDiscoveryResponse = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({
+		models: AgentNetworkModelDiscoveryResponseModelsList,
+	}),
+).annotate({ identifier: "AgentNetworkModelDiscoveryResponse" }) as any as S.Schema<AgentNetworkModelDiscoveryResponse>;
 
 export interface AgentNetworkConsumptionGetRequest {}
 export const AgentNetworkConsumptionGetRequest = /*@__PURE__*/ S.suspend(() =>
@@ -1202,12 +1396,21 @@ export interface AgentNetworkProviderModel {
 	input_per_1k: number;
 	/** Cost per 1k output tokens, in USD. */
 	output_per_1k: number;
+	/** OpenAI-shape cache rate — cost per 1k cached prompt tokens (a subset of input tokens), in USD. Omitted means inherit NetBird's default rate for this model when one exists; 0 means no discount (cached tokens bill at input_per_1k). */
+	cached_input_per_1k?: number;
+	/** Anthropic-shape cache rate — cost per 1k cache-read tokens (additive to input tokens), in USD. Omitted means inherit NetBird's default rate for this model when one exists; 0 means cache reads bill at input_per_1k. */
+	cache_read_per_1k?: number;
+	/** Anthropic-shape cache rate — cost per 1k cache-creation tokens (additive to input tokens), in USD. Omitted means inherit NetBird's default rate for this model when one exists; 0 means cache writes bill at input_per_1k. */
+	cache_creation_per_1k?: number;
 }
 export const AgentNetworkProviderModel = /*@__PURE__*/ S.suspend(() =>
 	S.Struct({
 		id: S.String,
 		input_per_1k: S.Number,
 		output_per_1k: S.Number,
+		cached_input_per_1k: S.optional(S.Number),
+		cache_read_per_1k: S.optional(S.Number),
+		cache_creation_per_1k: S.optional(S.Number),
 	}),
 ).annotate({ identifier: "AgentNetworkProviderModel" }) as any as S.Schema<AgentNetworkProviderModel>;
 
@@ -1237,10 +1440,10 @@ export interface AgentNetworkProvider {
 	models: AgentNetworkProviderModelsList;
 	/** Operator-typed values for catalog-declared extra headers. Keys are wire header names (e.g. `x-portkey-config`); values are the strings the proxy stamps on every upstream request to this provider. Catalog (AgentNetworkCatalogProvider.extra_headers) declares which keys are accepted; values not declared by the catalog are ignored at synth time. Empty / missing values mean no header stamped. */
 	extra_values?: AgentNetworkProviderExtraValuesMap;
-	/** Wire header name the proxy stamps with the caller's display identity (user email or peer name) when the catalog entry's HeaderPair is `customizable`. Empty disables stamping for this dimension. Ignored when the catalog entry has a fixed HeaderPair (e.g. LiteLLM, Portkey). Used today by Bifrost: typical values are `x-bf-lh-netbird_user_id` (always-on log metadata) or `x-bf-dim-netbird_user_id` (Prometheus / OTEL — requires the label to be pre-declared in the gateway's `client.prometheus_labels` config). */
-	identity_header_user_id?: string;
-	/** Wire header name the proxy stamps with the caller's NetBird groups as a comma-separated list (sorted) when the catalog entry's HeaderPair is `customizable`. Empty disables stamping for this dimension. Same per-catalog semantics as `identity_header_user_id`. */
-	identity_header_groups?: string;
+	/** Wire header name the proxy stamps with the caller's display identity (user email or peer name) when the catalog entry's HeaderPair is `customizable`. Always present in responses; empty disables stamping for this dimension. Ignored when the catalog entry has a fixed HeaderPair (e.g. LiteLLM, Portkey). Used today by Bifrost: typical values are `x-bf-lh-netbird_user_id` (always-on log metadata) or `x-bf-dim-netbird_user_id` (Prometheus / OTEL — requires the label to be pre-declared in the gateway's `client.prometheus_labels` config). */
+	identity_header_user_id: string;
+	/** Wire header name the proxy stamps with the caller's NetBird groups as a comma-separated list (sorted) when the catalog entry's HeaderPair is `customizable`. Always present in responses; empty disables stamping for this dimension. Same per-catalog semantics as `identity_header_user_id`. */
+	identity_header_groups: string;
 	/** Whether the provider is enabled. */
 	enabled: boolean;
 	/** Whether upstream TLS certificate verification is skipped when the proxy dials this provider's URL. Intended for self-hosted / internal gateways behind a private or self-signed certificate. */
@@ -1260,8 +1463,8 @@ export const AgentNetworkProvider = /*@__PURE__*/ S.suspend(() =>
 		upstream_url: S.String,
 		models: AgentNetworkProviderModelsList,
 		extra_values: S.optional(AgentNetworkProviderExtraValuesMap),
-		identity_header_user_id: S.optional(S.String),
-		identity_header_groups: S.optional(S.String),
+		identity_header_user_id: S.String,
+		identity_header_groups: S.String,
 		enabled: S.Boolean,
 		skip_tls_verification: S.Boolean,
 		metadata_disabled: S.Boolean,
@@ -1286,7 +1489,7 @@ export const AgentNetworkProvidersPostRequestModelsList = /*@__PURE__*/ S.Array(
 	AgentNetworkProviderModel,
 ) as any as S.Schema<AgentNetworkProvidersPostRequestModelsList>;
 
-/** Operator-typed values for catalog-declared extra headers (see AgentNetworkProvider.extra_values). When present on a request, the whole map replaces the stored values. Empty strings drop the corresponding key. */
+/** Operator-typed values for catalog-declared extra headers (see AgentNetworkProvider.extra_values). The request's map replaces the stored values; empty strings drop the corresponding key. */
 export type AgentNetworkProvidersPostRequestExtraValuesMap = { [key: string]: string };
 export const AgentNetworkProvidersPostRequestExtraValuesMap = /*@__PURE__*/ S.Record(
 	S.String,
@@ -1300,23 +1503,21 @@ export interface AgentNetworkProvidersPostRequest {
 	name: string;
 	/** Full upstream URL (with scheme) that NetBird forwards traffic to. */
 	upstream_url: string;
-	/** Proxy cluster used to bootstrap the per-account agent-network endpoint when the first provider is created. Ignored on subsequent creates and on updates because the cluster is pinned on the account-level Settings row. */
-	bootstrap_cluster?: string;
 	/** Upstream provider API key. Sealed at rest on the management server and never returned in responses. Required on create; optional on update (omit to keep the existing key). */
 	api_key?: string | Redacted.Redacted<string>;
 	/** Models exposed through this endpoint, with the operator's per-1k input/output prices. Empty means all catalog models are allowed at catalog prices. */
 	models?: AgentNetworkProvidersPostRequestModelsList;
-	/** Operator-typed values for catalog-declared extra headers (see AgentNetworkProvider.extra_values). When present on a request, the whole map replaces the stored values. Empty strings drop the corresponding key. */
+	/** Operator-typed values for catalog-declared extra headers (see AgentNetworkProvider.extra_values). The request's map replaces the stored values; empty strings drop the corresponding key. */
 	extra_values?: AgentNetworkProvidersPostRequestExtraValuesMap;
-	/** Wire header name for the caller's display identity. See AgentNetworkProvider.identity_header_user_id. When omitted on a request, the stored value is left unchanged; pass an empty string explicitly to clear it (which disables stamping for this dimension). */
+	/** Wire header name for the caller's display identity. See AgentNetworkProvider.identity_header_user_id. Empty or omitted disables stamping for this dimension. */
 	identity_header_user_id?: string;
-	/** Wire header name for the caller's groups CSV. See AgentNetworkProvider.identity_header_groups. Same omit / empty semantics as `identity_header_user_id`. */
+	/** Wire header name for the caller's groups CSV. See AgentNetworkProvider.identity_header_groups. Same semantics as `identity_header_user_id`. */
 	identity_header_groups?: string;
 	/** Whether the provider is enabled. Defaults to true on create. */
 	enabled?: boolean;
-	/** Skip upstream TLS certificate verification when the proxy dials this provider's URL. For self-hosted / internal gateways behind a private or self-signed certificate. Defaults to false. When omitted on update, the stored value is left unchanged. */
+	/** Skip upstream TLS certificate verification when the proxy dials this provider's URL. For self-hosted / internal gateways behind a private or self-signed certificate. Defaults to false. */
 	skip_tls_verification?: boolean;
-	/** Disable identity metadata injection (the caller's user + authorizing group) for this provider. Defaults to false (metadata is injected). When omitted on update, the stored value is left unchanged. */
+	/** Disable identity metadata injection (the caller's user + authorizing group) for this provider. Defaults to false (metadata is injected). */
 	metadata_disabled?: boolean;
 }
 export const AgentNetworkProvidersPostRequest = /*@__PURE__*/ S.suspend(() =>
@@ -1324,7 +1525,6 @@ export const AgentNetworkProvidersPostRequest = /*@__PURE__*/ S.suspend(() =>
 		provider_id: S.String,
 		name: S.String,
 		upstream_url: S.String,
-		bootstrap_cluster: S.optional(S.String),
 		api_key: S.optional(S.String.pipe(T.SensitiveValue({}))),
 		models: S.optional(AgentNetworkProvidersPostRequestModelsList),
 		extra_values: S.optional(AgentNetworkProvidersPostRequestExtraValuesMap),
@@ -1371,7 +1571,7 @@ export const AgentNetworkProvidersProviderIdPutRequestModelsList = /*@__PURE__*/
 	AgentNetworkProviderModel,
 ) as any as S.Schema<AgentNetworkProvidersProviderIdPutRequestModelsList>;
 
-/** Operator-typed values for catalog-declared extra headers (see AgentNetworkProvider.extra_values). When present on a request, the whole map replaces the stored values. Empty strings drop the corresponding key. */
+/** Operator-typed values for catalog-declared extra headers (see AgentNetworkProvider.extra_values). The request's map replaces the stored values; empty strings drop the corresponding key. */
 export type AgentNetworkProvidersProviderIdPutRequestExtraValuesMap = { [key: string]: string };
 export const AgentNetworkProvidersProviderIdPutRequestExtraValuesMap = /*@__PURE__*/ S.Record(
 	S.String,
@@ -1387,23 +1587,21 @@ export interface AgentNetworkProvidersProviderIdPutRequest {
 	name: string;
 	/** Full upstream URL (with scheme) that NetBird forwards traffic to. */
 	upstream_url: string;
-	/** Proxy cluster used to bootstrap the per-account agent-network endpoint when the first provider is created. Ignored on subsequent creates and on updates because the cluster is pinned on the account-level Settings row. */
-	bootstrap_cluster?: string;
 	/** Upstream provider API key. Sealed at rest on the management server and never returned in responses. Required on create; optional on update (omit to keep the existing key). */
 	api_key?: string | Redacted.Redacted<string>;
 	/** Models exposed through this endpoint, with the operator's per-1k input/output prices. Empty means all catalog models are allowed at catalog prices. */
 	models?: AgentNetworkProvidersProviderIdPutRequestModelsList;
-	/** Operator-typed values for catalog-declared extra headers (see AgentNetworkProvider.extra_values). When present on a request, the whole map replaces the stored values. Empty strings drop the corresponding key. */
+	/** Operator-typed values for catalog-declared extra headers (see AgentNetworkProvider.extra_values). The request's map replaces the stored values; empty strings drop the corresponding key. */
 	extra_values?: AgentNetworkProvidersProviderIdPutRequestExtraValuesMap;
-	/** Wire header name for the caller's display identity. See AgentNetworkProvider.identity_header_user_id. When omitted on a request, the stored value is left unchanged; pass an empty string explicitly to clear it (which disables stamping for this dimension). */
+	/** Wire header name for the caller's display identity. See AgentNetworkProvider.identity_header_user_id. Empty or omitted disables stamping for this dimension. */
 	identity_header_user_id?: string;
-	/** Wire header name for the caller's groups CSV. See AgentNetworkProvider.identity_header_groups. Same omit / empty semantics as `identity_header_user_id`. */
+	/** Wire header name for the caller's groups CSV. See AgentNetworkProvider.identity_header_groups. Same semantics as `identity_header_user_id`. */
 	identity_header_groups?: string;
 	/** Whether the provider is enabled. Defaults to true on create. */
 	enabled?: boolean;
-	/** Skip upstream TLS certificate verification when the proxy dials this provider's URL. For self-hosted / internal gateways behind a private or self-signed certificate. Defaults to false. When omitted on update, the stored value is left unchanged. */
+	/** Skip upstream TLS certificate verification when the proxy dials this provider's URL. For self-hosted / internal gateways behind a private or self-signed certificate. Defaults to false. */
 	skip_tls_verification?: boolean;
-	/** Disable identity metadata injection (the caller's user + authorizing group) for this provider. Defaults to false (metadata is injected). When omitted on update, the stored value is left unchanged. */
+	/** Disable identity metadata injection (the caller's user + authorizing group) for this provider. Defaults to false (metadata is injected). */
 	metadata_disabled?: boolean;
 }
 export const AgentNetworkProvidersProviderIdPutRequest = /*@__PURE__*/ S.suspend(() =>
@@ -1412,7 +1610,6 @@ export const AgentNetworkProvidersProviderIdPutRequest = /*@__PURE__*/ S.suspend
 		provider_id: S.String,
 		name: S.String,
 		upstream_url: S.String,
-		bootstrap_cluster: S.optional(S.String),
 		api_key: S.optional(S.String.pipe(T.SensitiveValue({}))),
 		models: S.optional(AgentNetworkProvidersProviderIdPutRequestModelsList),
 		extra_values: S.optional(AgentNetworkProvidersProviderIdPutRequestExtraValuesMap),
@@ -1426,19 +1623,29 @@ export const AgentNetworkProvidersProviderIdPutRequest = /*@__PURE__*/ S.suspend
 	identifier: "AgentNetworkProvidersProviderIdPutRequest",
 }) as any as S.Schema<AgentNetworkProvidersProviderIdPutRequest>;
 
+export interface AgentNetworkSettingsDeleteRequest {}
+export const AgentNetworkSettingsDeleteRequest = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({}).pipe(T.Http({ method: "DELETE", uri: "/api/agent-network/settings", code: 200 })),
+).annotate({ identifier: "AgentNetworkSettingsDeleteRequest" }) as any as S.Schema<AgentNetworkSettingsDeleteRequest>;
+
+export interface AgentNetworkSettingsDeleteResponse {}
+export const AgentNetworkSettingsDeleteResponse = /*@__PURE__*/ S.suspend(() => S.Struct({})).annotate({
+	identifier: "AgentNetworkSettingsDeleteResponse",
+}) as any as S.Schema<AgentNetworkSettingsDeleteResponse>;
+
 export interface AgentNetworkSettingsGetRequest {}
 export const AgentNetworkSettingsGetRequest = /*@__PURE__*/ S.suspend(() =>
 	S.Struct({}).pipe(T.Http({ method: "GET", uri: "/api/agent-network/settings", code: 200 })),
 ).annotate({ identifier: "AgentNetworkSettingsGetRequest" }) as any as S.Schema<AgentNetworkSettingsGetRequest>;
 
-/** Per-account Agent Network gateway settings. One row per account; cluster and subdomain are auto-assigned on first provider create and immutable thereafter. */
+/** Per-account Agent Network gateway settings. One row per account; endpoint and proxy_address are assigned at bootstrap (POST) and immutable thereafter. Before bootstrap the account reads as the default values with empty endpoint and proxy_address. */
 export interface AgentNetworkSettings {
-	/** Address of the NetBird proxy cluster fronting this account's agent-network endpoint. */
-	cluster: string;
-	/** Auto-generated DNS-safe label that prefixes the cluster to form the agent-network endpoint. */
-	subdomain: string;
-	/** Bare hostname agents call for this account, computed as `<subdomain>.<cluster>`. */
+	/** Bare hostname agents call for this account. Empty until the account is bootstrapped. */
 	endpoint: string;
+	/** Declared cluster address of the proxy serving this account's gateway. Equal to `endpoint` when a dedicated proxy serves the account; otherwise the endpoint's immediate parent (a shared cluster the endpoint hangs one label beneath). Empty until the account is bootstrapped. */
+	proxy_address: string;
+	/** Whether the account's gateway is served by a proxy dedicated to it (endpoint equals proxy_address). */
+	dedicated: boolean;
 	/** Whether per-request access-log entries are collected for this account's agent-network traffic. */
 	enable_log_collection: boolean;
 	/** Master switch for request/response prompt capture. Capture runs only when this is on AND a policy guardrail also enables it. */
@@ -1447,26 +1654,55 @@ export interface AgentNetworkSettings {
 	redact_pii: boolean;
 	/** Days to retain full access-log rows; older rows are swept. 0 or less means keep indefinitely. Usage records are retained independently. */
 	access_log_retention_days?: number;
-	/** Timestamp when the settings row was created. */
-	created_at: string;
-	/** Timestamp when the settings row was last updated. */
-	updated_at: string;
+	/** Timestamp when the settings row was created. Absent until the account is bootstrapped. */
+	created_at?: string;
+	/** Timestamp when the settings row was last updated. Absent until the account is bootstrapped. */
+	updated_at?: string;
 }
 export const AgentNetworkSettings = /*@__PURE__*/ S.suspend(() =>
 	S.Struct({
-		cluster: S.String,
-		subdomain: S.String,
 		endpoint: S.String,
+		proxy_address: S.String,
+		dedicated: S.Boolean,
 		enable_log_collection: S.Boolean,
 		enable_prompt_collection: S.Boolean,
 		redact_pii: S.Boolean,
 		access_log_retention_days: S.optional(S.Number),
-		created_at: S.String,
-		updated_at: S.String,
+		created_at: S.optional(S.String),
+		updated_at: S.optional(S.String),
 	}),
 ).annotate({ identifier: "AgentNetworkSettings" }) as any as S.Schema<AgentNetworkSettings>;
 
+export interface AgentNetworkSettingsPostRequest {
+	/** Cluster address to allocate a labeled endpoint beneath. Mutually exclusive with `endpoint`. */
+	proxy_address?: string;
+	/** Hostname to claim as the account's self-addressed (dedicated) endpoint. Mutually exclusive with `proxy_address`. Rejected when another account already holds it. */
+	endpoint?: string;
+	/** Whether per-request access-log entries are collected for this account's agent-network traffic. Defaults to true. */
+	enable_log_collection?: boolean;
+	/** Master switch for request/response prompt capture. Defaults to false. */
+	enable_prompt_collection?: boolean;
+	/** Whether captured prompts have PII redacted. Defaults to false. */
+	redact_pii?: boolean;
+	/** Days to retain full access-log rows; older rows are swept. 0 or less means keep indefinitely. Defaults to 30. */
+	access_log_retention_days?: number;
+}
+export const AgentNetworkSettingsPostRequest = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({
+		proxy_address: S.optional(S.String),
+		endpoint: S.optional(S.String),
+		enable_log_collection: S.optional(S.Boolean),
+		enable_prompt_collection: S.optional(S.Boolean),
+		redact_pii: S.optional(S.Boolean),
+		access_log_retention_days: S.optional(S.Number),
+	}).pipe(T.Http({ method: "POST", uri: "/api/agent-network/settings", code: 200 })),
+).annotate({ identifier: "AgentNetworkSettingsPostRequest" }) as any as S.Schema<AgentNetworkSettingsPostRequest>;
+
 export interface AgentNetworkSettingsPutRequest {
+	/** The account's gateway endpoint hostname. Immutable — must match the assigned value; a different value is rejected. */
+	endpoint: string;
+	/** Declared cluster address of the proxy serving this account's gateway. Immutable — must match the assigned value; a different value is rejected. */
+	proxy_address: string;
 	/** Whether per-request access-log entries are collected for this account's agent-network traffic. */
 	enable_log_collection: boolean;
 	/** Master switch for request/response prompt capture. */
@@ -1474,14 +1710,16 @@ export interface AgentNetworkSettingsPutRequest {
 	/** Whether captured prompts have PII redacted. */
 	redact_pii: boolean;
 	/** Days to retain full access-log rows; older rows are swept. 0 or less means keep indefinitely. */
-	access_log_retention_days?: number;
+	access_log_retention_days: number;
 }
 export const AgentNetworkSettingsPutRequest = /*@__PURE__*/ S.suspend(() =>
 	S.Struct({
+		endpoint: S.String,
+		proxy_address: S.String,
 		enable_log_collection: S.Boolean,
 		enable_prompt_collection: S.Boolean,
 		redact_pii: S.Boolean,
-		access_log_retention_days: S.optional(S.Number),
+		access_log_retention_days: S.Number,
 	}).pipe(T.Http({ method: "PUT", uri: "/api/agent-network/settings", code: 200 })),
 ).annotate({ identifier: "AgentNetworkSettingsPutRequest" }) as any as S.Schema<AgentNetworkSettingsPutRequest>;
 
@@ -1544,10 +1782,24 @@ export interface AgentNetworkUsageBucket {
 	input_tokens: number;
 	/** Total output (completion) tokens in the bucket. */
 	output_tokens: number;
-	/** Total tokens in the bucket. */
+	/** Total tokens in the bucket, including prompt-cache tokens. */
 	total_tokens: number;
+	/** Total prompt-cache read tokens in the bucket. */
+	cached_input_tokens: number;
+	/** Total prompt-cache write tokens in the bucket. */
+	cache_creation_tokens: number;
+	/** Total cost of non-cached input tokens in the bucket. */
+	input_cost_usd: number;
+	/** Total cost of prompt-cache read tokens in the bucket. */
+	cached_input_cost_usd: number;
+	/** Total cost of prompt-cache write tokens in the bucket. */
+	cache_creation_cost_usd: number;
+	/** Total cost of output tokens in the bucket. */
+	output_cost_usd: number;
 	/** Total estimated USD spend in the bucket. */
 	cost_usd: number;
+	/** Portion of cost_usd billed for prompt-cache usage in the bucket. */
+	cache_cost_usd: number;
 }
 export const AgentNetworkUsageBucket = /*@__PURE__*/ S.suspend(() =>
 	S.Struct({
@@ -1555,7 +1807,14 @@ export const AgentNetworkUsageBucket = /*@__PURE__*/ S.suspend(() =>
 		input_tokens: S.Number,
 		output_tokens: S.Number,
 		total_tokens: S.Number,
+		cached_input_tokens: S.Number,
+		cache_creation_tokens: S.Number,
+		input_cost_usd: S.Number,
+		cached_input_cost_usd: S.Number,
+		cache_creation_cost_usd: S.Number,
+		output_cost_usd: S.Number,
 		cost_usd: S.Number,
+		cache_cost_usd: S.Number,
 	}),
 ).annotate({ identifier: "AgentNetworkUsageBucket" }) as any as S.Schema<AgentNetworkUsageBucket>;
 
@@ -1571,8 +1830,49 @@ export const AgentNetworkUsageOverviewGetResponse = /*@__PURE__*/ S.suspend(() =
 	identifier: "AgentNetworkUsageOverviewGetResponse",
 }) as any as S.Schema<AgentNetworkUsageOverviewGetResponse>;
 
+export interface IntegrationsAgentNetworkManagedProxyGetRequest {}
+export const IntegrationsAgentNetworkManagedProxyGetRequest = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({}).pipe(T.Http({ method: "GET", uri: "/api/integrations/agent-network/managed-proxy", code: 200 })),
+).annotate({
+	identifier: "IntegrationsAgentNetworkManagedProxyGetRequest",
+}) as any as S.Schema<IntegrationsAgentNetworkManagedProxyGetRequest>;
+
+/** Derived deployment state. `provisioning` until the gateway is rolled out and connected, `ready` while the gateway actively serves the endpoint, `failed` when the rollout reported a failure. */
+export type AgentNetworkManagedProxyState = "provisioning" | "ready" | "failed";
+export const AgentNetworkManagedProxyState = /*@__PURE__*/ S.String;
+
+/** A NetBird-managed Agent Network gateway deployment. */
+export interface AgentNetworkManagedProxy {
+	/** Managed proxy deployment ID. */
+	id: string;
+	/** Derived deployment state. `provisioning` until the gateway is rolled out and connected, `ready` while the gateway actively serves the endpoint, `failed` when the rollout reported a failure. */
+	state: AgentNetworkManagedProxyState;
+	/** The account's gateway hostname. */
+	endpoint: string;
+	/** Region of the cluster hosting the deployment. */
+	region?: string;
+	/** Failure detail reported by the rollout. Only set when state is `failed`. */
+	message?: string;
+}
+export const AgentNetworkManagedProxy = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({
+		id: S.String,
+		state: AgentNetworkManagedProxyState,
+		endpoint: S.String,
+		region: S.optional(S.String),
+		message: S.optional(S.String),
+	}),
+).annotate({ identifier: "AgentNetworkManagedProxy" }) as any as S.Schema<AgentNetworkManagedProxy>;
+
+export interface IntegrationsAgentNetworkManagedProxyPostRequest {}
+export const IntegrationsAgentNetworkManagedProxyPostRequest = /*@__PURE__*/ S.suspend(() =>
+	S.Struct({}).pipe(T.Http({ method: "POST", uri: "/api/integrations/agent-network/managed-proxy", code: 200 })),
+).annotate({
+	identifier: "IntegrationsAgentNetworkManagedProxyPostRequest",
+}) as any as S.Schema<IntegrationsAgentNetworkManagedProxyPostRequest>;
+
 export type AgentNetworkAccessLogSessionsGetError = Forbidden | NetbirdOpError;
-/** List Agent Network access logs grouped by session Returns a paginated, server-side-filtered list of agent-network (LLM) access logs grouped by session. The page unit is a session (total_records counts sessions); each session carries an aggregate summary and its ordered entries. Requests the client sent no session id for each form their own singleton group. Accepts the same filters as the flat access-logs endpoint. Available only when the account has log collection enabled. */
+/** List Agent Network access logs grouped by session Returns a paginated, server-side-filtered list of agent-network (LLM) access logs grouped by session. The page unit is a session (total_records counts sessions); each session carries an aggregate summary and its ordered entries. Requests the client sent no session id for each form their own singleton group. Accepts the same filters as the flat access-logs endpoint. Available only when the account has log collection enabled. Callers without the account-wide grant are not denied - the response is scoped to their own requests (any user_id or group_id filter is overridden). */
 export const agentNetworkAccessLogSessionsGet: API.OperationMethod<
 	AgentNetworkAccessLogSessionsGetRequest,
 	AgentNetworkAccessLogSessionsResponse,
@@ -1587,7 +1887,7 @@ export const agentNetworkAccessLogSessionsGet: API.OperationMethod<
 }));
 
 export type AgentNetworkAccessLogsGetError = Forbidden | NetbirdOpError;
-/** List Agent Network access logs Returns a paginated, server-side-filtered list of agent-network (LLM) access log entries. Available only when the account has log collection enabled; otherwise entries are not retained. */
+/** List Agent Network access logs Returns a paginated, server-side-filtered list of agent-network (LLM) access log entries. Available only when the account has log collection enabled; otherwise entries are not retained. Callers without the account-wide grant are not denied - the response is scoped to their own requests (any user_id or group_id filter is overridden). */
 export const agentNetworkAccessLogsGet: API.OperationMethod<
 	AgentNetworkAccessLogsGetRequest,
 	AgentNetworkAccessLogsResponse,
@@ -1597,6 +1897,21 @@ export const agentNetworkAccessLogsGet: API.OperationMethod<
 	input: AgentNetworkAccessLogsGetRequest,
 	output: AgentNetworkAccessLogsResponse,
 	errors: [Forbidden, UnknownNetbirdError],
+	protocol: NetbirdProtocol,
+	retry: Retry.Retry,
+}));
+
+export type AgentNetworkAgentConfigGetError = NetbirdOpError;
+/** Retrieve the caller's Agent Network agent config Returns everything the caller needs to configure a local AI tool and nothing more - the account's Agent Network endpoint plus the providers and models the caller's own policies allow. Available to every authenticated user regardless of role; the response never contains provider credentials, policy or guardrail configuration, or providers the caller cannot reach. */
+export const agentNetworkAgentConfigGet: API.OperationMethod<
+	AgentNetworkAgentConfigGetRequest,
+	AgentNetworkAgentConfig,
+	AgentNetworkAgentConfigGetError,
+	NetbirdOpContext
+> = /*@__PURE__*/ API.make(() => ({
+	input: AgentNetworkAgentConfigGetRequest,
+	output: AgentNetworkAgentConfig,
+	errors: [UnknownNetbirdError],
 	protocol: NetbirdProtocol,
 	retry: Retry.Retry,
 }));
@@ -1687,6 +2002,21 @@ export const agentNetworkCatalogProvidersGet: API.OperationMethod<
 	input: AgentNetworkCatalogProvidersGetRequest,
 	output: AgentNetworkCatalogProvidersGetResponse,
 	errors: [Forbidden, UnknownNetbirdError],
+	protocol: NetbirdProtocol,
+	retry: Retry.Retry,
+}));
+
+export type AgentNetworkCatalogProvidersModelsPostError = BadRequest | Forbidden | UnprocessableEntity | NetbirdOpError;
+/** Discover the models a provider credential can reach Asks the vendor which models the supplied credential can actually use, so the provider form can offer a live list instead of only the static catalog. The endpoint, auth header and response shape are taken from the catalog entry, never from the request. Supply either an api_key together with the upstream_url being configured (before the provider is saved), or a provider_id of an existing record to reuse its stored credential. Returns 422 for a catalog provider that has no listing endpoint (most gateways); the caller should fall back to the catalog's own model list. A model whose price the shipped table does not know is returned with pricing_known false, and the operator must set rates for it. */
+export const agentNetworkCatalogProvidersModelsPost: API.OperationMethod<
+	AgentNetworkCatalogProvidersModelsPostRequest,
+	AgentNetworkModelDiscoveryResponse,
+	AgentNetworkCatalogProvidersModelsPostError,
+	NetbirdOpContext
+> = /*@__PURE__*/ API.make(() => ({
+	input: AgentNetworkCatalogProvidersModelsPostRequest,
+	output: AgentNetworkModelDiscoveryResponse,
+	errors: [BadRequest, Forbidden, UnprocessableEntity, UnknownNetbirdError],
 	protocol: NetbirdProtocol,
 	retry: Retry.Retry,
 }));
@@ -1871,8 +2201,8 @@ export const agentNetworkProvidersGet: API.OperationMethod<
 	retry: Retry.Retry,
 }));
 
-export type AgentNetworkProvidersPostError = BadRequest | Forbidden | Conflict | NetbirdOpError;
-/** Create an Agent Network Provider Connects a new Agent Network AI provider for the account. */
+export type AgentNetworkProvidersPostError = BadRequest | Forbidden | Conflict | UnprocessableEntity | NetbirdOpError;
+/** Create an Agent Network Provider Connects a new Agent Network AI provider for the account. The credential is checked against the vendor's model listing before the provider is stored, so a record the vendor will not accept is refused rather than saved. A rejected credential, a listing endpoint that does not resolve or answer, a vendor outage, and a timeout all block the write and return 422. What that proves about the upstream URL is narrower than the URL itself. Only its host is used: the listing is requested over HTTPS at the path the catalog entry declares, so a configured scheme or path is neither used nor validated here. Where the catalog entry has a listing host of its own — Bedrock, whose listing comes from the control plane — even the host is only resolved, never contacted, so a public host that does not answer is still stored. Only what cannot be checked at all is exempt and stored unverified: a catalog provider with no listing endpoint, one with no host to derive a listing from, an upstream resolving to a private address the management service will not dial, and a provider configured to skip TLS verification. */
 export const agentNetworkProvidersPost: API.OperationMethod<
 	AgentNetworkProvidersPostRequest,
 	AgentNetworkProvider,
@@ -1881,7 +2211,7 @@ export const agentNetworkProvidersPost: API.OperationMethod<
 > = /*@__PURE__*/ API.make(() => ({
 	input: AgentNetworkProvidersPostRequest,
 	output: AgentNetworkProvider,
-	errors: [BadRequest, Forbidden, Conflict, UnknownNetbirdError],
+	errors: [BadRequest, Forbidden, Conflict, UnprocessableEntity, UnknownNetbirdError],
 	protocol: NetbirdProtocol,
 	retry: Retry.Retry,
 }));
@@ -1916,8 +2246,14 @@ export const agentNetworkProvidersProviderIdGet: API.OperationMethod<
 	retry: Retry.Retry,
 }));
 
-export type AgentNetworkProvidersProviderIdPutError = BadRequest | Forbidden | NotFound | Conflict | NetbirdOpError;
-/** Update an Agent Network Provider Update an existing Agent Network AI provider. */
+export type AgentNetworkProvidersProviderIdPutError =
+	| BadRequest
+	| Forbidden
+	| NotFound
+	| Conflict
+	| UnprocessableEntity
+	| NetbirdOpError;
+/** Update an Agent Network Provider Update an existing Agent Network AI provider. When the upstream URL, the API key or the catalog provider changes, the record is checked against the vendor before the change is stored, and a refusal returns 422 without replacing what was there. Switching TLS verification back on is the fourth trigger: a provider exempt from the check was stored unverified, so the edit that ends the exemption is the first opportunity to check it. Where one of the four does fire, an update that omits the API key is checked against the stored one. Edits touching none of them — a rename, model rows, price edits — are stored without a check, as are the cases the create description lists as unverifiable. */
 export const agentNetworkProvidersProviderIdPut: API.OperationMethod<
 	AgentNetworkProvidersProviderIdPutRequest,
 	AgentNetworkProvider,
@@ -1926,13 +2262,28 @@ export const agentNetworkProvidersProviderIdPut: API.OperationMethod<
 > = /*@__PURE__*/ API.make(() => ({
 	input: AgentNetworkProvidersProviderIdPutRequest,
 	output: AgentNetworkProvider,
-	errors: [BadRequest, Forbidden, NotFound, Conflict, UnknownNetbirdError],
+	errors: [BadRequest, Forbidden, NotFound, Conflict, UnprocessableEntity, UnknownNetbirdError],
 	protocol: NetbirdProtocol,
 	retry: Retry.Retry,
 }));
 
-export type AgentNetworkSettingsGetError = Forbidden | NotFound | NetbirdOpError;
-/** Retrieve Agent Network settings Returns the per-account Agent Network gateway settings (cluster, subdomain, endpoint). Returns 404 when no provider has been created yet — settings are lazily bootstrapped on first provider create. */
+export type AgentNetworkSettingsDeleteError = Forbidden | NotFound | NetbirdOpError;
+/** Delete Agent Network settings Deletes the account's Agent Network settings row, releasing the endpoint. Guarded — the delete is refused with 412 while any Agent Network provider exists for the account or while a proxy is actively serving the endpoint. Bootstrapping again after a delete allocates a new endpoint; the released hostname is not reserved. */
+export const agentNetworkSettingsDelete: API.OperationMethod<
+	AgentNetworkSettingsDeleteRequest,
+	AgentNetworkSettingsDeleteResponse,
+	AgentNetworkSettingsDeleteError,
+	NetbirdOpContext
+> = /*@__PURE__*/ API.make(() => ({
+	input: AgentNetworkSettingsDeleteRequest,
+	output: AgentNetworkSettingsDeleteResponse,
+	errors: [Forbidden, NotFound, UnknownNetbirdError],
+	protocol: NetbirdProtocol,
+	retry: Retry.Retry,
+}));
+
+export type AgentNetworkSettingsGetError = Forbidden | NetbirdOpError;
+/** Retrieve Agent Network settings Returns the per-account Agent Network gateway settings (endpoint, proxy address, collection toggles). Before the account is bootstrapped via POST, the response carries the default values with an empty endpoint and proxy address. */
 export const agentNetworkSettingsGet: API.OperationMethod<
 	AgentNetworkSettingsGetRequest,
 	AgentNetworkSettings,
@@ -1941,13 +2292,28 @@ export const agentNetworkSettingsGet: API.OperationMethod<
 > = /*@__PURE__*/ API.make(() => ({
 	input: AgentNetworkSettingsGetRequest,
 	output: AgentNetworkSettings,
-	errors: [Forbidden, NotFound, UnknownNetbirdError],
+	errors: [Forbidden, UnknownNetbirdError],
 	protocol: NetbirdProtocol,
 	retry: Retry.Retry,
 }));
 
-export type AgentNetworkSettingsPutError = BadRequest | Forbidden | NotFound | NetbirdOpError;
-/** Update Agent Network settings Updates the mutable account-level Agent Network settings (collection toggles). Cluster and subdomain are immutable and ignored if sent. Returns 404 when settings have not been bootstrapped (no provider created yet). */
+export type AgentNetworkSettingsPostError = BadRequest | Forbidden | Conflict | UnprocessableEntity | NetbirdOpError;
+/** Bootstrap Agent Network settings Creates the per-account Agent Network settings row and allocates the account's endpoint. Exactly one of `proxy_address` (labeled endpoint under that cluster; the server allocates the label) and `endpoint` (self-addressed dedicated endpoint, claimed verbatim) must be provided. The endpoint and proxy address are immutable once assigned. Returns 409 when the account already has a settings row. */
+export const agentNetworkSettingsPost: API.OperationMethod<
+	AgentNetworkSettingsPostRequest,
+	AgentNetworkSettings,
+	AgentNetworkSettingsPostError,
+	NetbirdOpContext
+> = /*@__PURE__*/ API.make(() => ({
+	input: AgentNetworkSettingsPostRequest,
+	output: AgentNetworkSettings,
+	errors: [BadRequest, Forbidden, Conflict, UnprocessableEntity, UnknownNetbirdError],
+	protocol: NetbirdProtocol,
+	retry: Retry.Retry,
+}));
+
+export type AgentNetworkSettingsPutError = BadRequest | Forbidden | NotFound | UnprocessableEntity | NetbirdOpError;
+/** Update Agent Network settings Updates the account-level Agent Network settings; the request carries every field, replacing the mutable ones (collection toggles and retention). Returns 404 when the account has no settings row yet — bootstrap it with POST first. The endpoint and proxy address are assigned at bootstrap and immutable; the request must carry them unchanged, and a request carrying different values is rejected. */
 export const agentNetworkSettingsPut: API.OperationMethod<
 	AgentNetworkSettingsPutRequest,
 	AgentNetworkSettings,
@@ -1956,13 +2322,13 @@ export const agentNetworkSettingsPut: API.OperationMethod<
 > = /*@__PURE__*/ API.make(() => ({
 	input: AgentNetworkSettingsPutRequest,
 	output: AgentNetworkSettings,
-	errors: [BadRequest, Forbidden, NotFound, UnknownNetbirdError],
+	errors: [BadRequest, Forbidden, NotFound, UnprocessableEntity, UnknownNetbirdError],
 	protocol: NetbirdProtocol,
 	retry: Retry.Retry,
 }));
 
 export type AgentNetworkUsageOverviewGetError = Forbidden | NetbirdOpError;
-/** Agent Network usage overview Returns agent-network token and cost usage aggregated into time buckets, server-side filtered. Usage is always collected (independent of log collection). */
+/** Agent Network usage overview Returns agent-network token and cost usage aggregated into time buckets, server-side filtered. Usage is always collected (independent of log collection). Callers without the account-wide grant are not denied - the response is scoped to their own usage (any user_id or group_id filter is overridden). */
 export const agentNetworkUsageOverviewGet: API.OperationMethod<
 	AgentNetworkUsageOverviewGetRequest,
 	AgentNetworkUsageOverviewGetResponse,
@@ -1972,6 +2338,36 @@ export const agentNetworkUsageOverviewGet: API.OperationMethod<
 	input: AgentNetworkUsageOverviewGetRequest,
 	output: AgentNetworkUsageOverviewGetResponse,
 	errors: [Forbidden, UnknownNetbirdError],
+	protocol: NetbirdProtocol,
+	retry: Retry.Retry,
+}));
+
+export type IntegrationsAgentNetworkManagedProxyGetError = Forbidden | NotFound | NetbirdOpError;
+/** Retrieve managed Agent Network gateway status Reports the account's managed gateway deployment and its derived state. Returns 404 when the account has no managed deployment. */
+export const integrationsAgentNetworkManagedProxyGet: API.OperationMethod<
+	IntegrationsAgentNetworkManagedProxyGetRequest,
+	AgentNetworkManagedProxy,
+	IntegrationsAgentNetworkManagedProxyGetError,
+	NetbirdOpContext
+> = /*@__PURE__*/ API.make(() => ({
+	input: IntegrationsAgentNetworkManagedProxyGetRequest,
+	output: AgentNetworkManagedProxy,
+	errors: [Forbidden, NotFound, UnknownNetbirdError],
+	protocol: NetbirdProtocol,
+	retry: Retry.Retry,
+}));
+
+export type IntegrationsAgentNetworkManagedProxyPostError = Forbidden | Conflict | NetbirdOpError;
+/** Provision a managed Agent Network gateway Starts provisioning of a NetBird-managed Agent Network gateway for the account, allocating its endpoint under the managed zone on the first call. Idempotent — answers 202 when this call started (or, after a failure, restarted) provisioning and 200 when a deployment already exists, reporting current state either way. Returns 409 when the account already has an Agent Network endpoint that managed provisioning does not own, and 503 when endpoint allocation is temporarily exhausted. */
+export const integrationsAgentNetworkManagedProxyPost: API.OperationMethod<
+	IntegrationsAgentNetworkManagedProxyPostRequest,
+	AgentNetworkManagedProxy,
+	IntegrationsAgentNetworkManagedProxyPostError,
+	NetbirdOpContext
+> = /*@__PURE__*/ API.make(() => ({
+	input: IntegrationsAgentNetworkManagedProxyPostRequest,
+	output: AgentNetworkManagedProxy,
+	errors: [Forbidden, Conflict, UnknownNetbirdError],
 	protocol: NetbirdProtocol,
 	retry: Retry.Retry,
 }));

@@ -46,11 +46,11 @@ export const PolicyRuleAction = /*@__PURE__*/ S.String;
 export type PolicyRuleProtocol = "all" | "tcp" | "udp" | "icmp" | "netbird-ssh";
 export const PolicyRuleProtocol = /*@__PURE__*/ S.String;
 
-/** Policy rule affected ports */
+/** Policy rule affected ports. Mutually exclusive with `port_ranges`. A rule accepts either individual ports or port ranges, not both. */
 export type PolicyRulePortsList = ReadonlyArray<string>;
 export const PolicyRulePortsList = /*@__PURE__*/ S.Array(S.String) as any as S.Schema<PolicyRulePortsList>;
 
-/** Policy rule affected ports range */
+/** Policy rule affected ports range. A range with identical start and end values represents a single port. */
 export interface RulePortRange {
 	/** The starting port of the range */
 	start: number;
@@ -64,7 +64,7 @@ export const RulePortRange = /*@__PURE__*/ S.suspend(() =>
 	}),
 ).annotate({ identifier: "RulePortRange" }) as any as S.Schema<RulePortRange>;
 
-/** Policy rule affected ports ranges list */
+/** Policy rule affected ports ranges list. Mutually exclusive with `ports`. To mix individual ports with ranges in one rule, express each single port as a range with identical start and end values (for example, start 443, end 443). */
 export type PolicyRulePortRangesList = ReadonlyArray<RulePortRange>;
 export const PolicyRulePortRangesList = /*@__PURE__*/ S.Array(
 	RulePortRange,
@@ -144,9 +144,9 @@ export interface PolicyRule {
 	bidirectional: boolean;
 	/** Policy rule type of the traffic */
 	protocol: PolicyRuleProtocol;
-	/** Policy rule affected ports */
+	/** Policy rule affected ports. Mutually exclusive with `port_ranges`. A rule accepts either individual ports or port ranges, not both. */
 	ports?: PolicyRulePortsList;
-	/** Policy rule affected ports ranges list */
+	/** Policy rule affected ports ranges list. Mutually exclusive with `ports`. To mix individual ports with ranges in one rule, express each single port as a range with identical start and end values (for example, start 443, end 443). */
 	port_ranges?: PolicyRulePortRangesList;
 	/** Map of user group ids to a list of local users */
 	authorized_groups?: PolicyRuleAuthorizedGroupsMap;
@@ -295,11 +295,11 @@ export const PolicyRuleUpdateAction = /*@__PURE__*/ S.String;
 export type PolicyRuleUpdateProtocol = "all" | "tcp" | "udp" | "icmp" | "netbird-ssh";
 export const PolicyRuleUpdateProtocol = /*@__PURE__*/ S.String;
 
-/** Policy rule affected ports */
+/** Policy rule affected ports. Mutually exclusive with `port_ranges`. A rule accepts either individual ports or port ranges, not both. */
 export type PolicyRuleUpdatePortsList = ReadonlyArray<string>;
 export const PolicyRuleUpdatePortsList = /*@__PURE__*/ S.Array(S.String) as any as S.Schema<PolicyRuleUpdatePortsList>;
 
-/** Policy rule affected ports ranges list */
+/** Policy rule affected ports ranges list. Mutually exclusive with `ports`. To mix individual ports with ranges in one rule, express each single port as a range with identical start and end values (for example, start 443, end 443). */
 export type PolicyRuleUpdatePortRangesList = ReadonlyArray<RulePortRange>;
 export const PolicyRuleUpdatePortRangesList = /*@__PURE__*/ S.Array(
 	RulePortRange,
@@ -342,9 +342,9 @@ export interface PolicyRuleUpdate {
 	bidirectional: boolean;
 	/** Policy rule type of the traffic */
 	protocol: PolicyRuleUpdateProtocol;
-	/** Policy rule affected ports */
+	/** Policy rule affected ports. Mutually exclusive with `port_ranges`. A rule accepts either individual ports or port ranges, not both. */
 	ports?: PolicyRuleUpdatePortsList;
-	/** Policy rule affected ports ranges list */
+	/** Policy rule affected ports ranges list. Mutually exclusive with `ports`. To mix individual ports with ranges in one rule, express each single port as a range with identical start and end values (for example, start 443, end 443). */
 	port_ranges?: PolicyRuleUpdatePortRangesList;
 	/** Map of user group ids to a list of local users */
 	authorized_groups?: PolicyRuleUpdateAuthorizedGroupsMap;

@@ -724,7 +724,7 @@ export const reverseProxiesClustersGet: API.OperationMethod<
 }));
 
 export type ReverseProxiesDomainsDomainIdDeleteError = BadRequest | Forbidden | NotFound | NetbirdOpError;
-/** Delete a Custom domain Delete an existing service custom domain */
+/** Delete a Custom domain Delete an existing service custom domain after removing or moving all services that use it or its subdomains, including disabled services. */
 export const reverseProxiesDomainsDomainIdDelete: API.OperationMethod<
 	ReverseProxiesDomainsDomainIdDeleteRequest,
 	ReverseProxiesDomainsDomainIdDeleteResponse,

@@ -81,6 +81,8 @@ export interface PeerLocalFlags {
 	rosenpass_permissive?: boolean;
 	/** Indicates whether SSH access this peer is allowed or not */
 	server_ssh_allowed?: boolean;
+	/** Indicates whether the peer has opted into management-requested remote jobs (e.g. debug bundles) */
+	remote_jobs_allowed?: boolean;
 	/** Indicates whether client routes are disabled on this peer or not */
 	disable_client_routes?: boolean;
 	/** Indicates whether server routes are disabled on this peer or not */
@@ -101,6 +103,7 @@ export const PeerLocalFlags = /*@__PURE__*/ S.suspend(() =>
 		rosenpass_enabled: S.optional(S.Boolean),
 		rosenpass_permissive: S.optional(S.Boolean),
 		server_ssh_allowed: S.optional(S.Boolean),
+		remote_jobs_allowed: S.optional(S.Boolean),
 		disable_client_routes: S.optional(S.Boolean),
 		disable_server_routes: S.optional(S.Boolean),
 		disable_dns: S.optional(S.Boolean),

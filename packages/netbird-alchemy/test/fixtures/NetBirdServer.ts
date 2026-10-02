@@ -12,7 +12,7 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import { findAvailablePort } from "./Runtime.ts";
 
 export const NETBIRD_SERVER_IMAGE = "netbirdio/netbird-server";
-export const NETBIRD_SERVER_TAG = "0.75.0";
+export const NETBIRD_SERVER_TAG = "0.80.0";
 
 const FIXTURE_ENVIRONMENT = {
 	NB_SETUP_PAT_ENABLED: "true",

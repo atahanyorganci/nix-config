@@ -39,8 +39,8 @@
 		"yaml": "^2.9.0"
 	},
 	"spec": {
-		"ref": "v0.75.0",
+		"ref": "v0.80.0",
 		"path": "shared/management/http/api/openapi.yml",
-		"sha256": "ec2f046e2722c505b4e779ff45ffd77bd224e4042756e1b7907378cfb64b0418"
+		"sha256": "011f51023d678c2819edcb087c59915c166bd60e7f3cceba5ae2569dc2c2a9d7"
 	}
 }

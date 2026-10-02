@@ -123,7 +123,7 @@ export const FleetDMMatchAttributesRequiredPoliciesList = /*@__PURE__*/ S.Array(
 	S.Number,
 ) as any as S.Schema<FleetDMMatchAttributesRequiredPoliciesList>;
 
-/** Attribute conditions to match when approving FleetDM hosts. Most attributes work with FleetDM's free/open-source version. Premium-only attributes are marked accordingly */
+/** Attribute conditions to match when approving FleetDM hosts. Most attributes work with FleetDM's free/open source version. Premium-only attributes are marked accordingly */
 export interface FleetDMMatchAttributes {
 	/** Whether disk encryption (FileVault/BitLocker) must be enabled on the host */
 	disk_encryption_enabled?: boolean;
