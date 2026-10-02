@@ -75,7 +75,7 @@
       expose = {
         enable = true;
         key = "ai";
-        accessGroups = ["Admin"];
+        accessGroups = ["Admin" "Servers"];
       };
     };
   };
