@@ -1,4 +1,6 @@
-{lib, ...}: {
+{lib, ...}: let
+  deployKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQEQWwP1aWkv4t/nzin3rRn7ueC7HWR+g9Tec1nwuS";
+in {
   options.flake = {
     me = lib.mkOption {
       type = lib.types.submodule {
@@ -8,6 +10,16 @@
           username = lib.mkOption {type = lib.types.str;};
           shell = lib.mkOption {type = lib.types.str;};
           key = lib.mkOption {type = lib.types.str;};
+          deployKey = lib.mkOption {
+            type = lib.types.str;
+            description = ''
+              SSH public key the infrastructure stack provisions servers with:
+              the Hetzner SSH key, the AWS key pair and first-boot root access.
+              Kept apart from `authorizedKeys` because changing it replaces
+              servers (Saturn's key pair and user data are immutable), while
+              login keys should be free to change.
+            '';
+          };
           authorizedKeys = lib.mkOption {
             type = lib.types.listOf lib.types.str;
           };
@@ -29,9 +41,8 @@
     username = "atahan";
     shell = "fish";
     key = "277004B9D6B7DCE3";
-    authorizedKeys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQEQWwP1aWkv4t/nzin3rRn7ueC7HWR+g9Tec1nwuS"
-    ];
+    inherit deployKey;
+    authorizedKeys = [deployKey];
   };
   config.flake.infra = rec {
     domain = "yorganci.dev";

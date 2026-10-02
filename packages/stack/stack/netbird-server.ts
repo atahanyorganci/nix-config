@@ -16,7 +16,9 @@ const FlakeMe = Schema.Struct({
 	username: Schema.String,
 	shell: Schema.String,
 	key: Schema.String,
-	authorizedKeys: Schema.Array(Schema.String),
+	// Not `authorizedKeys[0]`: login keys must be free to change, while this key
+	// is baked into Saturn's key pair and user data, which replace the instance.
+	deployKey: Schema.String,
 });
 
 const meExpr = Effect.gen(function* () {
@@ -61,10 +63,33 @@ const AdminPassword = Action.Action(
 	}),
 );
 
-// A NixOS deploy re-runs whenever the flake or a host configuration changes.
-const NIX_MEMO = {
-	include: ["flake.nix", "flake.lock", "modules/**/*"],
-};
+// A NixOS deploy is triggered by its host's system (see `hostSystem`), so it
+// hashes no repository files.
+const DEPLOY_MEMO = { include: [] as string[] };
+
+/**
+ * The system a host's NixOS configuration evaluates to. Passed to the host's
+ * deploy so it re-runs exactly when that host's system changes: not for module
+ * edits or lockfile bumps that do not reach it. `nixos-deploy` also skips a
+ * host already running this system, so a deploy re-run after state is rebuilt
+ * leaves hosts untouched.
+ */
+const hostSystem = (logicalId: string, host: string) =>
+	Effect.gen(function* () {
+		const expr = yield* NixExpr.NixExpr(logicalId, {
+			cwd: REPO_ROOT,
+			expression: `.#nixosConfigurations.${host}.config.system.build.toplevel.outPath`,
+		});
+		return yield* NixExpr.decode(expr, Schema.String);
+	});
+
+/**
+ * Saturn boots this Ubuntu 24.04 arm64 AMI once; `nixos-bootstrap` then
+ * replaces the OS. Pinned because an AMI change replaces the instance: the
+ * `EC2.ubuntu2404()` lookup used before resolved to the latest release on
+ * every plan. This is the image the running instance was launched from.
+ */
+const SATURN_AMI = "ami-03e774c3214166a53";
 
 // Bootstrapping installs NixOS once per server, so its memo tracks no
 // repository content: configuration changes must not re-run it. A server
@@ -85,10 +110,7 @@ export default NetbirdServerStack.make(
 	Effect.gen(function* () {
 		const [me, infra] = yield* Effect.all([meExpr, infraExpr]);
 
-		const deployKey = me.authorizedKeys[0];
-		if (!deployKey) {
-			return yield* Effect.die("flake.me.authorizedKeys is empty");
-		}
+		const deployKey = me.deployKey;
 
 		const sshKey = yield* Hetzner.SshKey("DeployKey", {
 			name: me.username,
@@ -118,7 +140,8 @@ export default NetbirdServerStack.make(
 				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#mars`,
 			),
 			cwd: REPO_ROOT,
-			memo: NIX_MEMO,
+			env: { NIXOS_SYSTEM: yield* hostSystem("MarsSystem", "mars") },
+			memo: DEPLOY_MEMO,
 		});
 
 		const jupiterIpv4 = yield* Hetzner.PrimaryIp("JupiterIpv4", {
@@ -162,12 +185,14 @@ export default NetbirdServerStack.make(
 				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#jupiter`,
 			),
 			cwd: REPO_ROOT,
-			memo: NIX_MEMO,
+			env: { NIXOS_SYSTEM: yield* hostSystem("JupiterSystem", "jupiter") },
+			memo: DEPLOY_MEMO,
 		});
 
 		const saturn = yield* Aws.exitNode({
 			name: "saturn",
 			publicKey: deployKey,
+			imageId: SATURN_AMI,
 			instanceType: "t4g.medium",
 		});
 		const saturnBootstrap = yield* Command.Exec("SaturnNixosBootstrap", {
@@ -184,7 +209,8 @@ export default NetbirdServerStack.make(
 				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#saturn`,
 			),
 			cwd: REPO_ROOT,
-			memo: NIX_MEMO,
+			env: { NIXOS_SYSTEM: yield* hostSystem("SaturnSystem", "saturn") },
+			memo: DEPLOY_MEMO,
 		});
 
 		const zone = yield* Cloudflare.Zone.Zone("Domain", {

@@ -114,6 +114,7 @@ export const GrowRootVolume = Action.Action(
 export interface ExitNodeProps {
 	name: string;
 	publicKey: string;
+	imageId: string;
 	instanceType?: string;
 	cidrBlock?: string;
 }
@@ -121,6 +122,7 @@ export interface ExitNodeProps {
 export const exitNode = Effect.fn("AwsExitNode")(function* ({
 	name,
 	publicKey,
+	imageId,
 	instanceType = "t4g.medium",
 	cidrBlock = "10.88.0.0/16",
 }: ExitNodeProps) {
@@ -179,7 +181,7 @@ export const exitNode = Effect.fn("AwsExitNode")(function* ({
 			});
 
 			const instance = yield* EC2.Instance("Instance", {
-				imageId: EC2.ubuntu2404({ architecture: "arm64" }),
+				imageId,
 				instanceType,
 				subnetId,
 				securityGroupIds: [securityGroup.groupId],
