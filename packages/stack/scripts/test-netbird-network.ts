@@ -61,15 +61,7 @@ const envFileFlag = Flag.file("env-file").pipe(
 
 const timeoutFlag = Flag.integer("timeout-ms").pipe(
 	Flag.withDescription("Per-domain HTTPS probe timeout in milliseconds"),
-	Flag.optional,
-	Flag.mapEffect(
-		Effect.fn(function* (timeout) {
-			if (Option.isSome(timeout)) {
-				return timeout.value;
-			}
-			return 12_000;
-		}),
-	),
+	Flag.withDefault(12_000),
 );
 
 const domainsFlag = Flag.string("domain").pipe(
@@ -77,16 +69,13 @@ const domainsFlag = Flag.string("domain").pipe(
 		"Comma-separated domains to probe (defaults to every enabled reverse-proxy service from the API)",
 	),
 	Flag.optional,
-	Flag.mapEffect(
-		Effect.fn(function* (domain) {
-			if (Option.isNone(domain) || domain.value.trim() === "") {
-				return [] as Array<string>;
-			}
-			return domain.value
-				.split(",")
-				.map(entry => entry.trim())
-				.filter(Boolean);
-		}),
+	Flag.map(domain =>
+		Option.isNone(domain)
+			? []
+			: domain.value
+					.split(",")
+					.map(entry => entry.trim())
+					.filter(Boolean),
 	),
 );
 
