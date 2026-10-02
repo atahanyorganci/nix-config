@@ -5,7 +5,6 @@
     pkgs,
     ...
   }: let
-    gatewayPort = 3000;
     allEfforts = ["none" "low" "medium" "high" "xhigh"];
     mkThinkingLevelMap = efforts:
       lib.mapAttrs (_: effort:
@@ -281,7 +280,7 @@
         modelProfiles.models = lib.listToAttrs (map (model: lib.nameValuePair "llm-gateway/${model.id}" (mkProfile model)) gatewayModels);
 
         models.providers.llm-gateway = {
-          baseUrl = "http://localhost:${toString gatewayPort}/v1";
+          baseUrl = "https://ai.yorganci.dev/v1";
           api = "openai-completions";
           # The gateway runs on loopback and ignores the key, but pi
           # requires the field to be present.
