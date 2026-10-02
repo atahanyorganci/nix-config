@@ -1,7 +1,10 @@
-{
+{config, ...}: let
+  inherit (config.flake.inventory) managedTargets;
+in {
   flake.modules.homeManager.zed = {
     lib,
     config,
+    osConfig,
     pkgs,
     user,
     ...
@@ -9,6 +12,37 @@
     cfg = config.zed;
     package = pkgs.zed-editor;
     remoteServer = package.remoteServerExecutableName;
+
+    # The CLI launches the app bundle it was itself started from, which on
+    # macOS is the `/nix/store` one. The Dock pins nix-darwin's copy in
+    # `/Applications/Nix Apps` instead (see `modules/darwin/system.nix`), and
+    # macOS tells bundles apart by path, so the store app came up as a second
+    # tile. `--zed` points every `zeditor` call, `$EDITOR` included, at the
+    # pinned copy; nix-darwin installs the same `pkgs.zed-editor`, so the CLI
+    # and the app it talks to stay the same version.
+    cli =
+      if pkgs.stdenv.hostPlatform.isDarwin
+      then
+        pkgs.symlinkJoin {
+          name = "zed-editor-${package.version}";
+          paths = [package];
+          nativeBuildInputs = [pkgs.makeWrapper];
+          postBuild = ''
+            wrapProgram "$out/bin/${package.meta.mainProgram}" \
+              --add-flag --zed --add-flag "/Applications/Nix Apps/Zed.app"
+          '';
+          inherit (package) meta;
+        }
+      else package;
+    isAgentHolder = (osConfig.hostInventory.role or null) == "agentHolder";
+    connectionsFor = name: target: let
+      entry = label: host:
+        lib.optional (lib.elem host target.ssh.hostNames) {
+          inherit host;
+          nickname = "${name} (${label})";
+        };
+    in
+      entry "Local" "${name}.local" ++ entry "Netbird" "${name}.netbird.selfhosted";
   in {
     options.zed = {
       enable = lib.mkEnableOption "Zed";
@@ -18,7 +52,7 @@
       (lib.mkIf cfg.enable {
         programs.zed-editor = {
           enable = true;
-          inherit package;
+          package = cli;
           defaultEditor = true;
           # Everything is owned by Nix: settings and keymaps are read-only
           # symlinks, so changes made from Zed's UI will not persist.
@@ -50,6 +84,12 @@
           themes.cursor-dark = ./themes/cursor-dark.json;
           userSettings = {
             auto_update = false;
+            ssh_connections = lib.optionals isAgentHolder (
+              lib.concatLists (lib.mapAttrsToList connectionsFor managedTargets)
+            );
+            # Otherwise Zed also lists every alias in ~/.ssh/config, unlabelled,
+            # beside the connections above.
+            read_ssh_config = false;
             base_keymap = "VSCode";
             theme = "Cursor Dark";
             # Editor
