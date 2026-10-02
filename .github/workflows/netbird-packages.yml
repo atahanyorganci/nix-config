@@ -1,18 +1,15 @@
 name: NetBird Packages
 
+# Releases are cut by pushing a `netbird/v<version>` tag (see `just
+# netbird-release`). A rebuild of the same version, e.g. after a nixpkgs bump,
+# is either a `netbird/v<version>+N` tag or a manual run of this workflow.
 on:
   push:
-    branches: [main]
-  pull_request:
+    tags: ["netbird/v*"]
   workflow_dispatch:
 
 permissions:
-  actions: write
   contents: read
-
-concurrency:
-  group: netbird-packages-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   packages:
@@ -36,34 +33,32 @@ jobs:
       - uses: cachix/install-nix-action@v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          extra_nix_config: |
-            keep-env-derivations = true
-            keep-outputs = true
-
-      - name: Compute NetBird cache key
-        id: netbird-cache-key
-        run: |
-          set -euo pipefail
-          hash="$(nix build --no-link --print-out-paths --accept-flake-config \
-            ".#checks.${{ matrix.system }}.netbird-cache-key" | xargs cat)"
-          echo "hash=${hash}" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Nix store
-        uses: nix-community/cache-nix-action@v7
-        with:
-          primary-key: netbird-${{ matrix.system }}-${{ steps.netbird-cache-key.outputs.hash }}
-          restore-prefixes-first-match: netbird-${{ matrix.system }}-
-          gc-max-store-size-linux: 2G
-          purge: true
-          purge-prefixes: netbird-${{ matrix.system }}-
-          purge-last-accessed: P7D
-          purge-primary-key: never
 
       - uses: cachix/cachix-action@v16
         with:
           name: atahanyorganci
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           skipPush: true
+
+      # On a tag, every package must be at the tagged version (ignoring a `+N`
+      # rebuild suffix). On a manual run, they must at least agree.
+      - name: Check package versions
+        run: |
+          set -euo pipefail
+          want=
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            want="${GITHUB_REF_NAME#netbird/v}"
+            want="${want%%+*}"
+          fi
+          for pkg in ${{ matrix.packages }}; do
+            have="$(nix eval --raw --accept-flake-config ".#packages.${{ matrix.system }}.$pkg.version")"
+            want="${want:-$have}"
+            if [ "$have" != "$want" ]; then
+              echo "::error::$pkg is at $have, expected $want"
+              exit 1
+            fi
+          done
+          echo "NetBird $want on ${{ matrix.system }}"
 
       - name: Build NetBird packages (${{ matrix.system }})
         run: |
@@ -72,15 +67,7 @@ jobs:
           for pkg in ${{ matrix.packages }}; do
             args+=(".#packages.${{ matrix.system }}.$pkg")
           done
-          nix build -L --accept-flake-config "${args[@]}"
+          nix build -L --no-link --print-out-paths --accept-flake-config "${args[@]}" > out-paths
 
       - name: Push NetBird packages to Cachix
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          set -euo pipefail
-          args=()
-          for pkg in ${{ matrix.packages }}; do
-            args+=(".#packages.${{ matrix.system }}.$pkg")
-          done
-          nix build --no-link --print-out-paths --accept-flake-config "${args[@]}" \
-            | cachix push atahanyorganci
+        run: cachix push atahanyorganci < out-paths

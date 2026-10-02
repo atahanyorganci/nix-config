@@ -6,6 +6,43 @@ update *args: is-clean
     git add flake.lock
     git commit -m "chore: update flake.lock"
 
+# Tag the current NetBird package versions so CI builds them and pushes them to
+# Cachix. Cuts `netbird/v<version>`; if that tag already exists on an older
+# commit (e.g. after a nixpkgs bump changed the store paths), cuts the next
+# free `netbird/v<version>+N` instead.
+netbird-release: is-clean
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git fetch --quiet --tags origin main
+    if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+        echo "HEAD is not origin/main; push main first" >&2
+        exit 1
+    fi
+    # Mirrors the build matrix in .github/workflows/netbird-packages.yml.
+    versions=$(
+        for pkg in x86_64-linux.netbird x86_64-linux.netbird-server x86_64-linux.netbird-proxy \
+                   aarch64-linux.netbird aarch64-darwin.netbird aarch64-darwin.netbird-app; do
+            nix eval --raw ".#packages.$pkg.version" 2>/dev/null
+            echo
+        done | sort -u
+    )
+    if [ "$(wc -l <<<"$versions")" -ne 1 ]; then
+        echo "NetBird package versions disagree:" $versions >&2
+        exit 1
+    fi
+    tag="netbird/v$versions"
+    n=0
+    while git rev-parse -q --verify "refs/tags/$tag" >/dev/null; do
+        if [ "$(git rev-list -n 1 "$tag")" = "$(git rev-parse HEAD)" ]; then
+            echo "HEAD is already tagged $tag"
+            exit 0
+        fi
+        n=$((n + 1))
+        tag="netbird/v$versions+$n"
+    done
+    git tag -a "$tag" -m "NetBird $versions"
+    git push origin "$tag"
+
 # Root of the pi package the Nix options are generated from. Taken from the
 # flake so the options always match the pi that actually gets installed.
 pi_expr := "let f = builtins.getFlake (toString ./.); p = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in p.pi-coding-agent"

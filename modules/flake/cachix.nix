@@ -4,12 +4,6 @@
   cacheUrl = "https://${cacheName}.cachix.org";
   nixosCacheUrl = "https://cache.nixos.org/";
   nixosCachePublicKey = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-
-  netbirdPackagesBySystem = {
-    x86_64-linux = ["netbird" "netbird-server" "netbird-proxy"];
-    aarch64-linux = ["netbird"];
-    aarch64-darwin = ["netbird" "netbird-app"];
-  };
 in {
   options.flake.cachix = lib.mkOption {
     type = lib.types.submodule {
@@ -21,21 +15,9 @@ in {
     };
   };
 
-  options.flake.netbirdCache = lib.mkOption {
-    type = lib.types.submodule {
-      options.packagesBySystem = lib.mkOption {
-        type = lib.types.attrsOf (lib.types.listOf lib.types.str);
-      };
-    };
-  };
-
   config = {
     flake.cachix = {
       inherit cacheName cacheUrl cachePublicKey;
-    };
-
-    flake.netbirdCache = {
-      packagesBySystem = netbirdPackagesBySystem;
     };
 
     flake.nixConfig = {
@@ -55,24 +37,6 @@ in {
         substituters = [nixosCacheUrl cacheUrl];
         trusted-public-keys = [nixosCachePublicKey cachePublicKey];
       };
-    };
-
-    perSystem = {
-      pkgs,
-      lib,
-      system,
-      ...
-    }: let
-      names = netbirdPackagesBySystem.${system} or [];
-      getDrvPath = name:
-        if builtins.hasAttr name pkgs
-        then pkgs.${name}.drvPath
-        else throw "NetBird cache check: missing package ${name} on ${system}";
-      cacheKey = builtins.hashString "sha256" (
-        lib.concatStringsSep "\n" (map getDrvPath names)
-      );
-    in {
-      checks.netbird-cache-key = pkgs.writeText "netbird-cache-key" cacheKey;
     };
   };
 }
