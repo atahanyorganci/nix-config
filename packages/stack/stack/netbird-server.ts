@@ -2,6 +2,7 @@ import * as NetBird from "@yorganci/netbird-alchemy";
 import * as Action from "alchemy/Action";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Command from "alchemy/Command";
+import * as Doppler from "alchemy/Doppler";
 import * as Output from "alchemy/Output";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -108,6 +109,7 @@ export default NetbirdServerStack.make(
 			NixExpr.NixExprProvider(),
 		),
 		state: Cloudflare.state(),
+		secrets: [Doppler.Secrets({ project: "nix-config", config: "dev" })],
 	},
 	Effect.gen(function* () {
 		const [me, infra] = yield* Effect.all([meExpr, infraExpr]);

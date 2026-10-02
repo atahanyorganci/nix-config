@@ -8,6 +8,7 @@
         nodejs-slim
         corepack
         awscli2
+        doppler
       ];
     };
   };

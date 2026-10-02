@@ -8,7 +8,7 @@
  * HTTP status and NetBird Cloud may use strings.
  *
  * The API is rooted at `/api` on the management host, and the generated
- * routes carry that prefix, so `apiBaseUrl` is the bare origin.
+ * routes carry that prefix, so `managementUrl` is the bare origin.
  */
 import * as API from "@distilled.cloud/core/api";
 import { HTTP_STATUS_MAP, type ConfigError } from "@distilled.cloud/core/errors";
@@ -17,7 +17,7 @@ import { makeRestProtocol, type RestErrorEnvelope } from "@distilled.cloud/core/
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
-import { Credentials, type CredentialsConfig } from "./credentials.ts";
+import { Credentials, type Config } from "./credentials.ts";
 import { NetbirdParseError, UnknownNetbirdError, type DefaultErrors } from "./errors.ts";
 import type * as HttpClient from "effect/http/HttpClient";
 import type * as HttpClientError from "effect/http/HttpClientError";
@@ -42,14 +42,15 @@ const errorEnvelope = (body: unknown): RestErrorEnvelope | undefined => {
 const authorization = (token: string): string =>
 	token.startsWith("Token ") || token.startsWith("Bearer ") ? token : `Token ${token}`;
 
-const restProtocol = makeRestProtocol<CredentialsConfig>({
-	// Resolved on the calling fiber per request, so credentials hydrated by an
-	// Alchemy action after NetBird setup are seen by later calls.
+const restProtocol = makeRestProtocol<Config>({
+	// Resolved on the CALLING fiber per request (the layer is memoized per
+	// process); the Credentials service holds an effect, so a token rotated
+	// between calls is picked up without rebuilding the layer.
 	credentials: Effect.gen(function* () {
 		const resolve = yield* Credentials;
 		return yield* resolve;
 	}),
-	baseUrl: credentials => credentials.apiBaseUrl,
+	baseUrl: credentials => credentials.managementUrl,
 	headers: credentials => ({ Authorization: authorization(Redacted.value(credentials.apiToken)) }),
 	errorEnvelope,
 	statusMap: HTTP_STATUS_MAP,

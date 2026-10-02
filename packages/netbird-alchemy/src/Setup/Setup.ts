@@ -57,7 +57,7 @@ export type Setup = Resource<"NetBird.Setup", SetupProps, SetupAttributes>;
  * First-time NetBird management bootstrap via unauthenticated `POST /api/setup`.
  *
  * Creates the owner account only. API credentials are supplied out of band via
- * `NETBIRD_API_TOKEN` (mint a token from the dashboard), so no PAT is
+ * `NB_PAT` (mint a token from the dashboard), so no PAT is
  * requested here. The admin password is persisted in Alchemy state and reused
  * when setup is already complete (`setup_required: false`).
  *

@@ -11,9 +11,6 @@ REPO_ROOT="$(cd "${STACK_DIR}/../.." && pwd)"
 PROXY_TOKEN_FILE="/var/lib/netbird-proxy/token"
 PROXY_SERVICE="netbird-proxy.service"
 
-STAGE="${STAGE:-dev_${USER}}"
-PROFILE="${ALCHEMY_PROFILE:-default}"
-ENV_FILE=""
 SSH_USER="${SSH_USER:-$USER}"
 
 NAME=""
@@ -39,9 +36,6 @@ Arguments:
   os           Host OS (default: nixos)
 
 Flags:
-  --stage STAGE            Alchemy stage (defaults to dev_${USER})
-  --profile PROFILE        Alchemy auth profile (defaults to $ALCHEMY_PROFILE or default)
-  --env-file PATH          Environment file for Alchemy (same as create-proxy-token.ts)
   --ssh-user USER          SSH login user (defaults to $SSH_USER or $USER)
   -h, --help               Show this help
 EOF
@@ -59,18 +53,6 @@ die() {
 parse_args() {
     while (($# > 0)); do
         case "$1" in
-            --stage)
-                STAGE="${2:?--stage requires a value}"
-                shift 2
-                ;;
-            --profile)
-                PROFILE="${2:?--profile requires a value}"
-                shift 2
-                ;;
-            --env-file)
-                ENV_FILE="${2:?--env-file requires a value}"
-                shift 2
-                ;;
             --ssh-user)
                 SSH_USER="${2:?--ssh-user requires a value}"
                 shift 2
@@ -113,11 +95,7 @@ load_cluster_domain() {
 }
 
 provision_proxy_token() {
-    local -a cmd=(bun "${SCRIPT_DIR}/create-proxy-token.ts" --stage "$STAGE" --profile "$PROFILE")
-    if [[ -n $ENV_FILE ]]; then
-        cmd+=(--env-file "$ENV_FILE")
-    fi
-    cmd+=("$NAME")
+    local -a cmd=(doppler run -- node "${SCRIPT_DIR}/create-proxy-token.ts" "$NAME")
 
     cd "$STACK_DIR"
     local line proxy_token
@@ -167,13 +145,8 @@ REMOTE
 
 verify_cluster() {
     local cluster_domain=$1
-    local -a cmd=(bun "${SCRIPT_DIR}/list-proxy-clusters.ts" --stage "$STAGE" --profile "$PROFILE")
+    local -a cmd=(doppler run -- node "${SCRIPT_DIR}/list-proxy-clusters.ts" "$cluster_domain")
     local output
-
-    if [[ -n $ENV_FILE ]]; then
-        cmd+=(--env-file "$ENV_FILE")
-    fi
-    cmd+=("$cluster_domain")
 
     sleep 5
 

@@ -1,6 +1,5 @@
 import { NodeRuntime } from "@effect/platform-node";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
 import { setupKeysPost } from "@yorganci/netbird-api/setup_keys";
 import { AlchemyContextLive } from "alchemy/AlchemyContext";
 import { ArtifactStore, createArtifactStore } from "alchemy/Artifacts";
@@ -9,7 +8,7 @@ import { ProfileStoreLive } from "alchemy/Auth/Profile";
 import { withProfileOverride } from "alchemy/Auth/Resolve";
 import { Stage } from "alchemy/Stage";
 import * as State from "alchemy/State";
-import { loadConfigProvider } from "alchemy/Util/ConfigProvider";
+import { StackConfigOverrides } from "alchemy/Util/ConfigProvider";
 import { PlatformServices } from "alchemy/Util/PlatformServices";
 import * as Argument from "effect/cli/Argument";
 import * as Command from "effect/cli/Command";
@@ -27,8 +26,9 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as Schema from "effect/Schema";
 import { readHomeInfraGroupId } from "../src/home-infra-state.ts";
 import * as Inventory from "../src/inventory.ts";
-import { netbirdCredentialsFromConfig } from "../src/netbird-credentials.ts";
 import netbirdServerStack from "../stack/netbird-server.ts";
+import type { Credentials } from "@yorganci/netbird-api/Credentials";
+import type * as HttpClient from "effect/http/HttpClient";
 
 const SETUP_KEY_EXPIRES_IN_SECONDS = 86_400;
 
@@ -88,20 +88,16 @@ const profileFlag = Flag.String("profile").pipe(
 	),
 );
 
-const envFileFlag = Flag.File("env-file").pipe(
-	Flag.optional,
-	Flag.withDescription("Environment file to load (defaults to .env when present)"),
-);
-
 // Unlike the other scripts, this one still needs Alchemy state: it resolves
-// HomeInfra group ids to populate each setup key's auto_groups.
+// HomeInfra group ids to populate each setup key's auto_groups. Running inside
+// the NetbirdServer stack also gives it the stack's NetBird credentials, which
+// its `secrets` load from Doppler, so it needs no `doppler run`.
 const withAlchemyState = <A, E>(
 	options: {
 		stage: string;
 		profile: string;
-		envFile: Option.Option<string>;
 	},
-	body: (state: State.StateService) => Effect.Effect<A, E>,
+	body: (state: State.StateService) => Effect.Effect<A, E, Credentials | HttpClient.HttpClient>,
 ) =>
 	Effect.gen(function* () {
 		if (!Effect.isEffect(netbirdServerStack)) {
@@ -113,7 +109,10 @@ const withAlchemyState = <A, E>(
 			Layer.provide(ProfileStoreLive, PlatformServices),
 			Layer.succeed(ArtifactStore, createArtifactStore()),
 			Layer.succeed(AuthProviders, {}),
-			ConfigProvider.layer(withProfileOverride(yield* loadConfigProvider(options.envFile), options.profile)),
+			ConfigProvider.layer(withProfileOverride(ConfigProvider.fromEnv(), options.profile)),
+			// A stack with `secrets` takes `ALCHEMY_PROFILE` only from here (the CLI's
+			// `--profile`) or the real process environment, never from config.
+			Layer.succeed(StackConfigOverrides, { profile: options.profile }),
 			Logger.layer([], { mergeWithExisting: true }),
 			Layer.succeed(Stage, options.stage),
 			// Alchemy's stack and state layers take the HTTP client from the environment.
@@ -138,19 +137,15 @@ const createSetupKeys = Command.make("create-setup-keys", {
 	hosts: hostsArg,
 	stage: stageFlag,
 	profile: profileFlag,
-	envFile: envFileFlag,
 }).pipe(
 	Command.withDescription(
 		"Create one-off NetBird setup keys that assign each host to its inventory peer group (Servers or Agents)",
 	),
 	Command.withHandler(
-		Effect.fn(function* ({ hosts, stage, profile, envFile }) {
+		Effect.fn(function* ({ hosts, stage, profile }) {
 			const inventory = yield* evalInventory;
-			yield* withAlchemyState({ stage, profile, envFile }, state =>
+			yield* withAlchemyState({ stage, profile }, state =>
 				Effect.gen(function* () {
-					const credentials = yield* netbirdCredentialsFromConfig;
-					const netbirdApi = Layer.mergeAll(CredentialsFromConfig(credentials), FetchHttpClient.layer);
-
 					for (const host of hosts) {
 						const groupName = Inventory.peerGroupForHost(inventory, host);
 						if (!groupName) {
@@ -172,7 +167,7 @@ const createSetupKeys = Command.make("create-setup-keys", {
 							usage_limit: 1,
 							ephemeral: false,
 							allow_extra_dns_labels: false,
-						}).pipe(Effect.provide(netbirdApi));
+						});
 
 						yield* Console.log(`${host}\t${setupKey.key}`);
 					}

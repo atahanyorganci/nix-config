@@ -21,17 +21,17 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 
 ## Credentials
 
-Stack deploys resolve credentials via Effect `Config` (default provider: environment):
+`providers()` registers a `NetBird` auth provider and resolves credentials the way Alchemy's built-in clouds do. On first use it takes them from the environment when `NB_PAT` is set, which includes a stack's `secrets` (e.g. `Doppler.Secrets`). In CI it reads only the environment. Otherwise it uses the selected Alchemy profile (`alchemy profile edit --add NetBird`).
 
-| Config key             | Purpose                                                    |
-| ---------------------- | ---------------------------------------------------------- |
-| `NETBIRD_API_TOKEN`    | Management API token (optional until hydrated after Setup) |
-| `NETBIRD_API_BASE_URL` | Optional; defaults to `https://api.netbird.io`             |
-| `DEBUG`                | Optional boolean; enables Debug log level in tests         |
+| Variable            | Purpose                                                                  |
+| ------------------- | ------------------------------------------------------------------------ |
+| `NB_PAT`            | Personal access token (required for every resource except `Setup`)       |
+| `NB_MANAGEMENT_URL` | Optional; management server origin, defaults to `https://api.netbird.io` |
+| `DEBUG`             | Optional boolean; enables Debug log level in tests                       |
 
-`NetBird.Setup` does not use `Credentials` (setup is unauthenticated). After Setup, the infra stack hydrates `NETBIRD_API_TOKEN` into the process env / `.env.local` for Group, SetupKey, and other API resources.
+These are the variables NetBird's Terraform provider reads. `NetBird.Setup` does not use `Credentials` (setup is unauthenticated). After Setup, mint a token in the dashboard and store it as `NB_PAT` for Group, SetupKey, and other API resources.
 
-Tests use a fixture Layer backed by a bootstrapped PAT (same `Credentials` service as `CredentialsFromConfig`) — no cloud token required.
+Tests pass the fixture's bootstrapped PAT to `providers()` as `NB_PAT` / `NB_MANAGEMENT_URL` — no cloud token required.
 
 ## Examples
 

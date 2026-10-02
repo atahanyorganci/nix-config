@@ -1,30 +1,22 @@
 import { NodeRuntime } from "@effect/platform-node";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { CredentialsFromConfig } from "@yorganci/netbird-api/Credentials";
+import { CredentialsFromEnv } from "@yorganci/netbird-api/Credentials";
 import { dnsNameserversGet } from "@yorganci/netbird-api/dns";
 import { groupsGet } from "@yorganci/netbird-api/groups";
 import { peersGet } from "@yorganci/netbird-api/peers";
 import { policiesGet } from "@yorganci/netbird-api/policies";
 import { routesGet } from "@yorganci/netbird-api/routes";
 import { reverseProxiesClustersGet, reverseProxiesServicesGet } from "@yorganci/netbird-api/services";
-import { ProfileStoreLive } from "alchemy/Auth/Profile";
-import { withProfileOverride } from "alchemy/Auth/Resolve";
-import { loadConfigProvider } from "alchemy/Util/ConfigProvider";
-import { PlatformServices } from "alchemy/Util/PlatformServices";
 import * as Command from "effect/cli/Command";
 import * as Flag from "effect/cli/Flag";
-import * as Config from "effect/Config";
-import * as ConfigProvider from "effect/ConfigProvider";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
-import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { promises as dns } from "node:dns";
 import { isIPv4 } from "node:net";
-import { netbirdCredentialsFromConfig } from "../src/netbird-credentials.ts";
 
 /** Inventory hosts that should normally be online on the mesh. */
 
@@ -41,24 +33,6 @@ const REQUIRED_POLICIES = [
 	"allow-admin-ssh",
 	"allow-admin-proxy-tcp",
 ] as const;
-
-const profileFlag = Flag.String("profile").pipe(
-	Flag.withDescription("Alchemy auth profile (defaults to $ALCHEMY_PROFILE or 'default')"),
-	Flag.optional,
-	Flag.mapEffect(
-		Effect.fn(function* (profile) {
-			if (Option.isSome(profile)) {
-				return profile.value;
-			}
-			return yield* Config.String("ALCHEMY_PROFILE").pipe(Config.withDefault("default"), Effect.orDie);
-		}),
-	),
-);
-
-const envFileFlag = Flag.File("env-file").pipe(
-	Flag.optional,
-	Flag.withDescription("Environment file to load (defaults to .env when present)"),
-);
 
 const timeoutFlag = Flag.Int("timeout-ms").pipe(
 	Flag.withDescription("Per-domain HTTPS probe timeout in milliseconds"),
@@ -81,30 +55,10 @@ const domainsFlag = Flag.String("domain").pipe(
 );
 
 /**
- * Credentials now come from configuration rather than NetbirdServer stack
- * state, so this only needs the ambient ConfigProvider (which is what makes
- * `--env-file` and the profile override work).
+ * NetBird credentials (`NB_PAT`, `NB_MANAGEMENT_URL`) come from
+ * the environment, which `doppler run` fills from Doppler.
  */
-const withScriptConfig = <A, E>(
-	options: {
-		profile: string;
-		envFile: Option.Option<string>;
-	},
-	body: Effect.Effect<A, E>,
-) =>
-	Effect.gen(function* () {
-		const configProvider = withProfileOverride(yield* loadConfigProvider(options.envFile), options.profile);
-		return yield* body.pipe(
-			Effect.provide(
-				Layer.mergeAll(
-					ConfigProvider.layer(configProvider),
-					Layer.provide(ProfileStoreLive, PlatformServices),
-					Logger.layer([], { mergeWithExisting: true }),
-					FetchHttpClient.layer,
-				),
-			),
-		);
-	}).pipe(Effect.provide(PlatformServices), Effect.scoped);
+const netbirdApi = Layer.mergeAll(CredentialsFromEnv, FetchHttpClient.layer);
 
 type Check = {
 	name: string;
@@ -270,8 +224,6 @@ const httpsOkForPrivate = (probe: { ok: boolean; status: number }) =>
 const httpsOkForPublic = (probe: { ok: boolean; status: number }) => probe.ok && probe.status > 0 && probe.status < 500;
 
 const testNetbirdNetwork = Command.make("test-netbird-network", {
-	profile: profileFlag,
-	envFile: envFileFlag,
 	timeoutMs: timeoutFlag,
 	domains: domainsFlag,
 }).pipe(
@@ -279,7 +231,7 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 		"Smoke-test the NetBird mesh: client status, inventory peers, policies/routes/DNS, proxy cluster, and HTTPS to published services",
 	),
 	Command.withHandler(
-		Effect.fn(function* ({ profile, envFile, timeoutMs, domains }) {
+		Effect.fn(function* ({ timeoutMs, domains }) {
 			const checks: Array<Check> = [];
 
 			const client = yield* parseNetbirdClientStatus();
@@ -316,199 +268,191 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 					: "netbird CLI unavailable",
 			});
 
-			yield* withScriptConfig(
-				{ profile, envFile },
-				Effect.gen(function* () {
-					const credentials = yield* netbirdCredentialsFromConfig;
-					const netbirdApi = Layer.mergeAll(CredentialsFromConfig(credentials), FetchHttpClient.layer);
-					const [groups, policies, routes, services, peers, nameservers, clusters] = yield* Effect.all([
-						groupsGet({}),
-						policiesGet({}),
-						routesGet({}),
-						reverseProxiesServicesGet({}),
-						peersGet({}),
-						dnsNameserversGet({}),
-						reverseProxiesClustersGet({}),
-					]).pipe(Effect.provide(netbirdApi));
+			const [groups, policies, routes, services, peers, nameservers, clusters] = yield* Effect.all([
+				groupsGet({}),
+				policiesGet({}),
+				routesGet({}),
+				reverseProxiesServicesGet({}),
+				peersGet({}),
+				dnsNameserversGet({}),
+				reverseProxiesClustersGet({}),
+			]).pipe(Effect.provide(netbirdApi));
 
-					const managementProbe = yield* probeHttps("https://netbird.yorganci.dev/", timeoutMs);
-					checks.push({
-						name: "management-https",
-						ok: managementProbe.ok && managementProbe.status > 0 && managementProbe.status < 500,
-						detail: managementProbe.ok
-							? `HTTP ${managementProbe.status} in ${managementProbe.ms}ms`
-							: `failed: ${"error" in managementProbe ? managementProbe.error : "unknown"}`,
-					});
+			const managementProbe = yield* probeHttps("https://netbird.yorganci.dev/", timeoutMs);
+			checks.push({
+				name: "management-https",
+				ok: managementProbe.ok && managementProbe.status > 0 && managementProbe.status < 500,
+				detail: managementProbe.ok
+					? `HTTP ${managementProbe.status} in ${managementProbe.ms}ms`
+					: `failed: ${"error" in managementProbe ? managementProbe.error : "unknown"}`,
+			});
 
-					for (const groupName of REQUIRED_GROUPS) {
-						const group = groups.find(entry => entry.name === groupName);
-						checks.push({
-							name: `group:${groupName}`,
-							ok: group !== undefined,
-							detail: group === undefined ? "missing" : `id=${group.id} peers=${group.peers?.length ?? 0}`,
-						});
-					}
+			for (const groupName of REQUIRED_GROUPS) {
+				const group = groups.find(entry => entry.name === groupName);
+				checks.push({
+					name: `group:${groupName}`,
+					ok: group !== undefined,
+					detail: group === undefined ? "missing" : `id=${group.id} peers=${group.peers?.length ?? 0}`,
+				});
+			}
 
-					const proxyGroup = groups.find(group => group.name === "Proxy");
-					checks.push({
-						name: "proxy-group-has-peers",
-						ok: (proxyGroup?.peers?.length ?? 0) > 0,
-						soft: true,
-						detail: `peers=${proxyGroup?.peers?.length ?? 0} (add live proxy-* peers in the dashboard for durable Admin→Proxy ACL)`,
-					});
+			const proxyGroup = groups.find(group => group.name === "Proxy");
+			checks.push({
+				name: "proxy-group-has-peers",
+				ok: (proxyGroup?.peers?.length ?? 0) > 0,
+				soft: true,
+				detail: `peers=${proxyGroup?.peers?.length ?? 0} (add live proxy-* peers in the dashboard for durable Admin→Proxy ACL)`,
+			});
 
-					for (const host of REQUIRED_PEERS) {
-						const peer = peers.find(entry => peerMatchesHost(entry.name || entry.dns_label || "", host));
-						checks.push({
-							name: `peer-online:${host}`,
-							ok: peer?.connected === true,
-							detail:
-								peer === undefined
-									? "peer missing from API"
-									: `connected=${peer.connected} ip=${peer.ip} name=${peer.name || peer.dns_label}`,
-						});
-					}
+			for (const host of REQUIRED_PEERS) {
+				const peer = peers.find(entry => peerMatchesHost(entry.name || entry.dns_label || "", host));
+				checks.push({
+					name: `peer-online:${host}`,
+					ok: peer?.connected === true,
+					detail:
+						peer === undefined
+							? "peer missing from API"
+							: `connected=${peer.connected} ip=${peer.ip} name=${peer.name || peer.dns_label}`,
+				});
+			}
 
-					const defaultPolicy = policies.find(policy => policy.name === "Default");
-					checks.push({
-						name: "default-policy-disabled",
-						ok: defaultPolicy?.enabled === false,
-						detail: defaultPolicy === undefined ? "Default policy missing" : `enabled=${defaultPolicy.enabled}`,
-					});
+			const defaultPolicy = policies.find(policy => policy.name === "Default");
+			checks.push({
+				name: "default-policy-disabled",
+				ok: defaultPolicy?.enabled === false,
+				detail: defaultPolicy === undefined ? "Default policy missing" : `enabled=${defaultPolicy.enabled}`,
+			});
 
-					for (const policyName of REQUIRED_POLICIES) {
-						const policy = policies.find(entry => entry.name === policyName);
-						checks.push({
-							name: `policy:${policyName}`,
-							ok: policy?.enabled === true,
-							detail: policy === undefined ? "missing" : `enabled=${policy.enabled}`,
-						});
-					}
+			for (const policyName of REQUIRED_POLICIES) {
+				const policy = policies.find(entry => entry.name === policyName);
+				checks.push({
+					name: `policy:${policyName}`,
+					ok: policy?.enabled === true,
+					detail: policy === undefined ? "missing" : `enabled=${policy.enabled}`,
+				});
+			}
 
-					const marsExit = routes.find(
-						route => route.network_id === "mars-exit" || (route.description ?? "").includes("mars-exit"),
-					);
-					const marsAccessControl = marsExit?.access_control_groups ?? null;
-					checks.push({
-						name: "exit-route",
-						ok:
-							marsExit?.enabled === true &&
-							marsExit.network === "0.0.0.0/0" &&
-							(marsAccessControl === null || marsAccessControl.length === 0),
-						detail:
-							marsExit === undefined
-								? "mars exit route missing"
-								: `enabled=${marsExit.enabled} network=${marsExit.network} access_control_groups=${JSON.stringify(marsAccessControl)}`,
-					});
-
-					const saturnExit = routes.find(
-						route => route.network_id === "saturn-exit" || (route.description ?? "").includes("saturn-exit"),
-					);
-					checks.push({
-						name: "saturn-exit-route",
-						ok:
-							saturnExit?.enabled === true && saturnExit.network === "0.0.0.0/0" && saturnExit.skip_auto_apply === true,
-						soft: true,
-						detail:
-							saturnExit === undefined
-								? "saturn exit route missing (enroll saturn, then deploy HomeInfra)"
-								: `enabled=${saturnExit.enabled} network=${saturnExit.network} skip_auto_apply=${saturnExit.skip_auto_apply} metric=${saturnExit.metric}`,
-					});
-
-					const primaryNs = nameservers.find(entry => entry.primary && entry.enabled);
-					checks.push({
-						name: "nameserver-primary",
-						ok: primaryNs !== undefined,
-						detail:
-							primaryNs === undefined
-								? "no enabled primary nameserver"
-								: `${primaryNs.name} servers=[${primaryNs.nameservers.map(entry => `${entry.ip}:${entry.port}`).join(",")}]`,
-					});
-
-					const onlineCluster = clusters.find(cluster => cluster.online && cluster.connected_proxies > 0);
-					checks.push({
-						name: "proxy-cluster-online",
-						ok: onlineCluster !== undefined,
-						detail:
-							clusters.length === 0
-								? "no proxy clusters"
-								: clusters
-										.map(
-											cluster =>
-												`${cluster.address} online=${cluster.online} connected=${cluster.connected_proxies} private=${cluster.private}`,
-										)
-										.join("; "),
-					});
-
-					const enabledServices = services.filter(service => service.enabled);
-					const probeTargets =
-						domains.length > 0
-							? domains.map(domain => {
-									const service = enabledServices.find(entry => entry.domain === domain);
-									return {
-										domain,
-										private: service?.private === true,
-										known: service !== undefined,
-									};
-								})
-							: enabledServices.map(service => ({
-									domain: service.domain,
-									private: service.private === true,
-									known: true,
-								}));
-
-					checks.push({
-						name: "services-enabled-count",
-						ok: enabledServices.length > 0,
-						detail: `enabled=${enabledServices.length} total=${services.length}`,
-					});
-
-					for (const target of probeTargets) {
-						if (!target.known) {
-							checks.push({
-								name: `service:${target.domain}`,
-								ok: false,
-								detail: "domain not found among enabled reverse-proxy services",
-							});
-							continue;
-						}
-
-						const addrs = (yield* resolveA(target.domain)).filter(isIPv4);
-						if (target.private) {
-							const meshAddrs = addrs.filter(isMeshIpv4);
-							checks.push({
-								name: `dns-mesh:${target.domain}`,
-								ok: meshAddrs.length > 0,
-								detail: addrs.length === 0 ? "no A records" : `A=[${addrs.join(", ")}]`,
-							});
-						} else {
-							checks.push({
-								name: `dns:${target.domain}`,
-								ok: addrs.length > 0,
-								detail: addrs.length === 0 ? "no A records" : `A=[${addrs.join(", ")}]`,
-							});
-						}
-
-						const probe = yield* probeHttps(`https://${target.domain}/`, timeoutMs);
-						const httpOk = target.private ? httpsOkForPrivate(probe) : httpsOkForPublic(probe);
-						checks.push({
-							name: `https:${target.domain}`,
-							ok: httpOk,
-							detail: probe.ok
-								? `HTTP ${probe.status} in ${probe.ms}ms private=${target.private}`
-								: `failed: ${"error" in probe ? probe.error : "unknown"}`,
-						});
-					}
-
-					// Mesh DNS for the management peer itself.
-					const marsDns = (yield* resolveA("mars.netbird.selfhosted")).filter(isIPv4);
-					checks.push({
-						name: "dns-mesh:mars.netbird.selfhosted",
-						ok: marsDns.some(isMeshIpv4),
-						detail: marsDns.length === 0 ? "no A records" : `A=[${marsDns.join(", ")}]`,
-					});
-				}),
+			const marsExit = routes.find(
+				route => route.network_id === "mars-exit" || (route.description ?? "").includes("mars-exit"),
 			);
+			const marsAccessControl = marsExit?.access_control_groups ?? null;
+			checks.push({
+				name: "exit-route",
+				ok:
+					marsExit?.enabled === true &&
+					marsExit.network === "0.0.0.0/0" &&
+					(marsAccessControl === null || marsAccessControl.length === 0),
+				detail:
+					marsExit === undefined
+						? "mars exit route missing"
+						: `enabled=${marsExit.enabled} network=${marsExit.network} access_control_groups=${JSON.stringify(marsAccessControl)}`,
+			});
+
+			const saturnExit = routes.find(
+				route => route.network_id === "saturn-exit" || (route.description ?? "").includes("saturn-exit"),
+			);
+			checks.push({
+				name: "saturn-exit-route",
+				ok: saturnExit?.enabled === true && saturnExit.network === "0.0.0.0/0" && saturnExit.skip_auto_apply === true,
+				soft: true,
+				detail:
+					saturnExit === undefined
+						? "saturn exit route missing (enroll saturn, then deploy HomeInfra)"
+						: `enabled=${saturnExit.enabled} network=${saturnExit.network} skip_auto_apply=${saturnExit.skip_auto_apply} metric=${saturnExit.metric}`,
+			});
+
+			const primaryNs = nameservers.find(entry => entry.primary && entry.enabled);
+			checks.push({
+				name: "nameserver-primary",
+				ok: primaryNs !== undefined,
+				detail:
+					primaryNs === undefined
+						? "no enabled primary nameserver"
+						: `${primaryNs.name} servers=[${primaryNs.nameservers.map(entry => `${entry.ip}:${entry.port}`).join(",")}]`,
+			});
+
+			const onlineCluster = clusters.find(cluster => cluster.online && cluster.connected_proxies > 0);
+			checks.push({
+				name: "proxy-cluster-online",
+				ok: onlineCluster !== undefined,
+				detail:
+					clusters.length === 0
+						? "no proxy clusters"
+						: clusters
+								.map(
+									cluster =>
+										`${cluster.address} online=${cluster.online} connected=${cluster.connected_proxies} private=${cluster.private}`,
+								)
+								.join("; "),
+			});
+
+			const enabledServices = services.filter(service => service.enabled);
+			const probeTargets =
+				domains.length > 0
+					? domains.map(domain => {
+							const service = enabledServices.find(entry => entry.domain === domain);
+							return {
+								domain,
+								private: service?.private === true,
+								known: service !== undefined,
+							};
+						})
+					: enabledServices.map(service => ({
+							domain: service.domain,
+							private: service.private === true,
+							known: true,
+						}));
+
+			checks.push({
+				name: "services-enabled-count",
+				ok: enabledServices.length > 0,
+				detail: `enabled=${enabledServices.length} total=${services.length}`,
+			});
+
+			for (const target of probeTargets) {
+				if (!target.known) {
+					checks.push({
+						name: `service:${target.domain}`,
+						ok: false,
+						detail: "domain not found among enabled reverse-proxy services",
+					});
+					continue;
+				}
+
+				const addrs = (yield* resolveA(target.domain)).filter(isIPv4);
+				if (target.private) {
+					const meshAddrs = addrs.filter(isMeshIpv4);
+					checks.push({
+						name: `dns-mesh:${target.domain}`,
+						ok: meshAddrs.length > 0,
+						detail: addrs.length === 0 ? "no A records" : `A=[${addrs.join(", ")}]`,
+					});
+				} else {
+					checks.push({
+						name: `dns:${target.domain}`,
+						ok: addrs.length > 0,
+						detail: addrs.length === 0 ? "no A records" : `A=[${addrs.join(", ")}]`,
+					});
+				}
+
+				const probe = yield* probeHttps(`https://${target.domain}/`, timeoutMs);
+				const httpOk = target.private ? httpsOkForPrivate(probe) : httpsOkForPublic(probe);
+				checks.push({
+					name: `https:${target.domain}`,
+					ok: httpOk,
+					detail: probe.ok
+						? `HTTP ${probe.status} in ${probe.ms}ms private=${target.private}`
+						: `failed: ${"error" in probe ? probe.error : "unknown"}`,
+				});
+			}
+
+			// Mesh DNS for the management peer itself.
+			const marsDns = (yield* resolveA("mars.netbird.selfhosted")).filter(isIPv4);
+			checks.push({
+				name: "dns-mesh:mars.netbird.selfhosted",
+				ok: marsDns.some(isMeshIpv4),
+				detail: marsDns.length === 0 ? "no A records" : `A=[${marsDns.join(", ")}]`,
+			});
 
 			checks.push({
 				name: "client-proxy-peer",

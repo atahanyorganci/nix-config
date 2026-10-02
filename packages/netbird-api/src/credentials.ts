@@ -1,61 +1,63 @@
-import * as Config from "effect/Config";
-import * as ConfigProvider from "effect/ConfigProvider";
+/**
+ * NetBird credentials — hand-written.
+ *
+ * The `Credentials` service holds an *effect* that resolves the current
+ * credentials on every request (the protocol layer resolves it per request
+ * on the calling fiber). `CredentialsFromEnv` reads `NB_PAT` and
+ * `NB_MANAGEMENT_URL`.
+ */
+import { ConfigError } from "@distilled.cloud/core/errors";
+import * as EffectConfig from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
-import * as Ref from "effect/Ref";
 
+/**
+ * NetBird Cloud's management API. Routes carry the `/api` prefix, so this is
+ * the bare origin; self-hosted accounts point it at their management server.
+ */
 export const DEFAULT_API_BASE_URL = "https://api.netbird.io";
 
-export interface CredentialsConfig {
+export interface Config {
 	readonly apiToken: Redacted.Redacted<string>;
-	readonly apiBaseUrl: string;
+	readonly managementUrl: string;
 }
 
-export class Credentials extends Context.Service<Credentials, Effect.Effect<CredentialsConfig>>()(
-	"NetbirdCredentials",
-) {}
+export class Credentials extends Context.Service<Credentials, Effect.Effect<Config>>()("NetbirdCredentials") {}
 
-export type CredentialsRef = Ref.Ref<Record<string, string>>;
+const envConfig = EffectConfig.all({
+	// `NB_PAT` / `NB_MANAGEMENT_URL` are what NetBird's Terraform provider reads.
+	apiToken: EffectConfig.String("NB_PAT"),
+	managementUrl: EffectConfig.String("NB_MANAGEMENT_URL").pipe(EffectConfig.withDefault(DEFAULT_API_BASE_URL)),
+});
 
-const credentialsFromProvider = (provider: ConfigProvider.ConfigProvider) =>
+export const CredentialsFromEnv = Layer.succeed(
+	Credentials,
+	envConfig.pipe(
+		Effect.mapError(
+			() =>
+				new ConfigError({
+					message: "NB_PAT environment variable is required",
+				}),
+		),
+		Effect.map(({ apiToken, managementUrl }) => ({
+			apiToken: Redacted.make(apiToken),
+			managementUrl,
+		})),
+		Effect.orDie,
+	),
+);
+
+/** Convenience layer from a plain token + optional management URL. */
+export const credentials = (config: {
+	readonly apiToken: string;
+	readonly managementUrl?: string;
+}): Layer.Layer<Credentials> =>
 	Layer.succeed(
 		Credentials,
-		Effect.gen(function* () {
-			const apiToken = yield* Config.Redacted("NETBIRD_API_TOKEN").pipe(
-				Config.orElse(() => Config.succeed(Redacted.make(""))),
-			);
-			const apiBaseUrl = yield* Config.String("NETBIRD_API_BASE_URL").pipe(Config.withDefault(DEFAULT_API_BASE_URL));
-			return { apiToken, apiBaseUrl };
-		}).pipe(Effect.provideService(ConfigProvider.ConfigProvider, provider), Effect.orDie),
+		Effect.succeed({
+			apiToken: Redacted.make(config.apiToken),
+			managementUrl: config.managementUrl ?? DEFAULT_API_BASE_URL,
+		}),
 	);
-
-/**
- * Resolve credentials from the process environment at API-call time.
- */
-export const CredentialsFromEnv = credentialsFromProvider(ConfigProvider.fromEnv());
-
-/**
- * A ConfigProvider backed by a Ref, with process environment fallback.
- *
- * This permits an Alchemy action to hydrate credentials after `NetBird.Setup`
- * and makes the PAT visible to downstream resources in the same apply.
- */
-export const CredentialsFromRef = (credentials: CredentialsRef) =>
-	credentialsFromProvider(
-		ConfigProvider.orElse(
-			ConfigProvider.make(path =>
-				Ref.get(credentials).pipe(Effect.flatMap(values => ConfigProvider.fromUnknown(values).load(path))),
-			),
-			ConfigProvider.fromEnv(),
-		),
-	);
-
-/**
- * Provide explicit NetBird credentials (e.g. from a Docker test fixture).
- */
-export const CredentialsFromConfig = (input: { apiToken: Redacted.Redacted<string> | string; apiBaseUrl: string }) => {
-	const apiToken = typeof input.apiToken === "string" ? Redacted.make(input.apiToken) : input.apiToken;
-	return Layer.succeed(Credentials, Effect.succeed({ apiToken, apiBaseUrl: input.apiBaseUrl }));
-};

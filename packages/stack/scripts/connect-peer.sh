@@ -12,7 +12,6 @@ SETUP_KEY_FILE="/var/lib/netbird-client/setup.key"
 
 STAGE="${STAGE:-dev_${USER}}"
 PROFILE="${ALCHEMY_PROFILE:-default}"
-ENV_FILE=""
 MANAGEMENT_URL="${NETBIRD_MANAGEMENT_URL:-}"
 SSH_USER="${SSH_USER:-$USER}"
 
@@ -41,7 +40,6 @@ Arguments:
 Flags:
   --stage STAGE            Alchemy stage (defaults to dev_${USER})
   --profile PROFILE        Alchemy auth profile (defaults to $ALCHEMY_PROFILE or default)
-  --env-file PATH          Environment file for Alchemy (same as create-setup-keys.ts)
   --management-url URL     NetBird management URL (defaults to $NETBIRD_MANAGEMENT_URL or flake)
   --ssh-user USER          SSH login user (defaults to $SSH_USER or $USER)
   -h, --help               Show this help
@@ -66,10 +64,6 @@ parse_args() {
                 ;;
             --profile)
                 PROFILE="${2:?--profile requires a value}"
-                shift 2
-                ;;
-            --env-file)
-                ENV_FILE="${2:?--env-file requires a value}"
                 shift 2
                 ;;
             --management-url)
@@ -125,11 +119,8 @@ load_management_url() {
 }
 
 provision_setup_key() {
-    local -a cmd=(bun "${SCRIPT_DIR}/create-setup-keys.ts" --stage "$STAGE" --profile "$PROFILE")
-    if [[ -n $ENV_FILE ]]; then
-        cmd+=(--env-file "$ENV_FILE")
-    fi
-    cmd+=("$PEER")
+    # Runs inside the NetbirdServer stack, whose secrets load NetBird credentials from Doppler.
+    local -a cmd=(node "${SCRIPT_DIR}/create-setup-keys.ts" --stage "$STAGE" --profile "$PROFILE" "$PEER")
 
     cd "$STACK_DIR"
     local line setup_key
@@ -245,13 +236,8 @@ REMOTE
 }
 
 verify_peer() {
-    local -a cmd=(bun "${SCRIPT_DIR}/list-peers.ts" --stage "$STAGE" --profile "$PROFILE")
+    local -a cmd=(doppler run -- node "${SCRIPT_DIR}/list-peers.ts" "$PEER")
     local output
-
-    if [[ -n $ENV_FILE ]]; then
-        cmd+=(--env-file "$ENV_FILE")
-    fi
-    cmd+=("$PEER")
 
     sleep 5
 

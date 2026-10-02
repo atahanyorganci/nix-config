@@ -16,6 +16,7 @@
 		"test": "vitest run"
 	},
 	"dependencies": {
+		"@distilled.cloud/core": "catalog:",
 		"@yorganci/netbird-api": "workspace:*",
 		"alchemy": "catalog:",
 		"effect": "catalog:"

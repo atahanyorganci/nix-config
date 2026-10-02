@@ -1,0 +1,5 @@
+# Doppler scope for `doppler run` in this package (`doppler setup --no-interactive`).
+# Keep in sync with `Doppler.Secrets` in stack/home-infra.ts and stack/netbird-server.ts.
+setup:
+  - project: nix-config
+    config: dev

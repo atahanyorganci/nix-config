@@ -1,6 +1,8 @@
 set export
-set dotenv-filename := ".env.local"
-set dotenv-load
+
+# Stacks load Hetzner and NetBird credentials through their Doppler `secrets`
+# (`just profile edit --add Doppler`). Scripts get them from `doppler run`,
+# scoped by doppler.yaml (`doppler login`, then `doppler setup --no-interactive`).
 
 ALCHEMY_PROFILE := "personal"
 ALCHEMY_STAGE := env("ALCHEMY_STAGE", "dev_atahan")
@@ -9,6 +11,7 @@ ALCHEMY_PLAIN := "1"
 
 AWS_REGION := "us-east-2"
 
+doppler := require("doppler")
 node := require("node")
 pnpm := require("pnpm")
 
@@ -23,10 +26,10 @@ destroy *args:
 
 # Print users, groups, peers, routes, nameservers and policy rules from the live account.
 verify *args:
-    {{ node }} scripts/verify-access.ts {{ args }}
+    {{ doppler }} run -- {{ node }} scripts/verify-access.ts {{ args }}
 
 test *args:
-    {{ node }} scripts/test-netbird-network.ts {{ args }}
+    {{ doppler }} run -- {{ node }} scripts/test-netbird-network.ts {{ args }}
 
 bootstrap *args:
     {{ pnpm }} exec alchemy provider cloudflare bootstrap {{ args }}

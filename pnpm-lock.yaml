@@ -223,6 +223,9 @@ importers:
 
   packages/netbird-alchemy:
     dependencies:
+      '@distilled.cloud/core':
+        specifier: 'catalog:'
+        version: 1.0.0-rc.13(effect@4.0.0)
       '@yorganci/netbird-api':
         specifier: workspace:*
         version: link:../netbird-api

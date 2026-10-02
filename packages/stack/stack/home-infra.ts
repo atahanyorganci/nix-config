@@ -1,6 +1,7 @@
 import * as NetBird from "@yorganci/netbird-alchemy";
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
+import * as Doppler from "alchemy/Doppler";
 import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -27,6 +28,7 @@ export default HomeInfra.make(
 	{
 		providers: Layer.mergeAll(NetBird.providers(), NixExpr.NixExprProvider()),
 		state: Cloudflare.state(),
+		secrets: [Doppler.Secrets({ project: "nix-config", config: "dev" })],
 	},
 	Effect.gen(function* () {
 		const infraExpr = yield* NixExpr.NixExpr("Infra", {
@@ -135,16 +137,18 @@ export default HomeInfra.make(
 		}
 
 		// Built-in All group — adopt by name, never rewrite members, never delete.
-		const allGroup = yield* NetBird.Group("All", { name: Policies.ALL_GROUP_NAME }).pipe(
-			Alchemy.RemovalPolicy.retain(),
-		);
+		const allGroup = yield* NetBird.Group("All", {
+			name: Policies.ALL_GROUP_NAME,
+		}).pipe(Alchemy.RemovalPolicy.retain());
 
 		// The reverse proxy joins the mesh as embedded peers that are not in the
 		// flake inventory and are omitted from /api/peers. Add those peers to this
 		// group once in the dashboard (Peers → proxy-* → Groups). Without that,
 		// allow-admin-proxy-tcp has an empty destination after Default is disabled,
 		// and matrix rules that list Proxy as a source never match a peer.
-		const proxyGroup = yield* NetBird.Group("Proxy", { name: Inventory.PROXY_GROUP_NAME });
+		const proxyGroup = yield* NetBird.Group("Proxy", {
+			name: Inventory.PROXY_GROUP_NAME,
+		});
 		groupOutputs[Inventory.PROXY_GROUP_NAME] = {
 			groupId: proxyGroup.groupId,
 			name: proxyGroup.name,
@@ -252,7 +256,11 @@ export default HomeInfra.make(
 		const nsPlans = yield* Schema.decodeEffect(NameServers.NameServerPlansFromNameServers)(nameServers);
 		const dns: Record<
 			string,
-			{ nameserverGroupId: NetBird.NameserverGroup["nsgroupId"]; host: string; ip: NetBird.Peer["ip"] }
+			{
+				nameserverGroupId: NetBird.NameserverGroup["nsgroupId"];
+				host: string;
+				ip: NetBird.Peer["ip"];
+			}
 		> = {};
 		for (const plan of nsPlans) {
 			const peer = peers[plan.hostKey];

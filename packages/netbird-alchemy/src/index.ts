@@ -1,13 +1,6 @@
-export type { CredentialsConfig } from "./Credentials.ts";
-export {
-	Credentials,
-	CredentialsFromConfig,
-	CredentialsFromEnv,
-	CredentialsFromRef,
-	DEFAULT_API_BASE_URL,
-} from "./Credentials.ts";
-export type { CredentialsRef } from "./Credentials.ts";
 export * from "./ApiKey/index.ts";
+export * from "./AuthProvider.ts";
+export * from "./Credentials.ts";
 export * from "./Group/index.ts";
 export * from "./NameserverGroup/index.ts";
 export * from "./Network/index.ts";

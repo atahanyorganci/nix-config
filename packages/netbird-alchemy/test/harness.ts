@@ -1,6 +1,7 @@
 import * as Alchemy from "alchemy";
 import * as Docker from "alchemy/Docker";
 import * as Test from "alchemy/Test/Vitest";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -13,35 +14,32 @@ import {
 	waitUntilReady,
 } from "./fixtures/NetBirdServer.ts";
 import { isDockerReady } from "./fixtures/Runtime.ts";
-import type { StackServices } from "alchemy/Stack";
 
 /**
  * Per-file Vitest harness: Docker NetBird fixture + scratch-stack resource tests.
  *
  * The fixture boots lazily on first `yield* fixture` (inside `it.live`) so it
  * shares the test Effect runtime. `afterAll` destroys the fixture stack.
- * Credentials live in a Ref provided by the providers Layer so
+ * The fixture's PAT reaches `NetBird.providers()` as `NB_PAT` /
+ * `NB_MANAGEMENT_URL` environment credentials, read from a Ref the fixture
+ * fills once it has booted. The providers resolve them on first use, so
  * create/update/delete and ensuring teardown all see the same PAT.
  */
 export const createHarness = (fixtureName: string) => {
-	const credsRef = Ref.makeUnsafe({
-		apiToken: Redacted.make(""),
-		apiBaseUrl: "http://127.0.0.1:0",
-	} satisfies NetBird.CredentialsConfig);
+	const envRef = Ref.makeUnsafe<Record<string, string>>({});
 
 	const handleRef = Ref.makeUnsafe<NetBirdServerHandle | null>(null);
 
-	const CredentialsFromFixture = Layer.succeed(
-		NetBird.Credentials,
-		Effect.gen(function* () {
-			return yield* Ref.get(credsRef);
-		}),
+	const FixtureEnv = ConfigProvider.layer(
+		ConfigProvider.orElse(ConfigProvider.fromEnv())(
+			ConfigProvider.make(path =>
+				Ref.get(envRef).pipe(Effect.flatMap(env => ConfigProvider.fromEnv({ env }).load(path))),
+			),
+		),
 	);
 
 	const api = Test.make({
-		providers: Layer.mergeAll(Docker.providers(), NetBird.resourceProviders()).pipe(
-			Layer.provideMerge(CredentialsFromFixture),
-		) as Layer.Layer<Docker.Docker | NetBird.ProviderRequirements, never, StackServices>,
+		providers: Layer.mergeAll(Docker.providers(), NetBird.providers().pipe(Layer.provide(FixtureEnv))),
 	});
 
 	const fixtureStack = Alchemy.Stack(
@@ -75,9 +73,9 @@ export const createHarness = (fixtureName: string) => {
 			hostPort: resources.hostPort,
 			apiToken,
 		} satisfies NetBirdServerHandle;
-		yield* Ref.set(credsRef, {
-			apiToken,
-			apiBaseUrl: resources.baseUrl,
+		yield* Ref.set(envRef, {
+			[NetBird.NB_PAT_ENV]: Redacted.value(apiToken),
+			[NetBird.NB_MANAGEMENT_URL_ENV]: resources.baseUrl,
 		});
 		yield* Ref.set(handleRef, handle);
 		return handle;
