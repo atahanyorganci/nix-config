@@ -65,6 +65,7 @@ in {
             "docker-compose"
             "dockerfile"
             "fish"
+            "git-firefly"
             "just"
             "latex"
             "nix"
@@ -105,6 +106,11 @@ in {
             file_types = {
               JSONC = ["*.json"];
               Markdown = ["*.rmd"];
+              # Git Firefly detects most Git files on its own; these are the
+              # paths its README says need mapping by hand.
+              "Git Attributes" = ["**/{git,.git,.git/info}/attributes"];
+              "Git Config" = ["*.gitconfig" "**/{git,.git,.git/modules,.git/modules/*}/config"];
+              "Git Ignore" = ["**/{git,.git}/ignore" "**/.git/info/exclude"];
             };
             # Panels
             agent.dock = "right";
