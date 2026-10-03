@@ -15,6 +15,7 @@ in {
         inputs.hermes-agent.nixosModules.default
         inputs.home-manager.nixosModules.home-manager
         inputs.stylix.nixosModules.stylix
+        inputs.catppuccin.nixosModules.catppuccin
         inputs.vscode-server.nixosModules.default
       ]
       ++ autoImport;

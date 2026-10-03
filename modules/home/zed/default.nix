@@ -77,12 +77,6 @@ in {
             "toml"
             "xml"
           ];
-          # Cursor Dark, ported to Zed by Nexmoe and copied unmodified from
-          # https://github.com/nexmoe/cursor-themes-for-zed at commit
-          # 46278c624a7174e4f19fa07b58523bc7512a0dc3 (MIT, see ./themes/LICENSE).
-          # An unofficial port of Anysphere's Cursor Dark theme; the same
-          # palette drives the rest of the system through Stylix.
-          themes.cursor-dark = ./themes/cursor-dark.json;
           userSettings = {
             auto_update = false;
             ssh_connections = lib.optionals isAgentHolder (
@@ -92,7 +86,6 @@ in {
             # beside the connections above.
             read_ssh_config = false;
             base_keymap = "VSCode";
-            theme = "Cursor Dark";
             # Editor
             auto_indent_on_paste = true;
             colorize_brackets = false;
@@ -165,8 +158,6 @@ in {
           ];
         };
         stylix.targets.zed = {
-          # The Cursor Dark theme above replaces Stylix's base16 rendition.
-          colors.enable = false;
           # Stylix converts points to pixels (x4/3): 14px UI, 12px buffers.
           fonts.override = {
             sizes = {
