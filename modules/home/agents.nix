@@ -5,6 +5,10 @@
     pkgs,
     ...
   }: let
+    # The agent gateway on mars, which serves the models under `/v1` and each
+    # account's limits under `/_/usage`.
+    gateway = "https://ai.yorganci.dev";
+
     allEfforts = ["none" "low" "medium" "high" "xhigh"];
     mkThinkingLevelMap = efforts:
       lib.mapAttrs (_: effort:
@@ -225,6 +229,10 @@
   in {
     options.agents.enable = lib.mkEnableOption "Agent harnesses";
     config = lib.mkIf config.agents.enable {
+      # The usage widget otherwise asks `localhost:3000`, where the gateway
+      # used to run.
+      home.sessionVariables.PI_USAGE_ENDPOINT = "${gateway}/_/usage";
+
       programs.pi = {
         enable = true;
         settings = {
@@ -280,10 +288,10 @@
         modelProfiles.models = lib.listToAttrs (map (model: lib.nameValuePair "llm-gateway/${model.id}" (mkProfile model)) gatewayModels);
 
         models.providers.llm-gateway = {
-          baseUrl = "https://ai.yorganci.dev/v1";
+          baseUrl = "${gateway}/v1";
           api = "openai-completions";
-          # The gateway runs on loopback and ignores the key, but pi
-          # requires the field to be present.
+          # The gateway ignores the key (NetBird decides who reaches it), but
+          # pi requires the field to be present.
           apiKey = "1234567890";
           compat = {
             supportsDeveloperRole = true;
