@@ -33,11 +33,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790954514,
-        "narHash": "sha256-dEACTgTF44g1Bsr5fEaBmP+WcDh62+xNEdxAulQez0E=",
+        "lastModified": 1791128794,
+        "narHash": "sha256-kn9Qk7bzHxGZ5frTl3eCrQGxLGADtb5GgA5W8PViq1k=",
         "owner": "atahanyorganci",
         "repo": "agent",
-        "rev": "e70b11d2065f62288b7d8c50941a8210aba9182f",
+        "rev": "044d623fca6d7893a760dcb87cb45469e3857fa0",
         "type": "github"
       },
       "original": {
