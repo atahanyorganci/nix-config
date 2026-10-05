@@ -82,6 +82,8 @@ test.provider.skipIf(!isDockerReady)(
 			const provider = yield* agentNetworkProvidersProviderIdGet({ providerId: first.provider.providerId });
 			expect(provider.provider_id).toEqual("agentgateway");
 			expect(provider.upstream_url).toEqual(UPSTREAM);
+			// NetBird stores `false` when `enabled` is omitted, whatever its docs say.
+			expect(provider.enabled).toBe(true);
 			expect(provider.models).toEqual([
 				{ id: LUNA.id, input_per_1k: 0.0001, output_per_1k: 0.0005, cached_input_per_1k: 0.00001 },
 			]);
@@ -172,27 +174,33 @@ test.provider.skipIf(!isDockerReady)(
 		}).pipe(withLogLevel),
 );
 
-test.provider.skipIf(!isDockerReady)("adopt an existing provider by name", stack =>
+test.provider.skipIf(!isDockerReady)("adopt an existing provider by name and enable it", stack =>
 	Effect.gen(function* () {
 		yield* fixture;
 		yield* stack.destroy();
 
-		const provider = (id: string) =>
+		const provider = (id: string, enabled?: boolean) =>
 			NetBird.AgentNetworkProvider(id, {
 				name: `${PREFIX}-adopted`,
 				catalogId: "custom",
 				upstreamUrl: UPSTREAM,
 				apiKey: Redacted.make("adopted"),
 				models: [LUNA],
+				...(enabled !== undefined ? { enabled } : {}),
 			});
 
-		const original = yield* stack.deploy(provider("Original").pipe(Alchemy.RemovalPolicy.retain()));
+		const original = yield* stack.deploy(provider("Original", false).pipe(Alchemy.RemovalPolicy.retain()));
+		expect(original.enabled).toBe(false);
 		yield* stack.destroy();
 		expect(yield* catchNotFound(agentNetworkProvidersProviderIdGet({ providerId: original.providerId }))).toBeDefined();
 
+		// Omitting `enabled` means enabled, which repairs a provider that NetBird
+		// created disabled.
 		const adopted = yield* stack.deploy(provider("Adopted"));
 		expect(adopted.providerId).toEqual(original.providerId);
 		expect(adopted.catalogId).toEqual("custom");
+		expect(adopted.enabled).toBe(true);
+		expect((yield* agentNetworkProvidersProviderIdGet({ providerId: original.providerId })).enabled).toBe(true);
 
 		yield* stack.destroy();
 		expect(

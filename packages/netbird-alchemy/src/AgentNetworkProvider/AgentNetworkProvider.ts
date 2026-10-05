@@ -77,7 +77,13 @@ export interface AgentNetworkProviderProps {
 	identityHeaderUserId?: string;
 	/** Header carrying the caller's groups, for catalog entries that let it be renamed. Omitted leaves it as is. */
 	identityHeaderGroups?: string;
-	/** Omitted leaves the current value (NetBird's default on create: `true`). */
+	/**
+	 * Whether the gateway routes to the provider. Always sent: NetBird 0.80
+	 * documents `true` as the create default but stores `false` when the field
+	 * is omitted, and the endpoint serves only enabled providers.
+	 *
+	 * @default true
+	 */
 	enabled?: boolean;
 	/** Skip upstream certificate verification. Omitted leaves the current value (default `false`). */
 	skipTlsVerification?: boolean;
@@ -200,7 +206,7 @@ export const AgentNetworkProviderProvider = () =>
 					...(props.extraValues !== undefined ? { extra_values: { ...props.extraValues } } : {}),
 					...(props.identityHeaderUserId !== undefined ? { identity_header_user_id: props.identityHeaderUserId } : {}),
 					...(props.identityHeaderGroups !== undefined ? { identity_header_groups: props.identityHeaderGroups } : {}),
-					...(props.enabled !== undefined ? { enabled: props.enabled } : {}),
+					enabled: props.enabled ?? true,
 					...(props.skipTlsVerification !== undefined ? { skip_tls_verification: props.skipTlsVerification } : {}),
 					...(props.metadataDisabled !== undefined ? { metadata_disabled: props.metadataDisabled } : {}),
 				}).pipe(
@@ -223,7 +229,7 @@ export const AgentNetworkProviderProvider = () =>
 				extra_values: props.extraValues ?? observed.extra_values ?? {},
 				identity_header_user_id: props.identityHeaderUserId ?? observed.identity_header_user_id,
 				identity_header_groups: props.identityHeaderGroups ?? observed.identity_header_groups,
-				enabled: props.enabled ?? observed.enabled,
+				enabled: props.enabled ?? true,
 				skip_tls_verification: props.skipTlsVerification ?? observed.skip_tls_verification,
 				metadata_disabled: props.metadataDisabled ?? observed.metadata_disabled,
 			};
