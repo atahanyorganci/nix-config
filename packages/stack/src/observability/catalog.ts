@@ -153,6 +153,14 @@ export const virtualFields = (models: ReadonlyArray<PricedModel>): ReadonlyArray
 		expression: `tostring(${attr("upstream.account")})`,
 	},
 	{
+		name: "failed_in_band",
+		description:
+			"A stream that failed after its 200 was sent, so the client was told in the stream rather than by the status: what a 5xx count misses.",
+		expression:
+			`tostring(body) == "chat completion stream failed after the response started"` +
+			` or (tostring(body) == "chat completion stream failed before any output" and tostring(${attr("stream.committed")}) == "true")`,
+	},
+	{
 		name: "termination",
 		description: "Why a stream ended: finish, truncated, upstream-error, defect, encode-error.",
 		expression: `tostring(${attr("stream.termination")})`,
@@ -326,12 +334,12 @@ export const monitors = (dataset: string): ReadonlyArray<Monitor> => [
 		props: {
 			name: "Agent gateway failing requests",
 			description:
-				"More than 5 failed requests in 15 minutes, twice running: gateway 5xx responses and streams that ended in an upstream error or truncated.",
+				"More than 5 failed requests in 15 minutes, twice running: 5xx responses, and streams that failed after their 200 was sent. A stream that failed before it is one of the 5xx.",
 			type: "Threshold",
 			aplQuery: lines(
 				`['${dataset}']`,
 				`| where service == "${SERVICE}"`,
-				'| where (kind == "server" and status_class == "5xx") or termination in ("upstream-error", "truncated")',
+				'| where (kind == "server" and status_class == "5xx") or failed_in_band',
 				"| summarize failures = count()",
 			),
 			operator: "Above",
