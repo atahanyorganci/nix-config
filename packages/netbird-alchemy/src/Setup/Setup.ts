@@ -1,4 +1,3 @@
-import { isResolved } from "alchemy/Diff";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
 import * as Data from "effect/Data";
@@ -10,6 +9,8 @@ import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
+import type { Diff } from "alchemy/Diff";
+import type { Input } from "alchemy/Input";
 
 export class NetBirdSetupError extends Data.TaggedError("NetBirdSetupError")<{
 	readonly message: string;
@@ -36,7 +37,8 @@ export interface SetupProps {
 	password?: Redacted.Redacted<string>;
 	/**
 	 * Optional dependency edge (e.g. NixOS `Command.Exec` hash). Ignored by
-	 * the provider; include any upstream Output so Setup waits for it.
+	 * the provider, including when diffing; include any upstream Output so
+	 * Setup waits for it.
 	 */
 	ready?: string | boolean | null;
 }
@@ -62,6 +64,9 @@ export type Setup = Resource<"NetBird.Setup", SetupProps, SetupAttributes>;
  * requested here. The admin password is generated unless supplied, persisted
  * in Alchemy state and reused when setup is already complete
  * (`setup_required: false`).
+ *
+ * Setup happens once per management server: after it, the resource only
+ * changes when `apiBaseUrl` names a different server.
  *
  * @resource
  * @product Setup
@@ -91,6 +96,8 @@ const SetupResponse = Schema.Struct({
 	email: Schema.String,
 });
 
+const normalizeBaseUrl = (url: string) => url.replace(/\/$/, "");
+
 const PASSWORD_BYTES = 24;
 
 /**
@@ -103,19 +110,38 @@ const generatePassword = () => {
 	return Redacted.make(`Nb${hex}!`);
 };
 
+/**
+ * The owner account's email, name and password are fixed by the first
+ * `/api/setup`, and `ready` only orders the resource, so none of them is
+ * compared. A different management server needs its own setup.
+ *
+ * Returns `undefined` (the engine's props comparison) before the first setup
+ * or while `apiBaseUrl` is still unresolved.
+ */
+export const diffSetup = ({
+	news,
+	output,
+}: {
+	news: Input<SetupProps>;
+	output: SetupAttributes | undefined;
+}): Diff | undefined => {
+	if (!output) return undefined;
+	const apiBaseUrl = (news as { apiBaseUrl?: unknown }).apiBaseUrl;
+	if (typeof apiBaseUrl !== "string") return undefined;
+	return normalizeBaseUrl(apiBaseUrl) === normalizeBaseUrl(output.apiBaseUrl)
+		? { action: "noop" }
+		: { action: "replace" };
+};
+
 export const SetupProvider = () =>
 	Provider.succeed(Setup, {
 		stables: ["userId", "email", "apiBaseUrl"],
-		diff: ({ news }) =>
-			Effect.sync(() => {
-				if (!isResolved(news)) return undefined;
-				// Email/name/password identity is fixed after first setup; ignore drift.
-			}),
+		diff: ({ news, output }) => Effect.sync(() => diffSetup({ news, output })),
 		read: ({ output }) => Effect.succeed(output),
 		list: () => Effect.succeed([]),
 		reconcile: Effect.fn(function* ({ news, output }) {
 			const props = news ?? ({} as SetupProps);
-			const apiBaseUrl = props.apiBaseUrl.replace(/\/$/, "");
+			const apiBaseUrl = normalizeBaseUrl(props.apiBaseUrl);
 			const email = props.email;
 			const name = props.name;
 
