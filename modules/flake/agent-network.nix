@@ -215,6 +215,9 @@ in {
   config.flake.agentNetwork = {
     enable = true;
     gateway = {
+      # Allocated by NetBird on the first deploy and never renamed; clients
+      # (Hermes) are configured with it, and the stack fails if it drifts.
+      endpoint = "sandy-geranium.yorganci.dev";
       logCollection = true;
       promptCollection = true;
       redactPii = false;
