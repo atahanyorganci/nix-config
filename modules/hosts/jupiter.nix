@@ -66,7 +66,8 @@
       # agent gateway on mars; jupiter is authorised as an `Agents` peer.
       agentNetwork = {
         enable = true;
-        model = "codex/gpt-6-luna";
+        model = "claude-code/claude-opus-5-5";
+        effort = "medium";
       };
       environmentFiles = ["/var/lib/hermes/env"];
       dashboard = {

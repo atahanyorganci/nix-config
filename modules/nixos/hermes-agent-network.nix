@@ -34,6 +34,24 @@ in {
     defaultModel = lib.findFirst (model: model.id == cfg.model) null agentModels;
     baseUrl = "https://${cfg.endpoint}/v1";
 
+    # Gives every offered model its context length, which the gateway's
+    # `/v1/models` does not report, and `/model custom:netbird:<id>`.
+    netbirdProvider =
+      {
+        name = "netbird";
+        base_url = baseUrl;
+        api_mode = "chat_completions";
+        models = lib.listToAttrs (map (model: lib.nameValuePair model.id (modelSettings model)) agentModels);
+      }
+      # Hermes only sends a reasoning effort to endpoints it knows (OpenRouter,
+      # Nous, LM Studio, …), so `agent.reasoning_effort` alone never reaches a
+      # custom one. A provider's `extra_body` is merged into every request to
+      # its base URL, and the gateway reads OpenAI's top-level
+      # `reasoning_effort`.
+      // lib.optionalAttrs (cfg.effort != null) {
+        extra_body.reasoning_effort = cfg.effort;
+      };
+
     # Every auxiliary task of the pinned Hermes. They default to `auto`, which
     # picks whichever provider key is left in `.env`, bypassing the gateway;
     # `main` sends them to the same endpoint as the agent. Recheck the list
@@ -83,6 +101,17 @@ in {
         default = "codex/gpt-6-luna";
         description = "Model Hermes uses by default; one of the models the endpoint offers.";
       };
+
+      effort = lib.mkOption {
+        type = lib.types.nullOr (lib.types.enum ["none" "low" "medium" "high" "xhigh"]);
+        default = null;
+        example = "medium";
+        description = ''
+          Reasoning effort sent with every request to the endpoint, whichever
+          model serves it; one the default model accepts. Null leaves it to
+          the gateway and the model's own default.
+        '';
+      };
     };
 
     config = lib.mkIf (hermesCfg.enable && cfg.enable) (lib.mkMerge [
@@ -94,6 +123,13 @@ in {
               services.hermes-agent.agentNetwork.model = "${cfg.model}" is not offered through the
               Agent Network endpoint. Offered: ${lib.concatStringsSep ", " agentModelIds}.
               Add "agents" to its audience in flake.agentGateway.models.
+            '';
+          }
+          {
+            assertion = cfg.effort == null || defaultModel == null || lib.elem cfg.effort defaultModel.efforts;
+            message = ''
+              services.hermes-agent.agentNetwork.effort = "${toString cfg.effort}" is not an effort
+              ${cfg.model} accepts: ${lib.concatStringsSep ", " (defaultModel.efforts or [])}.
             '';
           }
         ];
@@ -120,16 +156,7 @@ in {
               default = cfg.model;
             }
             // modelSettings defaultModel;
-          # Gives every offered model its context length, which the gateway's
-          # `/v1/models` does not report, and `/model custom:netbird:<id>`.
-          custom_providers = [
-            {
-              name = "netbird";
-              base_url = baseUrl;
-              api_mode = "chat_completions";
-              models = lib.listToAttrs (map (model: lib.nameValuePair model.id (modelSettings model)) agentModels);
-            }
-          ];
+          custom_providers = [netbirdProvider];
           auxiliary = lib.genAttrs auxiliaryTasks (_: {provider = "main";});
           fallback_providers = [];
         };
@@ -140,6 +167,13 @@ in {
           after = ["netbird-wt0.service"];
           wants = ["netbird-wt0.service"];
         };
+      })
+
+      # Kept in Hermes's own settings too, though only `extra_body` reaches the
+      # endpoint (see `netbirdProvider`). A definition of its own: `settings`
+      # merges plain attrsets, so an `mkIf` inside one would not be resolved.
+      (lib.mkIf (cfg.endpoint != null && defaultModel != null && cfg.effort != null) {
+        services.hermes-agent.settings.agent.reasoning_effort = cfg.effort;
       })
     ]);
   };
