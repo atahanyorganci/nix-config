@@ -23,6 +23,7 @@
   jupiterNixosModule = {
     user,
     pkgs,
+    config,
     ...
   }: {
     headless = true;
@@ -58,6 +59,9 @@
       enable = true;
       setupKeyFile = "/var/lib/netbird-client/setup.key";
     };
+    # hosts/jupiter.yaml in nix-secrets. Hermes merges it into its .env at
+    # activation and reads that at startup, so a change needs a restart.
+    sops.secrets."hermes/env".restartUnits = ["hermes-agent.service"];
     # Hermes agent + web dashboard at https://hermes.yorganci.dev
     services.hermes-agent = {
       enable = true;
@@ -69,7 +73,7 @@
         model = "claude-code/claude-opus-5-5";
         effort = "medium";
       };
-      environmentFiles = ["/var/lib/hermes/env"];
+      environmentFiles = [config.sops.secrets."hermes/env".path];
       dashboard = {
         enable = true;
         host = "127.0.0.1";
