@@ -107,6 +107,8 @@ const secretsFlag = Flag.Directory("secrets").pipe(
 
 const dryRunFlag = Flag.Boolean("dry-run").pipe(
 	Flag.withDescription("Read the outputs and check the host, but write nothing"),
+	// A boolean flag left out fails unless it has a default.
+	Flag.withDefault(false),
 );
 
 const hostArg = Argument.String("host").pipe(Argument.withDescription("Host running otel-collector (e.g. mars)"));
