@@ -66,6 +66,9 @@
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Servers";
     hostInventory.ssh.localHostName.enable = true;
+    # Verified over the NetBird mesh and the LAN, and matching known_hosts, on
+    # 2026-10-05.
+    hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFy1R34T0MVD0LR0MxbCcNJphaG6KKjRSktwoPcgc/tW";
     # Bootloader.
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = true;
