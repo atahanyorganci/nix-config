@@ -111,8 +111,43 @@ in {
         example = "/run/secrets/agent-gateway.env";
         description = ''
           `EnvironmentFile` for the unit, kept out of the world-readable store.
-          Useful for `OTEL_EXPORTER_OTLP_ENDPOINT` and its headers.
+          Telemetry needs none: it goes to the local collector (`telemetry`),
+          which holds the Axiom credentials.
         '';
+      };
+
+      telemetry = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = config.otel-collector.enable;
+          defaultText = lib.literalExpression "config.otel-collector.enable";
+          description = ''
+            Export traces and log records over OTLP to `telemetry.endpoint`, by
+            default this host's otel-collector, which ships them to Axiom.
+            Metrics stay in the process: the collector takes traces and logs.
+          '';
+        };
+
+        endpoint = lib.mkOption {
+          type = lib.types.str;
+          default = "http://127.0.0.1:4318";
+          description = "Base OTLP/HTTP endpoint (`OTEL_EXPORTER_OTLP_ENDPOINT`); the gateway appends `/v1/<signal>`.";
+        };
+
+        logs = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = ''
+            Export log records too (`OTEL_LOGS_ENABLED`), carrying their trace
+            id, at `logLevel`. The journal keeps them either way.
+          '';
+        };
+
+        sampleRatio = lib.mkOption {
+          type = lib.types.numbers.between 0 1;
+          default = 1;
+          description = "Fraction of new traces recorded (`OTEL_TRACES_SAMPLER_ARG`); a sampled trace is kept whole.";
+        };
       };
 
       expose = {
@@ -171,6 +206,14 @@ in {
 
     config = lib.mkIf cfg.enable {
       assertions = [
+        {
+          assertion = !cfg.telemetry.enable || cfg.telemetry.endpoint != "http://127.0.0.1:4318" || config.otel-collector.enable;
+          message = ''
+            agent-gateway.telemetry exports to ${cfg.telemetry.endpoint}, this host's
+            otel-collector, but otel-collector.enable is false. Enable it, or point
+            agent-gateway.telemetry.endpoint at another collector.
+          '';
+        }
         {
           assertion = cfg.port >= 1024;
           message = ''
@@ -236,8 +279,10 @@ in {
         description = "agent gateway, an OpenAI-compatible LLM gateway";
         documentation = ["https://github.com/atahanyorganci/agent"];
         wantedBy = ["multi-user.target"];
-        after = ["network-online.target"];
-        wants = ["network-online.target"];
+        # The collector first, so the first requests' telemetry has somewhere
+        # to go; the gateway retries an export it could not deliver.
+        after = ["network-online.target"] ++ lib.optional cfg.telemetry.enable "opentelemetry-collector.service";
+        wants = ["network-online.target"] ++ lib.optional cfg.telemetry.enable "opentelemetry-collector.service";
 
         # The credentials file is provisioned by hand. Until it is, skip the
         # start instead of serving no models (or failing in a restart loop):
@@ -246,20 +291,32 @@ in {
         # restart, since the gateway does not reload the file.
         unitConfig.ConditionFileNotEmpty = credentialsFile;
 
-        environment = {
-          AGENT_HOST = cfg.host;
-          AGENT_PORT = toString cfg.port;
-          # Named explicitly so it must exist, and so OAuth rotations are
-          # written back here (a temporary file renamed over it, hence the
-          # writable state directory).
-          AGENT_CREDENTIALS = credentialsFile;
-          # Must exist; a missing `config.json` in it is an empty configuration.
-          # Pinned so nothing is read from `$HOME/.config`.
-          AGENT_CONFIG_DIR = stateDir;
-          AGENT_LOG_LEVEL = cfg.logLevel;
-          AGENT_LOG_FORMAT = cfg.logFormat;
-          HOME = stateDir;
-        };
+        environment =
+          {
+            AGENT_HOST = cfg.host;
+            AGENT_PORT = toString cfg.port;
+            # Named explicitly so it must exist, and so OAuth rotations are
+            # written back here (a temporary file renamed over it, hence the
+            # writable state directory).
+            AGENT_CREDENTIALS = credentialsFile;
+            # Must exist; a missing `config.json` in it is an empty configuration.
+            # Pinned so nothing is read from `$HOME/.config`.
+            AGENT_CONFIG_DIR = stateDir;
+            AGENT_LOG_LEVEL = cfg.logLevel;
+            AGENT_LOG_FORMAT = cfg.logFormat;
+            HOME = stateDir;
+          }
+          // lib.optionalAttrs cfg.telemetry.enable {
+            OTEL_EXPORTER_OTLP_ENDPOINT = cfg.telemetry.endpoint;
+            # What the dashboards and monitors filter on.
+            OTEL_SERVICE_NAME = "agent-gateway";
+            # The agent package is 0.0.0; its commit says which build a trace came from.
+            OTEL_SERVICE_VERSION = inputs.agent.shortRev or inputs.agent.dirtyShortRev or "unknown";
+            OTEL_RESOURCE_ATTRIBUTES = "host.name=${config.networking.hostName},deployment.environment.name=production";
+            OTEL_TRACES_SAMPLER_ARG = toString cfg.telemetry.sampleRatio;
+            OTEL_LOGS_ENABLED = lib.boolToString cfg.telemetry.logs;
+            OTEL_METRICS_ENABLED = "false";
+          };
 
         serviceConfig = {
           Type = "exec";
