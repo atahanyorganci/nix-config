@@ -31,6 +31,15 @@ in {
         options = {
           domain = lib.mkOption {type = lib.types.str;};
           netbirdManagementDomain = lib.mkOption {type = lib.types.str;};
+          axiom.dataset = lib.mkOption {
+            type = lib.types.strMatching "[A-Za-z0-9-]{1,128}";
+            description = ''
+              Axiom dataset holding the OpenTelemetry logs and traces of every
+              host's `otel-collector`. One `axiom:events:v1` dataset for both
+              signals: the Personal plan allows three datasets. The HomeInfra
+              stack creates it; hosts route to it by name.
+            '';
+          };
         };
       };
     };
@@ -47,5 +56,6 @@ in {
   config.flake.infra = rec {
     domain = "yorganci.dev";
     netbirdManagementDomain = "netbird.${domain}";
+    axiom.dataset = "otel";
   };
 }
