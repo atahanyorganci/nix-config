@@ -1,5 +1,6 @@
 import * as NetBird from "@yorganci/netbird-alchemy";
 import * as Alchemy from "alchemy";
+import * as Axiom from "alchemy/Axiom";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Doppler from "alchemy/Doppler";
 import * as Output from "alchemy/Output";
@@ -15,6 +16,7 @@ import {
 	Inventory,
 	NameServers,
 	NixExpr,
+	Observability,
 	Policies,
 	ReverseProxy,
 } from "../src/index.ts";
@@ -22,6 +24,7 @@ import {
 const Infra = Schema.Struct({
 	domain: Schema.String,
 	netbirdManagementDomain: Schema.String,
+	axiom: Observability.AxiomInfra,
 });
 
 const Me = Schema.Struct({
@@ -36,7 +39,7 @@ const peerLogicalId = (hostKey: string) => hostKey[0]!.toUpperCase() + hostKey.s
 
 export default HomeInfra.make(
 	{
-		providers: Layer.mergeAll(NetBird.providers(), NixExpr.NixExprProvider()),
+		providers: Layer.mergeAll(NetBird.providers(), NixExpr.NixExprProvider(), Axiom.providers()),
 		state: Cloudflare.state(),
 		secrets: [Doppler.Secrets({ project: "nix-config", config: "dev" })],
 	},
@@ -425,6 +428,11 @@ export default HomeInfra.make(
 			});
 		}
 
+		// Telemetry: hosts' otel-collectors ship to this Axiom dataset with this
+		// token, which `just connect-axiom <host>` writes to nix-secrets. The
+		// Axiom credentials (AXIOM_TOKEN, AXIOM_ORG_ID) load from Doppler.
+		const axiom = yield* Observability.deploy({ infra: infra.axiom });
+
 		// Adopt the dashboard All→All policy, keep it disabled (default deny),
 		// and retain it so destroy never deletes the built-in rule.
 		yield* NetBird.Policy("DisableDefault", {
@@ -443,6 +451,7 @@ export default HomeInfra.make(
 				allowRuleCount: allowRules.length,
 			},
 			...(agentNetworkOutput !== undefined ? { agentNetwork: agentNetworkOutput } : {}),
+			axiom,
 		};
 	}).pipe(Effect.orDie),
 );

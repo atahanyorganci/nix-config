@@ -1,4 +1,5 @@
 import * as Alchemy from "alchemy";
+import type * as Redacted from "effect/Redacted";
 
 export interface HomeInfraPeerOutput {
 	hostname: string;
@@ -32,6 +33,18 @@ export interface HomeInfraAgentNetworkOutput {
 	policies: Record<string, string>;
 }
 
+export interface HomeInfraAxiomOutput {
+	/** OTLP/HTTP base URL of the dataset's edge deployment; the collector appends `/v1/<signal>`. */
+	endpoint: string;
+	/**
+	 * Bearer for `otel-ingest`, which can only create events in `dataset`.
+	 * Encrypted in state; `just connect-axiom <host>` writes it to nix-secrets.
+	 */
+	token: Redacted.Redacted<string>;
+	/** `infra.axiom.dataset`. */
+	dataset: string;
+}
+
 export interface HomeInfraOutputs {
 	peers: Record<string, HomeInfraPeerOutput>;
 	groups: Record<string, HomeInfraGroupOutput>;
@@ -44,6 +57,7 @@ export interface HomeInfraOutputs {
 	};
 	/** Present while `flake.agentNetwork.enable` is set. */
 	agentNetwork?: HomeInfraAgentNetworkOutput;
+	axiom: HomeInfraAxiomOutput;
 }
 
 export class HomeInfra extends Alchemy.Stack<HomeInfra, HomeInfraOutputs>()("HomeInfra") {}

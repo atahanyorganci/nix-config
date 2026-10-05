@@ -8,11 +8,13 @@ export * as Policies from "./policies.ts";
 export * as NixExpr from "./nix-expr.ts";
 export * as Hetzner from "./hetzner.ts";
 export * as Aws from "./aws.ts";
-export { HOME_INFRA_STACK, readHomeInfraGroupId } from "./home-infra-state.ts";
+export * as Observability from "./observability/index.ts";
+export { HOME_INFRA_STACK, readHomeInfraAxiom, readHomeInfraGroupId } from "./home-infra-state.ts";
 export { NetbirdServerStack, type NetbirdServerStackOutputs } from "./netbird-server-stack.ts";
 export {
 	HomeInfra,
 	type HomeInfraAgentNetworkOutput,
+	type HomeInfraAxiomOutput,
 	type HomeInfraGroupOutput,
 	type HomeInfraNameserverOutput,
 	type HomeInfraOutputs,
