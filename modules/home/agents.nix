@@ -1,4 +1,6 @@
-{
+{config, ...}: let
+  catalog = config.flake.agentGateway;
+in {
   flake.modules.homeManager.agents = {
     lib,
     config,
@@ -7,7 +9,7 @@
   }: let
     # The agent gateway on mars, which serves the models under `/v1` and each
     # account's limits under `/_/usage`.
-    gateway = "https://ai.yorganci.dev";
+    gateway = catalog.url;
 
     allEfforts = ["none" "low" "medium" "high" "xhigh"];
     mkThinkingLevelMap = efforts:
@@ -40,156 +42,20 @@
         input = ["text"] ++ lib.optional image "image";
       }
       // lib.optionalAttrs reasoning {thinkingLevelMap = mkThinkingLevelMap efforts;}
-      // lib.optionalAttrs (cost != null) {inherit cost;}
+      // lib.optionalAttrs (cost != null) {cost = piCost cost;}
       // lib.optionalAttrs (compat != null) {inherit compat;};
 
-    # Prices are USD per million tokens. Either one attrset of flat rates, or
-    # a list whose first entry is the base rates and whose later entries each
-    # add `inputTokensAbove`, the prompt size at which those rates take over.
-    #
-    # The guard matters: an entry missing `inputTokensAbove` would otherwise
-    # land in `tiers` as an unbounded tier and quietly misprice the model.
-    mkCost = spec:
-      if !lib.isList spec
-      then spec
-      else let
-        base = lib.head spec;
-        tiers = lib.tail spec;
-        untiered = lib.filter (tier: !(tier ? inputTokensAbove)) tiers;
-      in
-        lib.throwIf (untiered != [])
-        "mkCost: every cost entry after the first needs inputTokensAbove"
-        (base // lib.optionalAttrs (tiers != []) {inherit tiers;});
+    # Prices are USD per million tokens (`flake.agentGateway.models`): the base
+    # rates, plus `tiers` that each take over above `inputTokensAbove`. Pi
+    # takes the same shape, minus the rates and tiers a model does not have.
+    piRates = lib.filterAttrs (_: rate: rate != null);
+    piCost = cost:
+      piRates (removeAttrs cost ["tiers"])
+      // lib.optionalAttrs (cost.tiers != []) {tiers = map piRates cost.tiers;};
 
-    gatewayModels = [
-      {
-        id = "codex/gpt-6-astra";
-        name = "GPT-6-Astra";
-        contextWindow = 1050000;
-        maxTokens = 128000;
-        efforts = lib.remove "none" allEfforts;
-        fast = true;
-        cost = mkCost [
-          {
-            input = 10;
-            output = 50;
-            cacheRead = 1;
-            cacheWrite = 12.5;
-          }
-          {
-            inputTokensAbove = 272000;
-            input = 20;
-            output = 75;
-            cacheRead = 2;
-            cacheWrite = 25;
-          }
-        ];
-      }
-      {
-        id = "codex/gpt-6.1-sol";
-        name = "GPT-6.1-Sol";
-        contextWindow = 1050000;
-        maxTokens = 128000;
-        efforts = lib.remove "none" allEfforts;
-        fast = true;
-        cost = mkCost [
-          {
-            input = 2;
-            output = 10;
-            cacheRead = 0.1;
-            cacheWrite = 2.5;
-          }
-          {
-            inputTokensAbove = 272000;
-            input = 4;
-            output = 15;
-            cacheRead = 0.2;
-            cacheWrite = 5;
-          }
-        ];
-      }
-      {
-        id = "codex/gpt-5.6-terra";
-        name = "GPT-5.6-Terra";
-        contextWindow = 1050000;
-        maxTokens = 128000;
-        fast = true;
-        cost = mkCost [
-          {
-            input = 2;
-            output = 12;
-            cacheRead = 0.2;
-            cacheWrite = 2.5;
-          }
-          {
-            inputTokensAbove = 272000;
-            input = 4;
-            output = 18;
-            cacheRead = 0.4;
-            cacheWrite = 5;
-          }
-        ];
-      }
-      {
-        id = "codex/gpt-6-luna";
-        name = "GPT-6-Luna";
-        contextWindow = 1050000;
-        maxTokens = 128000;
-        fast = true;
-        cost = mkCost [
-          {
-            input = 0.1;
-            output = 0.5;
-            cacheRead = 0.01;
-            cacheWrite = 0.125;
-          }
-          {
-            inputTokensAbove = 272000;
-            input = 0.2;
-            output = 0.75;
-            cacheRead = 0.02;
-            cacheWrite = 0.25;
-          }
-        ];
-      }
-      {
-        id = "claude-code/claude-fable-5-1";
-        name = "Claude Fable 5.1";
-        contextWindow = 1000000;
-        maxTokens = 128000;
-        cost = mkCost {
-          input = 10;
-          output = 50;
-          cacheRead = 0.25;
-          cacheWrite = 12.5;
-        };
-      }
-      {
-        id = "claude-code/claude-opus-5-5";
-        name = "Claude Opus 5.5";
-        contextWindow = 1000000;
-        maxTokens = 128000;
-        fast = true;
-        cost = mkCost {
-          input = 4;
-          output = 20;
-          cacheRead = 0.2;
-          cacheWrite = 5;
-        };
-      }
-      {
-        id = "claude-code/claude-sonnet-5-5";
-        name = "Claude Sonnet 5.5";
-        contextWindow = 1000000;
-        maxTokens = 128000;
-        cost = mkCost {
-          input = 2;
-          output = 10;
-          cacheRead = 0.2;
-          cacheWrite = 2.5;
-        };
-      }
-    ];
+    # Models served through `ai.yorganci.dev`; the catalog also holds the ones
+    # only the NetBird Agent Network endpoint offers.
+    gatewayModels = lib.filter (model: lib.elem "pi" model.audience) catalog.models;
 
     # A model-profile entry, built from the same spec as the model. The pi
     # module drops unset fields and empty entries, so a model with nothing to
@@ -298,8 +164,9 @@
             supportsReasoningEffort = true;
             supportsUsageInStreaming = true;
           };
-          # `fast` belongs to the profile; pi's model schema has no such field.
-          models = map (model: mkModel (removeAttrs model ["fast" "fastCostMultiplier"])) gatewayModels;
+          # `fast` belongs to the profile, and `audience` to the catalog; pi's
+          # model schema has neither.
+          models = map (model: mkModel (removeAttrs model ["fast" "fastCostMultiplier" "audience"])) gatewayModels;
         };
       };
     };
