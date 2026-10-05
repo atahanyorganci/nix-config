@@ -137,7 +137,8 @@ export const virtualFields = (models: ReadonlyArray<PricedModel>): ReadonlyArray
 	},
 	{
 		name: "masked_secrets",
-		description: "Secrets the mask-secrets processor replaced in a request.",
+		description:
+			"Secrets the mask-secrets processor replaced in a request; recorded on its span only when it replaced any.",
 		expression: `toint(${custom("gateway.mask.secrets")})`,
 	},
 	{ name: "model", description: "The model asked for, provider prefix included.", expression: raw.model },
@@ -182,8 +183,9 @@ export const virtualFields = (models: ReadonlyArray<PricedModel>): ReadonlyArray
 	},
 	{
 		name: "error_name",
-		description: "The root cause's error name (error.cause.name).",
-		expression: `tostring(${attr("error.cause.name")})`,
+		description:
+			"What failed, most specific first: the transport's code (UND_ERR_SOCKET), the root cause's name, the provider's error code (overloaded_error), the error type.",
+		expression: `coalesce(tostring(${attr("error.cause.code")}), tostring(${attr("error.cause.name")}), tostring(${attr("error.code")}), tostring(${attr("error.type")}))`,
 	},
 	{
 		name: "error_message",
@@ -826,7 +828,11 @@ const elements = (dataset: string, monitorIds: ReadonlyArray<string>) => {
 			id: "stat-masked",
 			type: "Statistic",
 			name: "Secrets masked in requests",
-			query: S("| where isnotnull(masked_secrets)", "| summarize sum(masked_secrets) by bin_auto(_time)"),
+			// Every run of the processor, so a window where nothing was masked reads 0 rather than no data.
+			query: S(
+				'| where name == "gateway.processor" and processor == "mask-secrets"',
+				"| summarize masked = sum(coalesce(masked_secrets, 0)) by bin_auto(_time)",
+			),
 			colorScheme: "Purple",
 			showChart: true,
 		},
