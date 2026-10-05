@@ -78,11 +78,11 @@
       };
       audience = mkOption {
         type = types.listOf (types.enum ["pi" "agents"]);
-        default = ["pi"];
+        default = ["pi" "agents"];
         description = ''
           Who the model is offered to: `pi` lists it in pi through
           `ai.yorganci.dev`, `agents` serves it through the NetBird Agent
-          Network endpoint.
+          Network endpoint. Both by default.
         '';
       };
     };
@@ -176,7 +176,6 @@ in {
       contextWindow = 1050000;
       maxTokens = 128000;
       fast = true;
-      audience = ["pi" "agents"];
       cost = {
         input = 0.1;
         output = 0.5;
