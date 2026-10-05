@@ -22,8 +22,6 @@
   };
   jupiterNixosModule = {
     user,
-    lib,
-    config,
     pkgs,
     ...
   }: {
@@ -63,14 +61,7 @@
     # Hermes agent + web dashboard at https://hermes.yorganci.dev
     services.hermes-agent = {
       enable = true;
-      settings = lib.mkMerge [
-        {telegram.require_mention = true;}
-        # Until the Agent Network endpoint is pinned, Hermes keeps calling
-        # OpenRouter itself with the key in its environment file.
-        (lib.mkIf (config.services.hermes-agent.agentNetwork.endpoint == null) {
-          model.default = "~deepseek/deepseek-v4-flash-latest";
-        })
-      ];
+      settings.telegram.require_mention = true;
       # Every LLM call goes through the NetBird Agent Network endpoint to the
       # agent gateway on mars; jupiter is authorised as an `Agents` peer.
       agentNetwork = {
