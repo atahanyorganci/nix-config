@@ -82,10 +82,11 @@ in {
         example = ["http://127.0.0.1:3000/v1/models"];
         description = ''
           URLs requested every minute with the `User-Agent` `otelcol-httpcheck`.
-          The probe's own result is discarded: a target exporting traces
-          records each probe as a request, so a stretch with no successful
-          probe means the target, this collector or the host is down, whether
-          or not anyone used the target.
+          The probe's own result is discarded: the target's telemetry records
+          each request (the agent gateway's access log does; it does not trace
+          `/v1/models`), so a stretch without a successful one means the
+          target, this collector or the host is down, whether or not anyone
+          used the target.
         '';
       };
 
@@ -117,7 +118,7 @@ in {
         package = pkgs.opentelemetry-collector-contrib;
         # The endpoint comes from the environment, which the build-time
         # `otelcol validate` does not have.
-        validateConfigOverrides = ["exporters::otlphttp::endpoint=https://validate.invalid"];
+        validateConfigOverrides = ["exporters::otlp_http::endpoint=https://validate.invalid"];
 
         settings = {
           extensions.file_storage = {
@@ -160,7 +161,7 @@ in {
                 spike_limit_mib = cfg.memoryLimitMiB / 4;
               };
               batch = {};
-              resourcedetection = {
+              resource_detection = {
                 detectors = ["system"];
                 system.hostname_sources = ["os"];
                 override = false;
@@ -230,7 +231,7 @@ in {
 
           exporters =
             {
-              otlphttp = {
+              otlp_http = {
                 endpoint = "\${env:AXIOM_ENDPOINT}";
                 compression = "zstd";
                 headers = {
@@ -252,20 +253,20 @@ in {
               {
                 traces = {
                   receivers = ["otlp"];
-                  processors = ["memory_limiter" "resourcedetection" "transform/spans" "batch"];
-                  exporters = ["otlphttp"];
+                  processors = ["memory_limiter" "resource_detection" "transform/spans" "batch"];
+                  exporters = ["otlp_http"];
                 };
                 "logs/app" = {
                   receivers = ["otlp"];
-                  processors = ["memory_limiter" "resourcedetection" "transform/logs" "batch"];
-                  exporters = ["otlphttp"];
+                  processors = ["memory_limiter" "resource_detection" "transform/logs" "batch"];
+                  exporters = ["otlp_http"];
                 };
               }
               // lib.mapAttrs' (name: _:
                 lib.nameValuePair "logs/journald-${name}" {
                   receivers = ["journald/${name}"];
-                  processors = ["memory_limiter" "filter/journald-json" "transform/journald" "resource/${name}" "resourcedetection" "batch"];
-                  exporters = ["otlphttp"];
+                  processors = ["memory_limiter" "filter/journald-json" "transform/journald" "resource/${name}" "resource_detection" "batch"];
+                  exporters = ["otlp_http"];
                 })
               journald
               // lib.optionalAttrs probing {
