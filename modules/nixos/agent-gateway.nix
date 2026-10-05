@@ -4,6 +4,7 @@
   ...
 }: let
   infra = config.flake.infra;
+  catalog = config.flake.agentGateway;
 in {
   flake.modules.nixos.agent-gateway = {
     lib,
@@ -20,6 +21,12 @@ in {
     wildcardHosts = ["0.0.0.0" "::" "[::]"];
     loopbackHosts = ["127.0.0.1" "localhost" "::1"];
     isLoopback = builtins.elem cfg.host loopbackHosts;
+    # The NetBird proxy reaches an Agent Network provider from its own host,
+    # so the listener has to answer on loopback.
+    loopbackUpstream =
+      if cfg.host == "::1"
+      then "http://[::1]:${toString cfg.port}"
+      else "http://127.0.0.1:${toString cfg.port}";
 
     # A wildcard bind has no address to dial, so probe over loopback.
     healthHost =
@@ -128,6 +135,38 @@ in {
           '';
         };
       };
+
+      agentNetwork = {
+        enable = lib.mkEnableOption ''
+          registering the gateway as a NetBird Agent Network provider, served
+          through the account's Agent Network endpoint alongside (not instead
+          of) `expose`. NetBird's proxy dials it over loopback, so this host
+          has to run `netbird-proxy`
+        '';
+
+        name = lib.mkOption {
+          type = lib.types.str;
+          default = "agent-gateway";
+          description = "Provider name in NetBird, which `flake.agentNetwork.policies` refer to.";
+        };
+
+        catalogId = lib.mkOption {
+          type = lib.types.str;
+          # NetBird's entry for solo.io's agentgateway, not this gateway. It is
+          # generic: OpenAI-shaped requests pass through untouched, models are
+          # listed from `/v1/models`, and the caller's identity arrives as
+          # `x-netbird-user-id` and `x-netbird-groups`.
+          default = "agentgateway";
+          description = "NetBird catalog entry the provider is registered as.";
+        };
+
+        models = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = map (model: model.id) (lib.filter (model: lib.elem "agents" model.audience) catalog.models);
+          defaultText = lib.literalExpression ''ids of the `flake.agentGateway.models` whose audience includes "agents"'';
+          description = "Models offered through the Agent Network endpoint; NetBird refuses any other.";
+        };
+      };
     };
 
     config = lib.mkIf cfg.enable {
@@ -137,6 +176,22 @@ in {
           message = ''
             agent-gateway.port = ${toString cfg.port} is privileged, but the unit
             runs unprivileged with an empty capability set. Pick a port >= 1024.
+          '';
+        }
+        {
+          assertion = !cfg.agentNetwork.enable || (config.netbird-proxy.enable && config.netbird-proxy.private);
+          message = ''
+            agent-gateway.agentNetwork.enable needs a private NetBird proxy on this
+            host (netbird-proxy.enable and netbird-proxy.private): the Agent Network
+            endpoint is a private service, and its proxy dials ${loopbackUpstream}.
+          '';
+        }
+        {
+          assertion = !cfg.agentNetwork.enable || isLoopback || builtins.elem cfg.host wildcardHosts;
+          message = ''
+            agent-gateway.agentNetwork.enable needs the gateway to answer on loopback,
+            where the NetBird proxy dials it, but agent-gateway.host = "${cfg.host}".
+            Use a loopback or wildcard address.
           '';
         }
         {
@@ -266,6 +321,14 @@ in {
       networking.firewall.interfaces = lib.genAttrs cfg.interfaces (_: {
         allowedTCPPorts = [cfg.port];
       });
+
+      # Loopback needs no firewall opening: the proxy dials it directly.
+      agentNetworkProviders = lib.mkIf cfg.agentNetwork.enable {
+        ${cfg.agentNetwork.name} = {
+          inherit (cfg.agentNetwork) catalogId models;
+          upstreamUrl = loopbackUpstream;
+        };
+      };
 
       # Always private: the gateway passes every caller through and holds
       # long-lived provider credentials, so NetBird's identity layer is the only

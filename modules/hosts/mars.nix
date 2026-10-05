@@ -79,6 +79,9 @@
         key = "ai";
         accessGroups = ["Admin" "Servers"];
       };
+      # A second entry point next to `ai`: the NetBird Agent Network endpoint,
+      # whose proxy runs here and dials the gateway over loopback.
+      agentNetwork.enable = true;
     };
   };
 in {
