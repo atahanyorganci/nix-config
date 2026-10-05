@@ -17,6 +17,10 @@ import type { ModelCost } from "../agent-network.ts";
  *   `severity_number` and Axiom's normalised `severity` (`info`, `warn`,
  *   `error`) are top-level. Only a span has a `duration`.
  *
+ * The gateway does not trace `/health` or `/v1/models` (`Gateway.ts`), so the
+ * collector's probe of `/v1/models` leaves no span; its access log line
+ * (`Sent HTTP response`, `http.url`, `http.status`) is what records it.
+ *
  * Queries use the virtual fields by name, so a path that moves is fixed in one
  * place.
  */
@@ -35,9 +39,6 @@ export interface PricedModel {
 /** The service whose dashboards and monitors these are (`OTEL_SERVICE_NAME`). */
 export const SERVICE = "agent-gateway";
 
-/** The `User-Agent` of the collector's probe of `/v1/models` (`otel-collector.nix`). */
-export const PROBE_USER_AGENT = "otelcol-httpcheck";
-
 // ---------------------------------------------------------------------------
 // Virtual fields
 // ---------------------------------------------------------------------------
@@ -52,6 +53,9 @@ const attr = (key: string) => `['attributes.${key}']`;
 const custom = (key: string) => `['attributes.custom']['${key}']`;
 
 /** Raw expressions, which the cost field composes: it does not depend on one virtual field reading another. */
+/** The message of the gateway's access log line, one per response, `/v1/models` included. */
+const ACCESS_LOG = "Sent HTTP response";
+
 const raw = {
 	model: `tostring(${attr("gen_ai.request.model")})`,
 	input: `toreal(${attr("gen_ai.usage.input_tokens")})`,
@@ -100,24 +104,21 @@ export const virtualFields = (models: ReadonlyArray<PricedModel>): ReadonlyArray
 		expression: `coalesce(tostring(${attr("log.source")}), "app")`,
 	},
 	{
-		name: "probe",
-		description: "A request from the collector's probe of /v1/models.",
-		expression: `tostring(${attr("user_agent.original")}) startswith "${PROBE_USER_AGENT}"`,
-	},
-	{
 		name: "client",
 		description: "The calling program: the product token of the User-Agent (`pi`, `hermes`, `curl`).",
 		expression: `extract("^([A-Za-z0-9._-]+)", 1, tostring(${attr("user_agent.original")}))`,
 	},
 	{
 		name: "route",
-		description: "The request path of a server span.",
-		expression: `tostring(${attr("url.path")})`,
+		description: "The request path, of a server span or an access log line.",
+		expression: `coalesce(tostring(${attr("url.path")}), tostring(${attr("http.url")}))`,
 	},
 	{
 		name: "status_class",
-		description: "A server span's response status as `2xx`, `4xx`, `5xx`.",
-		expression: `iff(kind == "server", strcat(tostring(toint(toint(${attr("http.response.status_code")}) / 100)), "xx"), "")`,
+		description: "The response status of a server span or an access log line as `2xx`, `4xx`, `5xx`.",
+		expression:
+			`iff(kind == "server", strcat(tostring(toint(toint(${attr("http.response.status_code")}) / 100)), "xx"),` +
+			` iff(tostring(body) == "${ACCESS_LOG}", strcat(tostring(toint(toint(${attr("http.status")}) / 100)), "xx"), ""))`,
 	},
 	{
 		name: "duration_ms",
@@ -250,9 +251,21 @@ const spans = (dataset: string, ...body: ReadonlyArray<string>) =>
 		...body,
 	);
 
-/** Requests clients made: server spans, the collector's probe left out. */
+/** Requests clients made: server spans. `/v1/models` and `/health`, the probe's among them, are not traced. */
 const requests = (dataset: string, ...body: ReadonlyArray<string>) =>
-	spans(dataset, '| where kind == "server" and not(probe)', ...body);
+	spans(dataset, '| where kind == "server"', ...body);
+
+/**
+ * Successful answers to `/v1/models`, from the access log. The collector asks every minute, so ten minutes without
+ * one means the gateway, its log export, the collector or the host is down.
+ */
+const served = (dataset: string, ...body: ReadonlyArray<string>) =>
+	lines(
+		`['${dataset}']`,
+		`| where service == "${SERVICE}" and isnull(duration) and source == "app"`,
+		`| where tostring(body) == "${ACCESS_LOG}" and route == "/v1/models" and status_class == "2xx"`,
+		...body,
+	);
 
 const FINISHED = '("chat completion stream finished", "chat completion finished")';
 const FAILED = '"chat completion stream failed"';
@@ -276,13 +289,9 @@ export const monitors = (dataset: string): ReadonlyArray<Monitor> => [
 		props: {
 			name: "Agent gateway unreachable",
 			description:
-				"The collector on mars probes /v1/models every minute. No successful probe in 10 minutes means the gateway, the collector or mars is down.",
+				"The collector on mars requests /v1/models every minute and the gateway's access log records each answer. None successful in 10 minutes means the gateway, its log export, the collector or mars is down.",
 			type: "Threshold",
-			aplQuery: lines(
-				`['${dataset}']`,
-				`| where service == "${SERVICE}" and kind == "server" and probe and status_class == "2xx"`,
-				"| summarize probes = count()",
-			),
+			aplQuery: served(dataset, "| summarize answers = count()"),
 			operator: "Below",
 			threshold: 1,
 			intervalMinutes: 5,
@@ -320,7 +329,7 @@ export const monitors = (dataset: string): ReadonlyArray<Monitor> => [
 			aplQuery: lines(
 				`['${dataset}']`,
 				`| where service == "${SERVICE}"`,
-				'| where (kind == "server" and not(probe) and status_class == "5xx") or termination in ("upstream-error", "truncated")',
+				'| where (kind == "server" and status_class == "5xx") or termination in ("upstream-error", "truncated")',
 				"| summarize failures = count()",
 			),
 			operator: "Above",
@@ -476,7 +485,7 @@ const filters = (dataset: string): Chart => ({
 			query: {
 				apl: lines(
 					`['${dataset}']`,
-					`| where service == "${SERVICE}" and kind == "server" and not(probe) and isnotempty(client)`,
+					`| where service == "${SERVICE}" and kind == "server" and isnotempty(client)`,
 					"| distinct client",
 					"| project key = client, value = client",
 					"| sort by key asc",
@@ -500,15 +509,8 @@ const elements = (dataset: string, monitorIds: ReadonlyArray<string>) => {
 		statProbe: {
 			id: "stat-probe",
 			type: "Statistic",
-			name: "Probes OK, last 10 min",
-			query: {
-				apl: lines(
-					`['${dataset}']`,
-					`| where service == "${SERVICE}" and kind == "server" and probe and status_class == "2xx"`,
-					"| where _time > ago(10m)",
-					"| summarize count()",
-				),
-			},
+			name: "Answering, last 10 min",
+			query: { apl: served(dataset, "| where _time > ago(10m)", "| summarize count()") },
 			colorScheme: "Green",
 			warningThreshold: "Below",
 			warningThresholdValue: "8",
