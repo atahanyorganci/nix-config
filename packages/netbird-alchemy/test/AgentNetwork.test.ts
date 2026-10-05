@@ -214,16 +214,18 @@ test.provider.skipIf(!isDockerReady)("a catch-all provider behind a policy witho
 				upstreamUrl: UPSTREAM,
 				apiKey: Redacted.make("catch-all"),
 			});
+			// Arrays of Outputs resolve element by element.
 			const policy = yield* NetBird.AgentNetworkPolicy("Bare", {
 				name: `${PREFIX}-bare`,
-				sourceGroups: Output.all(group.groupId).pipe(Output.map(ids => [...ids])),
-				providers: Output.all(provider.providerId).pipe(Output.map(ids => [...ids])),
+				sourceGroups: [group.groupId],
+				providers: [provider.providerId],
 			});
 			return { provider, policy };
 		});
 
 		const { provider, policy } = yield* stack.deploy(program);
 		expect(provider.models).toEqual([]);
+		expect(policy.providers).toEqual([provider.providerId]);
 		expect(policy.guardrails).toEqual([]);
 
 		const replanned = yield* stack.plan(program);
