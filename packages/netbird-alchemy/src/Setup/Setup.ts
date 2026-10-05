@@ -29,10 +29,11 @@ export interface SetupProps {
 	 */
 	name: string;
 	/**
-	 * Admin password. Generated once (e.g. via `Alchemy.Random`) and persisted
-	 * in Alchemy state — NetBird will not return it again.
+	 * Admin password. Generated on first setup when omitted. Either way the
+	 * password the owner account was created with is persisted in the
+	 * `password` attribute — NetBird will not return it again.
 	 */
-	password: Redacted.Redacted<string>;
+	password?: Redacted.Redacted<string>;
 	/**
 	 * Optional dependency edge (e.g. NixOS `Command.Exec` hash). Ignored by
 	 * the provider; include any upstream Output so Setup waits for it.
@@ -58,8 +59,9 @@ export type Setup = Resource<"NetBird.Setup", SetupProps, SetupAttributes>;
  *
  * Creates the owner account only. API credentials are supplied out of band via
  * `NB_PAT` (mint a token from the dashboard), so no PAT is
- * requested here. The admin password is persisted in Alchemy state and reused
- * when setup is already complete (`setup_required: false`).
+ * requested here. The admin password is generated unless supplied, persisted
+ * in Alchemy state and reused when setup is already complete
+ * (`setup_required: false`).
  *
  * @resource
  * @product Setup
@@ -67,13 +69,12 @@ export type Setup = Resource<"NetBird.Setup", SetupProps, SetupAttributes>;
  * @section Bootstrapping Management
  * @example Admin account
  * ```typescript
- * const password = yield* Alchemy.Random("AdminPassword", { bytes: 24 });
  * const setup = yield* NetBird.Setup("Admin", {
  *   apiBaseUrl: "https://netbird.example.com",
  *   email: "admin@example.com",
  *   name: "Admin",
- *   password: password.text,
  * });
+ * // setup.password holds the generated password.
  * ```
  */
 export const Setup = Resource<Setup>("NetBird.Setup");
@@ -90,6 +91,18 @@ const SetupResponse = Schema.Struct({
 	email: Schema.String,
 });
 
+const PASSWORD_BYTES = 24;
+
+/**
+ * A random admin password: `Nb`, 48 hex digits and `!`, so it holds upper- and
+ * lowercase letters, digits and a symbol.
+ */
+const generatePassword = () => {
+	const bytes = crypto.getRandomValues(new Uint8Array(PASSWORD_BYTES));
+	const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+	return Redacted.make(`Nb${hex}!`);
+};
+
 export const SetupProvider = () =>
 	Provider.succeed(Setup, {
 		stables: ["userId", "email", "apiBaseUrl"],
@@ -103,13 +116,8 @@ export const SetupProvider = () =>
 		reconcile: Effect.fn(function* ({ news, output }) {
 			const props = news ?? ({} as SetupProps);
 			const apiBaseUrl = props.apiBaseUrl.replace(/\/$/, "");
-			const password = props.password;
 			const email = props.email;
 			const name = props.name;
-
-			if (!password) {
-				return yield* Effect.fail(new NetBirdSetupError({ message: "NetBird.Setup requires a password" }));
-			}
 
 			const client = yield* HttpClient.HttpClient;
 
@@ -145,6 +153,10 @@ export const SetupProvider = () =>
 					}),
 				);
 			}
+
+			// Reuse a password from an earlier setup (e.g. management state was
+			// wiped) so the stored credential stays valid.
+			const password = props.password ?? output?.password ?? generatePassword();
 
 			const request = yield* HttpClientRequest.post(`${apiBaseUrl}/api/setup`).pipe(
 				HttpClientRequest.bodyJson({
