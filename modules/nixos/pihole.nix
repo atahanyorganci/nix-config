@@ -185,6 +185,12 @@
         primary = true;
         enabled = true;
         port = 53;
+        # Must be the only primary group: NetBird races separate primary groups and
+        # takes the fastest answer, which bypasses Pi-hole. Within this group
+        # Cloudflare is used only when Pi-hole fails to answer. Management never
+        # sends a group to a peer listed in it, so mars gets no primary and
+        # resolves through its own uplink (Hetzner) resolvers.
+        fallbacks = ["1.1.1.1"];
         # Agents peers (jupiter) are isolated and keep their provider resolver;
         # the reverse-proxy peer needs no Pi-hole either.
         groups = ["Admin" "Users" "Servers"];

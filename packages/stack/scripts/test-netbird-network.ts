@@ -22,6 +22,9 @@ import { isIPv4 } from "node:net";
 
 const REQUIRED_PEERS = ["mars", "mercury", "venus", "jupiter"] as const;
 
+/** On Pi-hole's blocklist; resolves to 0.0.0.0 only when Pi-hole answers. */
+const BLOCKED_PROBE_DOMAIN = "doubleclick.net";
+
 /** Segment groups HomeInfra always maintains. */
 const REQUIRED_GROUPS = ["Admin", "Users", "Servers", "Agents", "Proxy", "All"] as const;
 
@@ -75,11 +78,20 @@ const isMeshIpv4 = (ip: string) => {
 	return a === 100 && b !== undefined && b >= 64 && b <= 127;
 };
 
-const resolveA = (domain: string) =>
+/**
+ * Resolve through the OS resolver, the same path applications take. Not
+ * `dns.resolve4`: c-ares reads every nameserver (NetBird's resolver and the
+ * LAN router) and after a few queries prefers the lowest-latency one, so it
+ * drifts to the router and gets public answers for mesh-only names.
+ */
+const lookupSystem = (domain: string) =>
 	Effect.tryPromise({
-		try: () => dns.resolve4(domain),
+		try: () => dns.lookup(domain, { family: 4, all: true }),
 		catch: error => error,
-	}).pipe(Effect.orElseSucceed(() => [] as Array<string>));
+	}).pipe(
+		Effect.map(results => results.map(result => result.address)),
+		Effect.orElseSucceed(() => [] as Array<string>),
+	);
 
 const probeHttps = (url: string, timeoutMs: number) =>
 	Effect.tryPromise({
@@ -361,14 +373,51 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 						: `enabled=${saturnExit.enabled} network=${saturnExit.network} skip_auto_apply=${saturnExit.skip_auto_apply} metric=${saturnExit.metric}`,
 			});
 
-			const primaryNs = nameservers.find(entry => entry.primary && entry.enabled);
+			const primaries = nameservers.filter(entry => entry.primary && entry.enabled && entry.nameservers.length > 0);
 			checks.push({
 				name: "nameserver-primary",
-				ok: primaryNs !== undefined,
+				ok: primaries.length > 0,
 				detail:
-					primaryNs === undefined
+					primaries.length === 0
 						? "no enabled primary nameserver"
-						: `${primaryNs.name} servers=[${primaryNs.nameservers.map(entry => `${entry.ip}:${entry.port}`).join(",")}]`,
+						: primaries
+								.map(
+									entry =>
+										`${entry.name} servers=[${entry.nameservers.map(server => `${server.ip}:${server.port}`).join(",")}]`,
+								)
+								.join("; "),
+			});
+
+			// NetBird races every primary group a peer receives and keeps the fastest
+			// answer, so a second primary (e.g. a dashboard-added Cloudflare preset)
+			// silently bypasses Pi-hole. Fallbacks belong inside the one group.
+			const primaryConflicts = peers.flatMap(peer => {
+				const peerGroupIds = new Set(peer.groups.map(group => group.id));
+				const received = primaries.filter(entry => entry.groups.some(id => peerGroupIds.has(id)));
+				return received.length > 1
+					? [`${peer.name || peer.dns_label}: ${received.map(entry => entry.name).join(" + ")}`]
+					: [];
+			});
+			checks.push({
+				name: "nameserver-single-primary",
+				ok: primaryConflicts.length === 0,
+				detail:
+					primaryConflicts.length === 0
+						? "each peer receives at most one primary nameserver"
+						: `peers with competing primaries: ${primaryConflicts.join("; ")}`,
+			});
+
+			// Only meaningful on a peer that receives the Pi-hole group, which is
+			// where this script normally runs; elsewhere it is advisory.
+			const blockedAddrs = yield* lookupSystem(BLOCKED_PROBE_DOMAIN);
+			checks.push({
+				name: `dns-blocked:${BLOCKED_PROBE_DOMAIN}`,
+				ok: blockedAddrs.length > 0 && blockedAddrs.every(addr => addr === "0.0.0.0"),
+				soft: !client.available,
+				detail:
+					blockedAddrs.length === 0
+						? "lookup failed"
+						: `A=[${blockedAddrs.join(", ")}] (0.0.0.0 means Pi-hole answered)`,
 			});
 
 			const onlineCluster = clusters.find(cluster => cluster.online && cluster.connected_proxies > 0);
@@ -419,7 +468,7 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 					continue;
 				}
 
-				const addrs = (yield* resolveA(target.domain)).filter(isIPv4);
+				const addrs = (yield* lookupSystem(target.domain)).filter(isIPv4);
 				if (target.private) {
 					const meshAddrs = addrs.filter(isMeshIpv4);
 					checks.push({
@@ -447,7 +496,7 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 			}
 
 			// Mesh DNS for the management peer itself.
-			const marsDns = (yield* resolveA("mars.netbird.selfhosted")).filter(isIPv4);
+			const marsDns = (yield* lookupSystem("mars.netbird.selfhosted")).filter(isIPv4);
 			checks.push({
 				name: "dns-mesh:mars.netbird.selfhosted",
 				ok: marsDns.some(isMeshIpv4),

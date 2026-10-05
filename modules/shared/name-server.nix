@@ -21,6 +21,19 @@
             type = lib.types.port;
             default = 53;
           };
+          fallbacks = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [];
+            example = ["1.1.1.1"];
+            description = ''
+              IPv4 resolvers (port 53) listed after this peer in the same NetBird
+              nameserver group. NetBird tries a group's servers in order and moves on
+              only on timeout, SERVFAIL or REFUSED, so a blocked answer from this peer
+              still stands. Separate primary groups would instead be raced, with the
+              fastest answer winning. NetBird caps a group at three servers, so at
+              most two fallbacks.
+            '';
+          };
           groups = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = ["Admin" "Users" "Servers"];

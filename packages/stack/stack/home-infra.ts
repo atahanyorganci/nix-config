@@ -294,7 +294,12 @@ export default HomeInfra.make(
 			const ns = yield* NetBird.NameserverGroup(String.pascalCase(plan.nameserverKey), {
 				name: plan.nameserverKey,
 				description: plan.cfg.description || `DNS on ${plan.hostKey}`,
-				nameservers: Output.map(peer.ip, ip => [{ ip, ns_type: "udp" as const, port: plan.cfg.port }]),
+				// Order matters: NetBird tries the peer first and a fallback only when
+				// the previous server fails to answer.
+				nameservers: Output.map(peer.ip, ip => [
+					{ ip, ns_type: "udp" as const, port: plan.cfg.port },
+					...plan.cfg.fallbacks.map(fallback => ({ ip: fallback, ns_type: "udp" as const, port: 53 })),
+				]),
 				enabled: plan.cfg.enabled,
 				groups: Output.map(groupIdTable, groupIds =>
 					plan.cfg.groups.map(groupName => {
