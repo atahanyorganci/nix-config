@@ -120,3 +120,6 @@ dist
 # nix build output symlinks
 /result
 /result-*
+
+# Local worktrees and stractchpas
+/.local
