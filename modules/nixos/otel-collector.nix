@@ -138,6 +138,9 @@ in {
                 priority = "info";
                 storage = "file_storage";
                 convert_message_bytes = true;
+                # Without it journalctl writes a field over 4096 bytes as null,
+                # and a long JSON line would slip past `filter/journald-json`.
+                all = true;
               })
             journald
             // lib.optionalAttrs probing {
@@ -194,7 +197,11 @@ in {
 
               "filter/journald-json" = {
                 error_mode = "ignore";
-                log_conditions = [''IsMap(log.body) and IsMatch(log.body["MESSAGE"], "^[{]")''];
+                log_conditions = [
+                  ''IsMap(log.body) and IsMatch(log.body["MESSAGE"], "^[{]")''
+                  # An entry with no message has nothing to show.
+                  ''IsMap(log.body) and log.body["MESSAGE"] == nil''
+                ];
               };
 
               # The receiver puts the whole journal entry, some forty fields, in
