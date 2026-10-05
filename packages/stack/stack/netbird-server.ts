@@ -1,13 +1,10 @@
 import * as NetBird from "@yorganci/netbird-alchemy";
-import * as Action from "alchemy/Action";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Command from "alchemy/Command";
 import * as Doppler from "alchemy/Doppler";
 import * as Output from "alchemy/Output";
-import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { Aws, Hetzner, NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
 
@@ -37,19 +34,6 @@ const Infra = Schema.Struct({
 	domain: Schema.String,
 	netbirdManagementDomain: Schema.String,
 });
-
-const AdminPassword = Action.Action(
-	"AdminPassword",
-	Effect.fn(function* ({ length }: { length: number }) {
-		const crypto = yield* Crypto.Crypto;
-		const bytes = yield* crypto.randomBytes(length);
-		const hex = Array.from(bytes)
-			.map(byte => byte.toString(16))
-			.join("");
-		const password = Redacted.make(`Nb${hex}!`);
-		return password;
-	}),
-);
 
 // A NixOS deploy is triggered by its host's system (see `hostSystem`), so it
 // hashes no repository files.
@@ -226,7 +210,9 @@ export default NetbirdServerStack.make(
 			proxied: false,
 			ttl: "1",
 		});
-		const netbirdApiBaseUrl = Output.map(netbirdRecord.content, () => `https://${infra.netbirdManagementDomain}`);
+		// A plain string, so it is always resolved when diffing `Admin`; the DNS
+		// record is ordered before `Admin` through `ready` instead.
+		const netbirdApiBaseUrl = `https://${infra.netbirdManagementDomain}`;
 		yield* Cloudflare.DNS.Record("ProxyWildcardDnsRecord", {
 			zoneId: zone.zoneId,
 			name: `*.${infra.domain}`,
@@ -236,14 +222,16 @@ export default NetbirdServerStack.make(
 			ttl: "1",
 		});
 
-		const adminPassword = yield* AdminPassword({ length: 24 });
+		// Setup generates the admin password and keeps the one the account was
+		// created with; `setup.password` is the only source of it.
 		const setup = yield* NetBird.Setup("Admin", {
 			apiBaseUrl: netbirdApiBaseUrl,
 			email: me.email,
 			name: me.name,
-			password: adminPassword,
-			// Wait for NixOS install/rebuild before hitting the management API.
-			ready: Output.map(marsNixos.hash, hash => hash.input ?? "pending"),
+			// Order only: the management API needs its DNS record and Mars's NixOS
+			// install/rebuild. Setup's diff ignores this, so Mars deploys do not
+			// update `Admin`.
+			ready: Output.map(Output.all(netbirdRecord.content, marsNixos.hash), () => true),
 		});
 
 		return {
@@ -263,7 +251,7 @@ export default NetbirdServerStack.make(
 			apiBaseUrl: netbirdApiBaseUrl,
 			admin: {
 				email: setup.email,
-				password: adminPassword,
+				password: setup.password,
 			},
 		};
 	}),
