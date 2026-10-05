@@ -101,6 +101,23 @@ in {
     };
   };
 
+  # Prices are the vendors' API list prices, checked on 2026-10-05. The
+  # gateway's Codex and Claude Code subscriptions are not billed per token;
+  # these are what the same usage would cost on the API, which is what pi and
+  # NetBird report. Fast mode is 2x on both (`fastCostMultiplier`'s default).
+  #
+  # OpenAI (https://developers.openai.com/api/docs/pricing and each model's
+  # page): every GPT model here has a 1.05M window and 128k output. A prompt
+  # over 272k input tokens bills the whole request at 2x the input and cache
+  # rates and 1.5x output, hence the one tier each. Cache writes are 1.25x
+  # input.
+  #
+  # Anthropic (https://platform.claude.com/docs/en/about-claude/pricing):
+  # Claude 4.6 and later price the full 1M window flat, so these have no
+  # tier, and with no price break pi offers no smaller context profile.
+  # `cacheWrite` is the 5-minute write (1.25x input); a 1-hour write costs
+  # 2x. Cache reads are 0.025x input on Fable 5.1, 0.05x on Opus 5.5 and
+  # 0.1x on Sonnet 5.5.
   config.flake.agentGateway.models = [
     {
       id = "codex/gpt-6-astra";
