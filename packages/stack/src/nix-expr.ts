@@ -68,6 +68,22 @@ const hashExpression = (props: NixExprProps) =>
 			.pipe(Effect.map(stdout => stdout.trim()));
 	});
 
+/**
+ * Evaluate a flake expression and decode it with a schema, without recording
+ * it as a resource.
+ *
+ * Use this for values that only feed other resources' props: the value is
+ * persisted through those props, so a change shows up only on the resources
+ * it actually reaches, and fields the schema does not keep cannot cause churn.
+ * A {@link NixExpr} resource would instead report its own update for any
+ * change to the whole expression.
+ */
+export const evaluate = <A>(props: NixExprProps, schema: Schema.Schema<A>) =>
+	evalProps(props).pipe(
+		Effect.flatMap(({ value }) => Schema.decodeUnknownEffect(schema)(value)),
+		Effect.orDie,
+	);
+
 const evalProps = (props: NixExprProps) =>
 	Effect.gen(function* () {
 		const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;

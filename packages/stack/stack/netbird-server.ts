@@ -11,40 +11,6 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { Aws, Hetzner, NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
 
-const FlakeMe = Schema.Struct({
-	name: Schema.String,
-	email: Schema.String,
-	username: Schema.String,
-	shell: Schema.String,
-	key: Schema.String,
-	// Not `authorizedKeys[0]`: login keys must be free to change, while this key
-	// is baked into Saturn's key pair and user data, which replace the instance.
-	deployKey: Schema.String,
-});
-
-const meExpr = Effect.gen(function* () {
-	const meExpr = yield* NixExpr.NixExpr("FlakeMe", {
-		cwd: REPO_ROOT,
-		expression: ".#me",
-	});
-	const me = yield* NixExpr.decode(meExpr, FlakeMe);
-	return me;
-});
-
-const Infra = Schema.Struct({
-	domain: Schema.String,
-	netbirdManagementDomain: Schema.String,
-});
-
-const infraExpr = Effect.gen(function* () {
-	const infraExpr = yield* NixExpr.NixExpr("Infra", {
-		cwd: REPO_ROOT,
-		expression: ".#infra",
-	});
-	const infra = yield* NixExpr.decode(infraExpr, Infra);
-	return infra;
-});
-
 /**
  * The repository root, relative to `packages/stack`. `NixExpr` resolves it
  * against the stack package itself; `Command.Exec` resolves it against the
@@ -52,6 +18,25 @@ const infraExpr = Effect.gen(function* () {
  * `packages/stack` (as the package scripts and Justfile do).
  */
 const REPO_ROOT = "../..";
+
+// Flake values are evaluated while planning (`NixExpr.evaluate`), not kept as
+// `NixExpr` resources: each reaches state only through the props of the
+// resources that use it, so a flake change shows up exactly where it lands,
+// and fields these schemas drop (login keys, shell, ...) never show up.
+
+const Me = Schema.Struct({
+	name: Schema.String,
+	email: Schema.String,
+	username: Schema.String,
+	// Not `authorizedKeys[0]`: login keys must be free to change, while this key
+	// is baked into Saturn's key pair and user data, which replace the instance.
+	deployKey: Schema.String,
+});
+
+const Infra = Schema.Struct({
+	domain: Schema.String,
+	netbirdManagementDomain: Schema.String,
+});
 
 const AdminPassword = Action.Action(
 	"AdminPassword",
@@ -71,20 +56,21 @@ const AdminPassword = Action.Action(
 const DEPLOY_MEMO = { include: [] as string[] };
 
 /**
- * The system a host's NixOS configuration evaluates to. Passed to the host's
- * deploy so it re-runs exactly when that host's system changes: not for module
- * edits or lockfile bumps that do not reach it. `nixos-deploy` also skips a
- * host already running this system, so a deploy re-run after state is rebuilt
- * leaves hosts untouched.
+ * The system a host's NixOS configuration evaluates to: its store path, which
+ * changes exactly when the host's closure does. Passed to the host's deploy so
+ * it re-runs only then: not for module edits, commits or lockfile bumps that
+ * do not reach it (these hosts do not set `system.configurationRevision`).
+ * `nixos-deploy` also skips a host already running this system, so a deploy
+ * re-run after state is rebuilt leaves hosts untouched.
  */
-const hostSystem = (logicalId: string, host: string) =>
-	Effect.gen(function* () {
-		const expr = yield* NixExpr.NixExpr(logicalId, {
+const hostSystem = (host: string) =>
+	NixExpr.evaluate(
+		{
 			cwd: REPO_ROOT,
 			expression: `.#nixosConfigurations.${host}.config.system.build.toplevel.outPath`,
-		});
-		return yield* NixExpr.decode(expr, Schema.String);
-	});
+		},
+		Schema.String,
+	);
 
 /**
  * Saturn boots this Ubuntu 24.04 arm64 AMI once; `nixos-bootstrap` then
@@ -106,13 +92,25 @@ export default NetbirdServerStack.make(
 			Hetzner.providers(),
 			Aws.providers(),
 			NetBird.providers(),
+			// No resource here is a `NixExpr` any more. The provider stays only so
+			// the next deploy can delete the `FlakeMe` and `Infra` rows earlier
+			// deploys created (a row without a provider fails the plan). Drop it
+			// once those rows are gone.
 			NixExpr.NixExprProvider(),
 		),
 		state: Cloudflare.state(),
 		secrets: [Doppler.Secrets({ project: "nix-config", config: "dev" })],
 	},
 	Effect.gen(function* () {
-		const [me, infra] = yield* Effect.all([meExpr, infraExpr]);
+		const [me, infra, systems] = yield* Effect.all([
+			NixExpr.evaluate({ cwd: REPO_ROOT, expression: ".#me" }, Me),
+			NixExpr.evaluate({ cwd: REPO_ROOT, expression: ".#infra" }, Infra),
+			Effect.all({
+				mars: hostSystem("mars"),
+				jupiter: hostSystem("jupiter"),
+				saturn: hostSystem("saturn"),
+			}),
+		]);
 
 		const deployKey = me.deployKey;
 
@@ -144,7 +142,7 @@ export default NetbirdServerStack.make(
 				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#mars`,
 			),
 			cwd: REPO_ROOT,
-			env: { NIXOS_SYSTEM: yield* hostSystem("MarsSystem", "mars") },
+			env: { NIXOS_SYSTEM: systems.mars },
 			memo: DEPLOY_MEMO,
 		});
 
@@ -189,7 +187,7 @@ export default NetbirdServerStack.make(
 				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#jupiter`,
 			),
 			cwd: REPO_ROOT,
-			env: { NIXOS_SYSTEM: yield* hostSystem("JupiterSystem", "jupiter") },
+			env: { NIXOS_SYSTEM: systems.jupiter },
 			memo: DEPLOY_MEMO,
 		});
 
@@ -213,7 +211,7 @@ export default NetbirdServerStack.make(
 				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#saturn`,
 			),
 			cwd: REPO_ROOT,
-			env: { NIXOS_SYSTEM: yield* hostSystem("SaturnSystem", "saturn") },
+			env: { NIXOS_SYSTEM: systems.saturn },
 			memo: DEPLOY_MEMO,
 		});
 
