@@ -92,6 +92,14 @@
       # whose proxy runs here and dials the gateway over loopback.
       agentNetwork.enable = true;
     };
+    # Ships the gateway's traces and logs, and its journal, to Axiom; the
+    # gateway exports to it (agent-gateway.telemetry follows this). Its token
+    # and endpoint are in hosts/mars.yaml (`just connect-axiom mars`).
+    otel-collector = {
+      enable = true;
+      journald.units = ["agent-gateway.service" "opentelemetry-collector.service"];
+      httpcheck.targets = ["http://127.0.0.1:${toString config.agent-gateway.port}/v1/models"];
+    };
   };
 in {
   flake = {
