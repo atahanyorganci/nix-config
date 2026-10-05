@@ -28,6 +28,11 @@ export const PROXY_GROUP_NAME = "Proxy";
  * Group names accepted as policy sources. Agents peers are isolated and are
  * never a source; NetBird's built-in All group is rejected because it would
  * include them.
+ *
+ * Agent Network policies are the one place Agents may be a source
+ * (`AgentNetworkSourceGroupName` in agent-network.ts): NetBird turns them into
+ * access to the proxy peer on 80/443 only, and the proxy still checks every
+ * other service's own access groups.
  */
 export const PolicySourceGroupName = Schema.Literals(["Admin", "Users", "Servers", "Proxy"]);
 export type PolicySourceGroupName = typeof PolicySourceGroupName.Type;

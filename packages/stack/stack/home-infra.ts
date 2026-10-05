@@ -5,9 +5,19 @@ import * as Doppler from "alchemy/Doppler";
 import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
-import { AccessMatrix, HomeInfra, Inventory, NameServers, NixExpr, Policies, ReverseProxy } from "../src/index.ts";
+import {
+	AccessMatrix,
+	AgentNetwork,
+	HomeInfra,
+	Inventory,
+	NameServers,
+	NixExpr,
+	Policies,
+	ReverseProxy,
+} from "../src/index.ts";
 
 const Infra = Schema.Struct({
 	domain: Schema.String,
@@ -304,6 +314,94 @@ export default HomeInfra.make(
 			};
 		}
 
+		// NetBird Agent Network: a second entry point to the agent gateway, next to
+		// (not instead of) its `ai` reverse-proxy service, where NetBird decides who
+		// may call which models and records usage, cost and prompts. Synthesised
+		// from these objects, its endpoint gets its own DNS record and proxy ACL
+		// for the policies' source groups, so no mesh policy is needed for it.
+		const agentNetwork = yield* NixExpr.evaluate(
+			{ cwd: REPO_ROOT, expression: ".#agentNetwork" },
+			AgentNetwork.AgentNetwork,
+		).pipe(Effect.flatMap(AgentNetwork.validate));
+		let agentNetworkOutput:
+			| {
+					endpoint: Output.Output<string>;
+					url: NetBird.AgentGateway["url"];
+					providers: Record<string, NetBird.AgentNetworkProvider["providerId"]>;
+					policies: Record<string, NetBird.AgentNetworkPolicy["policyId"]>;
+			  }
+			| undefined;
+		if (agentNetwork.enable) {
+			// NetBird allocates the endpoint once and never renames it, so it is
+			// retained: destroying the stack must not strand the agents using it.
+			const gateway = yield* NetBird.AgentGateway("AgentGateway", AgentNetwork.gatewayProps(agentNetwork.gateway)).pipe(
+				Alchemy.RemovalPolicy.retain(),
+			);
+			// Clients are configured with the endpoint pinned in Nix, so a different
+			// live one has to stop the deploy rather than go unnoticed.
+			const pinned = agentNetwork.gateway.endpoint;
+			const endpoint = Output.map(gateway.endpoint, live => {
+				if (pinned !== null && live !== pinned) {
+					throw new Error(
+						`NetBird's Agent Network endpoint is "${live}", but flake.agentNetwork.gateway.endpoint pins "${pinned}"`,
+					);
+				}
+				return live;
+			});
+
+			const providers: Record<string, NetBird.AgentNetworkProvider> = {};
+			for (const [name, provider] of Object.entries(agentNetwork.providers)) {
+				providers[name] = yield* NetBird.AgentNetworkProvider(`AgentProvider${String.pascalCase(name)}`, {
+					name,
+					catalogId: provider.catalogId,
+					upstreamUrl: provider.upstreamUrl,
+					// NetBird requires a key. The upstream is the agent gateway on the
+					// proxy's own host, which takes callers without one.
+					apiKey: Redacted.make("netbird-agent-network"),
+					models: AgentNetwork.toNetBirdModels(provider.models),
+					// Orders providers after the gateway, so a destroy removes them first.
+					gateway: endpoint,
+				});
+			}
+
+			const guardrails: Record<string, NetBird.AgentNetworkGuardrail> = {};
+			for (const [name, guardrail] of Object.entries(agentNetwork.guardrails)) {
+				guardrails[name] = yield* NetBird.AgentNetworkGuardrail(
+					`AgentGuardrail${String.pascalCase(name)}`,
+					AgentNetwork.guardrailProps(name, guardrail),
+				);
+			}
+
+			const policies: Record<string, NetBird.AgentNetworkPolicy["policyId"]> = {};
+			for (const [name, policy] of Object.entries(agentNetwork.policies)) {
+				const resource = yield* NetBird.AgentNetworkPolicy(`AgentPolicy${String.pascalCase(name)}`, {
+					name,
+					description: policy.description,
+					enabled: policy.enabled,
+					sourceGroups: Output.map(groupIdTable, groupIds =>
+						policy.sourceGroups.map(group => {
+							const id = groupIds[group];
+							if (id === undefined) {
+								throw new Error(`NetBird group "${group}" has no id for Agent Network policy "${name}"`);
+							}
+							return id;
+						}),
+					),
+					providers: policy.providers.map(provider => providers[provider]!.providerId),
+					guardrails: policy.guardrails.map(guardrail => guardrails[guardrail]!.guardrailId),
+					limits: AgentNetwork.policyLimits(policy.limits),
+				});
+				policies[name] = resource.policyId;
+			}
+
+			agentNetworkOutput = {
+				endpoint,
+				url: gateway.url,
+				providers: Object.fromEntries(Object.entries(providers).map(([name, provider]) => [name, provider.providerId])),
+				policies,
+			};
+		}
+
 		const allowRules = [
 			...Policies.adminAllowAllRules(),
 			...Policies.adminSshRules(),
@@ -341,6 +439,7 @@ export default HomeInfra.make(
 			policies: {
 				allowRuleCount: allowRules.length,
 			},
+			...(agentNetworkOutput !== undefined ? { agentNetwork: agentNetworkOutput } : {}),
 		};
 	}).pipe(Effect.orDie),
 );

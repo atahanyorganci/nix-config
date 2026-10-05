@@ -1,5 +1,11 @@
 import { NodeRuntime } from "@effect/platform-node";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import {
+	agentNetworkGuardrailsGet,
+	agentNetworkPoliciesGet,
+	agentNetworkProvidersGet,
+	agentNetworkSettingsGet,
+} from "@yorganci/netbird-api/agent_network";
 import { CredentialsFromEnv } from "@yorganci/netbird-api/Credentials";
 import { dnsNameserversGet } from "@yorganci/netbird-api/dns";
 import { groupsGet } from "@yorganci/netbird-api/groups";
@@ -21,17 +27,32 @@ const netbirdApi = Layer.mergeAll(CredentialsFromEnv, FetchHttpClient.layer);
 
 const verifyAccess = Command.make("verify-access", {}).pipe(
 	Command.withDescription(
-		"Print NetBird users, groups, peers, routes, nameservers and policy rules to check zero-trust access before and after the Default policy cut-over",
+		"Print NetBird users, groups, peers, routes, nameservers, policy rules and the Agent Network to check zero-trust access before and after the Default policy cut-over",
 	),
 	Command.withHandler(
 		Effect.fn(function* () {
-			const [users, groups, peers, policies, routes, nameservers] = yield* Effect.all([
+			const [
+				users,
+				groups,
+				peers,
+				policies,
+				routes,
+				nameservers,
+				agentGateway,
+				agentProviders,
+				agentGuardrails,
+				agentPolicies,
+			] = yield* Effect.all([
 				usersGet({}),
 				groupsGet({}),
 				peersGet({}),
 				policiesGet({}),
 				routesGet({}),
 				dnsNameserversGet({}),
+				agentNetworkSettingsGet({}),
+				agentNetworkProvidersGet({}),
+				agentNetworkGuardrailsGet({}),
+				agentNetworkPoliciesGet({}),
 			]).pipe(Effect.provide(netbirdApi));
 
 			const peerById = new Map(peers.map(peer => [peer.id, peer]));
@@ -67,6 +88,30 @@ const verifyAccess = Command.make("verify-access", {}).pipe(
 			for (const nameserver of nameservers) {
 				yield* Console.log(
 					`NAMESERVER\t${nameserver.name}\tprimary=${nameserver.primary}\tenabled=${nameserver.enabled}\tservers=[${nameserver.nameservers.map(entry => `${entry.ip}:${entry.port}`).join(",")}]\tgroups=[${groupNames(nameserver.groups)}]\tdomains=[${nameserver.domains.join(",")}]`,
+				);
+			}
+			yield* Console.log(
+				agentGateway.endpoint === ""
+					? "AGENT_GATEWAY\tnot bootstrapped"
+					: `AGENT_GATEWAY\t${agentGateway.endpoint}\tproxy=${agentGateway.proxy_address}\tlogs=${agentGateway.enable_log_collection}\tprompts=${agentGateway.enable_prompt_collection}\tredact_pii=${agentGateway.redact_pii}\tretention_days=${agentGateway.access_log_retention_days ?? ""}`,
+			);
+			const providerNameById = new Map(agentProviders.map(provider => [provider.id, provider.name]));
+			const guardrailNameById = new Map(agentGuardrails.map(guardrail => [guardrail.id, guardrail.name]));
+			for (const provider of agentProviders) {
+				yield* Console.log(
+					`AGENT_PROVIDER\t${provider.name}\tcatalog=${provider.provider_id}\tupstream=${provider.upstream_url}\tenabled=${provider.enabled}\tmodels=[${provider.models.map(model => model.id).join(",")}]`,
+				);
+			}
+			for (const guardrail of agentGuardrails) {
+				const { model_allowlist: allowlist, prompt_capture: capture } = guardrail.checks;
+				yield* Console.log(
+					`AGENT_GUARDRAIL\t${guardrail.name}\tallowlist=${allowlist.enabled ? `[${allowlist.models.join(",")}]` : "off"}\tprompt_capture=${capture.enabled}\tredact_pii=${capture.redact_pii}`,
+				);
+			}
+			for (const policy of agentPolicies) {
+				const { token_limit: tokens, budget_limit: budget } = policy.limits;
+				yield* Console.log(
+					`AGENT_POLICY\t${policy.name}\tenabled=${policy.enabled}\tsrc=${groupNames(policy.source_groups)}\tproviders=[${policy.destination_provider_ids.map(id => providerNameById.get(id) ?? id).join(",")}]\tguardrails=[${policy.guardrail_ids.map(id => guardrailNameById.get(id) ?? id).join(",")}]\ttokens=${tokens.enabled ? `${tokens.group_cap}/group,${tokens.user_cap}/user per ${tokens.window_seconds}s` : "uncapped"}\tbudget=${budget.enabled ? `$${budget.group_cap_usd}/group,$${budget.user_cap_usd}/user per ${budget.window_seconds}s` : "uncapped"}`,
 				);
 			}
 			for (const policy of policies) {
