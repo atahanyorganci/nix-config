@@ -14,6 +14,7 @@ in {
         inputs.disko.nixosModules.disko
         inputs.hermes-agent.nixosModules.default
         inputs.home-manager.nixosModules.home-manager
+        inputs.sops-nix.nixosModules.sops
         inputs.stylix.nixosModules.stylix
         inputs.catppuccin.nixosModules.catppuccin
         inputs.vscode-server.nixosModules.default

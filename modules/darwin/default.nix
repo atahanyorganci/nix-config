@@ -8,6 +8,7 @@
     imports =
       [
         inputs.home-manager.darwinModules.home-manager
+        inputs.sops-nix.darwinModules.sops
         inputs.stylix.darwinModules.stylix
         inputs.catppuccin.darwinModules.catppuccin
       ]

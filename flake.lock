@@ -1001,6 +1001,8 @@
         "nix-darwin": "nix-darwin",
         "nixos-anywhere": "nixos-anywhere",
         "nixpkgs": "nixpkgs_2",
+        "secrets": "secrets",
+        "sops-nix": "sops-nix",
         "stylix": "stylix",
         "t3code": "t3code",
         "treefmt-nix": "treefmt-nix_2",
@@ -1025,6 +1027,42 @@
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "secrets": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1791186378,
+        "narHash": "sha256-8l5rGO5sJWsHRUJVaiPktmSpSS4T+IoQFFeCV1e/jjA=",
+        "owner": "atahanyorganci",
+        "repo": "nix-secrets",
+        "rev": "31f7db74564b70f2f0e52aabfc82d2b987ba78c3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "atahanyorganci",
+        "repo": "nix-secrets",
+        "type": "github"
+      }
+    },
+    "sops-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791103873,
+        "narHash": "sha256-nFxM+pKoZ8LJAEnUXARyCaOAloWgaW9kZQOSjWzKcTE=",
+        "owner": "Mic92",
+        "repo": "sops-nix",
+        "rev": "dcd241ba97088c22569d1573286e1b9daad340c0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Mic92",
+        "repo": "sops-nix",
         "type": "github"
       }
     },

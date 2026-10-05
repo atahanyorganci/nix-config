@@ -63,6 +63,15 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    # Encrypted host credentials (private). Not a flake: only its files are read.
+    secrets = {
+      url = "github:atahanyorganci/nix-secrets";
+      flake = false;
+    };
     nixos-anywhere = {
       url = "github:nix-community/nixos-anywhere";
       inputs.nixpkgs.follows = "nixpkgs";
