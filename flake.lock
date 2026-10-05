@@ -1033,11 +1033,11 @@
     "secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1791188949,
-        "narHash": "sha256-zmmDJH/kMj15UW/0ga1MWM6RiFUS8tvjcA/stP1B49o=",
+        "lastModified": 1791189049,
+        "narHash": "sha256-8/1CA1scnhPC07joY/Uk4+8fcc9nSIYNyQyKCacPoeE=",
         "owner": "atahanyorganci",
         "repo": "nix-secrets",
-        "rev": "2cdc3e8e0ef4359632296a64d31a14591e9655d8",
+        "rev": "fb07fce656bc7b3db8ba0c97b5fff11d7f79ad11",
         "type": "github"
       },
       "original": {

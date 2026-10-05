@@ -1,6 +1,6 @@
 # Bootstrap NixOS on a fresh host via nixos-anywhere.
 #
-# Usage: nixos-bootstrap <ssh-target> <flake-expr>
+# Usage: nixos-bootstrap <ssh-target> <flake-expr> [host]
 #
 # Installing wipes the target's disk, so it only proceeds on positive evidence
 # that the target is a fresh cloud image:
@@ -11,6 +11,14 @@
 #     NIXOS_BOOTSTRAP_WIPE_IDS (default: ubuntu). An unreadable file, a failed
 #     SSH call or any other OS aborts instead of installing.
 # Exits 0 without changes when the host is already installed.
+#
+# With [host], the host's backed-up SSH identity
+# (identities/<host>/ssh_host_ed25519_key in the secrets repository) is
+# installed with the system, so the new machine keeps its pinned identity and
+# can decrypt its secrets on first boot. It is decrypted (with an admin key)
+# only once every guard has passed, before anything on the target changes,
+# and must match the host's pin. Without a backup the host generates a new
+# key, which then has to be pinned and backed up.
 LOG_PREFIX=nixos-bootstrap
 
 SSH_OPTS=(
@@ -23,6 +31,7 @@ export TMPDIR="${TMPDIR:-/tmp}"
 export NIX_SSHOPTS="${NIX_SSHOPTS:-} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=auto -o ControlPath=/tmp/nr-%C -o ControlPersist=60"
 
 KNOWN_HOSTS="${NIXOS_KNOWN_HOSTS:?NIXOS_KNOWN_HOSTS must point at the pinned host keys}"
+SECRETS="${NIXOS_SECRETS:?NIXOS_SECRETS must point at the secrets repository}"
 WIPE_IDS="${NIXOS_BOOTSTRAP_WIPE_IDS:-ubuntu}"
 
 log() {
@@ -73,6 +82,7 @@ pinned_host_for() {
 
 SSH_TARGET="${1:?ssh target required (e.g. root@host)}"
 FLAKE_EXPR="${2:?flake expression required (e.g. .#pluto)}"
+HOST="${3:-}"
 
 if [[ $FLAKE_EXPR != *"#"* ]]; then
     log "flake expression must include configuration (path#name)"
@@ -136,13 +146,56 @@ run_nixos_anywhere() {
         "$@"
 }
 
+# Stage the host's identity for --extra-files. Done before kexec, so a key that
+# cannot be decrypted or does not match the pin aborts with the target intact.
+extra_files=()
+staged=""
+cleanup() {
+    [[ -z $staged ]] || rm -rf "$staged"
+}
+trap cleanup EXIT
+
+if [[ -n $HOST ]]; then
+    identity="${SECRETS}/identities/${HOST}/ssh_host_ed25519_key"
+    pin="$(awk -v host="$HOST" '$1 == host { print $2 " " $3; exit }' "$KNOWN_HOSTS")"
+    if [[ -f $identity ]]; then
+        if [[ -z $pin ]]; then
+            log "${HOST} has a backed-up identity but no pinned host key; pin it before installing"
+            exit 1
+        fi
+        staged="$(mktemp -d)"
+        install -d -m 755 "$staged/etc/ssh"
+        key="$staged/etc/ssh/ssh_host_ed25519_key"
+        (   
+            umask 077
+            sops --decrypt --input-type binary --output-type binary "$identity" > "$key"
+        ) || {
+            log "could not decrypt the identity of ${HOST}; refusing to install without it"
+            exit 1
+        }
+        chmod 600 "$key"
+        # ssh-keygen reads only a private key file with safe permissions.
+        if [[ "$(ssh-keygen -y -f "$key" 2> /dev/null | awk '{ print $1 " " $2 }')" != "$pin" ]]; then
+            log "the backed-up identity of ${HOST} does not match its pinned host key; refusing to install"
+            exit 1
+        fi
+        ssh-keygen -y -f "$key" > "$key.pub"
+        chmod 644 "$key.pub"
+        extra_files=(--extra-files "$staged")
+        log "installing the backed-up identity of ${HOST}"
+    else
+        log "warning: no backed-up identity for ${HOST}; it will generate a new host key"
+        log "pin that key (hostInventory.ssh.hostKey) and back it up, or it cannot decrypt its secrets"
+    fi
+fi
+
 log "bootstrapping ${FLAKE_EXPR} on ${SSH_TARGET} (currently ${os_id})"
 run_nixos_anywhere --phases kexec
 wait_for_ssh "$SSH_TARGET" 60
 
 run_nixos_anywhere --phases disko
 
-run_nixos_anywhere --phases install
+run_nixos_anywhere --phases install "${extra_files[@]}"
 
 run_nixos_anywhere --phases reboot
 

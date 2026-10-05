@@ -112,10 +112,13 @@ export default NetbirdServerStack.make(
 			serverType: "cx23",
 			sshKey,
 		});
+		// The trailing host name makes nixos-bootstrap install that host's backed-up
+		// SSH identity, so a recreated server keeps its pinned key and can decrypt
+		// its secrets on first boot.
 		const marsBootstrap = yield* Command.Exec("MarsNixosBootstrap", {
 			command: Output.map(
 				Output.all(marsServer.serverId, marsIp),
-				([, host]) => `nix run .#nixos-bootstrap -- root@${host} .#pluto`,
+				([, host]) => `nix run .#nixos-bootstrap -- root@${host} .#pluto mars`,
 			),
 			cwd: REPO_ROOT,
 			memo: BOOTSTRAP_MEMO,
@@ -160,7 +163,7 @@ export default NetbirdServerStack.make(
 		const jupiterNixosBootstrap = yield* Command.Exec("JupiterNixosBootstrap", {
 			command: Output.map(
 				Output.all(jupiter.serverId, jupiterIpv4.ip),
-				([, host]) => `nix run .#nixos-bootstrap -- root@${host} .#pluto`,
+				([, host]) => `nix run .#nixos-bootstrap -- root@${host} .#pluto jupiter`,
 			),
 			cwd: REPO_ROOT,
 			memo: BOOTSTRAP_MEMO,
@@ -184,7 +187,7 @@ export default NetbirdServerStack.make(
 		const saturnBootstrap = yield* Command.Exec("SaturnNixosBootstrap", {
 			command: Output.map(
 				Output.all(saturn.grown, saturn.associated, saturn.publicIp),
-				([, , host]) => `nix run .#nixos-bootstrap -- root@${host} .#saturn`,
+				([, , host]) => `nix run .#nixos-bootstrap -- root@${host} .#saturn saturn`,
 			),
 			cwd: REPO_ROOT,
 			memo: BOOTSTRAP_MEMO,
