@@ -31,6 +31,12 @@ verify *args:
 test *args:
     {{ doppler }} run -- {{ node }} scripts/test-netbird-network.ts {{ args }}
 
+# Run the Axiom catalog's virtual fields and queries against the live dataset.
+# Axiom rejects a query naming a field it has not seen, so run this before a
+# deploy that changes src/observability/catalog.ts.
+check-axiom *args:
+    {{ doppler }} run -- {{ node }} scripts/check-axiom-queries.ts {{ args }}
+
 bootstrap *args:
     {{ pnpm }} exec alchemy provider cloudflare bootstrap {{ args }}
 

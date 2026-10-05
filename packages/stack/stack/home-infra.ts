@@ -430,8 +430,14 @@ export default HomeInfra.make(
 
 		// Telemetry: hosts' otel-collectors ship to this Axiom dataset with this
 		// token, which `just connect-axiom <host>` writes to nix-secrets. The
-		// Axiom credentials (AXIOM_TOKEN, AXIOM_ORG_ID) load from Doppler.
-		const axiom = yield* Observability.deploy({ infra: infra.axiom });
+		// dashboards price tokens from the gateway's model catalog, and the
+		// monitors email the owner. The Axiom credentials (AXIOM_TOKEN,
+		// AXIOM_ORG_ID) load from Doppler.
+		const gatewayModels = yield* NixExpr.evaluate(
+			{ cwd: REPO_ROOT, expression: ".#agentGateway.models" },
+			Observability.PricedModels,
+		);
+		const axiom = yield* Observability.deploy({ infra: infra.axiom, email: me.email, models: gatewayModels });
 
 		// Adopt the dashboard All→All policy, keep it disabled (default deny),
 		// and retain it so destroy never deletes the built-in rule.

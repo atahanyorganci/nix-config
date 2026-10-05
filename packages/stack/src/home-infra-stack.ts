@@ -43,6 +43,10 @@ export interface HomeInfraAxiomOutput {
 	token: Redacted.Redacted<string>;
 	/** `infra.axiom.dataset`. */
 	dataset: string;
+	/** Dashboard uids: `https://app.axiom.co/<org>/dashboards/<uid>`. */
+	dashboards: { overview: string; weekly: string };
+	/** Monitor name -> Axiom monitor id. */
+	monitors: Record<string, string>;
 }
 
 export interface HomeInfraOutputs {
