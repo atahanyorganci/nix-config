@@ -359,6 +359,9 @@ export default HomeInfra.make(
 					// proxy's own host, which takes callers without one.
 					apiKey: Redacted.make("netbird-agent-network"),
 					models: AgentNetwork.toNetBirdModels(provider.models),
+					// Explicit: NetBird 0.80 created the provider disabled when this was
+					// left out, and the endpoint serves only enabled providers.
+					enabled: true,
 					// Orders providers after the gateway, so a destroy removes them first.
 					gateway: endpoint,
 				});
