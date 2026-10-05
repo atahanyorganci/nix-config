@@ -3,6 +3,10 @@ import { ProfileStoreLive } from "alchemy/Auth/Profile";
 import * as Provider from "alchemy/Provider";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
+import { AgentGateway, AgentGatewayProvider } from "./AgentGateway/AgentGateway.ts";
+import { AgentNetworkGuardrail, AgentNetworkGuardrailProvider } from "./AgentNetworkGuardrail/AgentNetworkGuardrail.ts";
+import { AgentNetworkPolicy, AgentNetworkPolicyProvider } from "./AgentNetworkPolicy/AgentNetworkPolicy.ts";
+import { AgentNetworkProvider, AgentNetworkProviderProvider } from "./AgentNetworkProvider/AgentNetworkProvider.ts";
 import { ApiKey, ApiKeyProvider } from "./ApiKey/ApiKey.ts";
 import { NetBirdAuth } from "./AuthProvider.ts";
 import * as Credentials from "./Credentials.ts";
@@ -55,6 +59,10 @@ export const providers = () =>
 	Layer.effect(
 		Providers,
 		Provider.collection([
+			AgentGateway,
+			AgentNetworkGuardrail,
+			AgentNetworkPolicy,
+			AgentNetworkProvider,
 			ApiKey,
 			Group,
 			NameserverGroup,
@@ -74,6 +82,10 @@ export const providers = () =>
 	).pipe(
 		Layer.provide(
 			Layer.mergeAll(
+				AgentGatewayProvider(),
+				AgentNetworkGuardrailProvider(),
+				AgentNetworkPolicyProvider(),
+				AgentNetworkProviderProvider(),
 				ApiKeyProvider(),
 				GroupProvider(),
 				NameserverGroupProvider(),

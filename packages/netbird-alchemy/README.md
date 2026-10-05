@@ -18,6 +18,10 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 - `NetBird.Route` — routes (exit nodes and network prefixes distributed to peer groups)
 - `NetBird.NetworkResource` — network resources
 - `NetBird.NetworkRouter` — network routers
+- `NetBird.AgentGateway` — the account's Agent Network gateway: its keyless endpoint and collection settings (one per account; the endpoint is immutable once bootstrapped)
+- `NetBird.AgentNetworkProvider` — upstream LLM APIs and gateways the endpoint routes to (`apiKey` is `Redacted` and never read back)
+- `NetBird.AgentNetworkGuardrail` — model allowlist and prompt capture checks
+- `NetBird.AgentNetworkPolicy` — which groups may call which providers, with optional token and spend caps
 
 ## Credentials
 
@@ -82,6 +86,48 @@ const svc =
 				enabled: true,
 			},
 		],
+	});
+```
+
+### Agent Network
+
+The gateway endpoint answers once an enabled provider and an enabled policy exist. Pass the gateway's
+`endpoint` to each provider so a destroy deletes providers first; NetBird refuses to release the
+endpoint while any exist.
+
+```typescript
+const gateway =
+	yield *
+	NetBird.AgentGateway("AgentGateway", {
+		proxyAddress: "proxy.example.com",
+		promptCollection: true,
+	}).pipe(Alchemy.RemovalPolicy.retain());
+
+const provider =
+	yield *
+	NetBird.AgentNetworkProvider("Gateway", {
+		name: "agent-gateway",
+		catalogId: "agentgateway",
+		// Dialled from the proxy's host; no path, the request path is appended.
+		upstreamUrl: "http://127.0.0.1:3000",
+		apiKey: Redacted.make("unused"),
+		models: [{ id: "gpt-4o-mini", inputPer1k: 0.00015, outputPer1k: 0.0006 }],
+		gateway: gateway.endpoint,
+	});
+
+const capture =
+	yield *
+	NetBird.AgentNetworkGuardrail("Capture", {
+		name: "capture-prompts",
+		promptCapture: {},
+	});
+
+yield *
+	NetBird.AgentNetworkPolicy("Agents", {
+		name: "agents",
+		sourceGroups: [agents.groupId],
+		providers: [provider.providerId],
+		guardrails: [capture.guardrailId],
 	});
 ```
 
