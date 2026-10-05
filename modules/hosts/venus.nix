@@ -39,6 +39,9 @@
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Servers";
     hostInventory.ssh.localHostName.enable = true;
+    # macOS's own key: verified over the NetBird mesh and the LAN, and matching
+    # known_hosts, on 2026-10-05. Reinstalling macOS generates a new one.
+    hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN6ZVEaeBBJO/0CieSAKNbFZz2Ob2WdRYwlDfvdwjHoe";
     # Hostname
     networking.hostName = "venus";
     # Disable `nix-darwin` documentation
