@@ -34,6 +34,15 @@
           LogLevel = "VERBOSE";
         };
         ports = [22];
+        # One identity per host: the ed25519 key pinned as
+        # `hostInventory.ssh.hostKey`, which is also the key sops-nix decrypts
+        # with. The default list adds an RSA key that nothing pins or checks.
+        hostKeys = [
+          {
+            path = "/etc/ssh/ssh_host_ed25519_key";
+            type = "ed25519";
+          }
+        ];
       };
       networking.firewall.allowedTCPPorts = [22];
     };
