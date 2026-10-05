@@ -31,6 +31,12 @@ verify *args:
 test *args:
     {{ doppler }} run -- {{ node }} scripts/test-netbird-network.ts {{ args }}
 
+# Write the Axiom ingest token and endpoint (HomeInfra outputs) into
+# nix-secrets/hosts/<host>.yaml for the host's otel-collector. Needs the
+# YubiKey and the infra shell's sops; commit, lock and deploy afterwards.
+connect-axiom *args:
+    {{ node }} scripts/connect-axiom.ts {{ args }}
+
 # Run the Axiom catalog's virtual fields and queries against the live dataset.
 # Axiom rejects a query naming a field it has not seen, so run this before a
 # deploy that changes src/observability/catalog.ts.
