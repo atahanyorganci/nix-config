@@ -20,7 +20,11 @@
       fish.enable = true;
     };
   };
-  marsNixosModule = {user, ...}: rec {
+  marsNixosModule = {
+    user,
+    config,
+    ...
+  }: rec {
     headless = true;
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Servers";
@@ -54,8 +58,13 @@
     };
     netbird-proxy = {
       enable = true;
-      tokenFile = "/var/lib/netbird-proxy/token";
+      tokenFile = config.sops.secrets."netbird-proxy/token".path;
       private = true;
+    };
+    # hosts/mars.yaml in nix-secrets; connect-proxy.sh writes a new token there.
+    sops.secrets."netbird-proxy/token" = {
+      owner = "netbird-proxy";
+      restartUnits = ["netbird-proxy.service"];
     };
     # Join the mesh as a peer so Pi-hole is reachable on wt0.
     netbird = {
