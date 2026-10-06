@@ -25,6 +25,20 @@ const stripInlineMarkup = (value: string): string =>
 		.trim();
 
 /**
+ * Split a markdown table row into trimmed cells.
+ *
+ * GFM treats `\|` as a literal pipe inside a cell (pi's docs write unions as
+ * `"a" \| "b"`), so only unescaped pipes delimit cells.
+ */
+const splitTableRow = (row: string): string[] => {
+	const inner = row.slice(1, row.endsWith("|") && !row.endsWith("\\|") ? -1 : undefined);
+	return inner.split(/(?<!\\)\|/).map(cell => cell.replace(/\\\|/g, "|").trim());
+};
+
+/** Default-column values that mean "no default", rather than a literal value. */
+const isNoDefault = (text: string): boolean => ["", "-", "(none)", "none"].includes(text.toLowerCase());
+
+/**
  * Parse every `| \`key\` | type | default | description |` row.
  *
  * The docs use one table per section with a stable four-column shape, so a
@@ -37,10 +51,7 @@ export const parseSettingsDocs = (markdown: string): Map<string, DocsEntry> => {
 		if (!trimmed.startsWith("|")) {
 			continue;
 		}
-		const cells = trimmed
-			.slice(1, trimmed.endsWith("|") ? -1 : undefined)
-			.split("|")
-			.map(cell => cell.trim());
+		const cells = splitTableRow(trimmed);
 		if (cells.length < 4) {
 			continue;
 		}
@@ -61,7 +72,7 @@ export const parseSettingsDocs = (markdown: string): Map<string, DocsEntry> => {
 		entries.set(keyMatch[1], {
 			path: keyMatch[1],
 			type: stripInlineMarkup(rawType),
-			...(defaultText === "" || defaultText === "-" ? {} : { default: defaultText }),
+			...(isNoDefault(defaultText) ? {} : { default: defaultText }),
 			description: stripInlineMarkup(rest.join(" | ")),
 		});
 	}
@@ -81,10 +92,7 @@ export const parseKeybindingDocs = (markdown: string): Map<string, DocsEntry> =>
 		if (!trimmed.startsWith("|")) {
 			continue;
 		}
-		const cells = trimmed
-			.slice(1, trimmed.endsWith("|") ? -1 : undefined)
-			.split("|")
-			.map(cell => cell.trim());
+		const cells = splitTableRow(trimmed);
 		if (cells.length < 3) {
 			continue;
 		}
@@ -96,12 +104,13 @@ export const parseKeybindingDocs = (markdown: string): Map<string, DocsEntry> =>
 		if (keyMatch?.[1] === undefined) {
 			continue;
 		}
-		// "*(none)*" marks an action that ships with no default binding.
+		// "*(none)*" (older docs) or "None" marks an action that ships with no
+		// default binding.
 		const defaultText = stripInlineMarkup(rawDefault);
 		entries.set(keyMatch[1], {
 			path: keyMatch[1],
 			type: "keys",
-			...(defaultText === "" || defaultText === "-" || defaultText === "(none)" ? {} : { default: defaultText }),
+			...(isNoDefault(defaultText) ? {} : { default: defaultText }),
 			description: stripInlineMarkup(rest.join(" | ")),
 		});
 	}

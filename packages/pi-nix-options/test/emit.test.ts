@@ -86,6 +86,22 @@ describe("parseSettingsDocs", () => {
 		const entries = parseSettingsDocs(["| `defaultModel` | string | - | Startup model ID |"].join("\n"));
 		expect(entries.get("defaultModel")?.default).toBeUndefined();
 	});
+
+	it("keeps escaped pipes inside a cell instead of splitting on them", () => {
+		const entries = parseSettingsDocs(
+			'| `steeringMode` | `"all" \\| "one-at-a-time"` | `"one-at-a-time"` | How steering messages are delivered. |',
+		);
+		expect(entries.get("steeringMode")).toMatchObject({
+			type: '"all" | "one-at-a-time"',
+			default: '"one-at-a-time"',
+			description: "How steering messages are delivered.",
+		});
+	});
+
+	it("treats a None default as absent", () => {
+		const entries = parseSettingsDocs("| `shellCommandPrefix` | string | None | Prefix for shell commands. |");
+		expect(entries.get("shellCommandPrefix")?.default).toBeUndefined();
+	});
 });
 
 describe("parseKeybindingDocs", () => {
@@ -109,5 +125,10 @@ describe("parseKeybindingDocs", () => {
 	it("treats *(none)* as having no default binding", () => {
 		const entries = parseKeybindingDocs("| `tui.editor.historyPrevious` | *(none)* | Previous entry |");
 		expect(entries.get("tui.editor.historyPrevious")?.default).toBeUndefined();
+	});
+
+	it("treats None as having no default binding", () => {
+		const entries = parseKeybindingDocs("| `app.session.new` | None | Start a new session |");
+		expect(entries.get("app.session.new")?.default).toBeUndefined();
 	});
 });

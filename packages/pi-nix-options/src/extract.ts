@@ -144,15 +144,25 @@ export class Extractor {
 				const hi = Math.max(...numbers);
 				return { kind: "intBetween", lo, hi };
 			}
-			// Mixed unions: split booleans from string literals and rejoin.
-			const booleanMembers = type.types.filter(member => (member.flags & ts.TypeFlags.BooleanLiteral) !== 0);
+			// Mixed unions (`boolean | "auto"`, `number | "auto"`): split the
+			// boolean or number members from the string literals and rejoin.
+			const isBooleanMember = (member: ts.Type) => (member.flags & ts.TypeFlags.BooleanLiteral) !== 0;
+			const isNumberMember = (member: ts.Type) => (member.flags & ts.TypeFlags.Number) !== 0;
+			const booleanMembers = type.types.filter(isBooleanMember);
+			const numberMembers = type.types.filter(isNumberMember);
 			const stringMembers = type.types.filter(member => member.isStringLiteral());
 			const others = type.types.filter(
-				member => (member.flags & ts.TypeFlags.BooleanLiteral) === 0 && !member.isStringLiteral(),
+				member => !isBooleanMember(member) && !isNumberMember(member) && !member.isStringLiteral(),
 			);
-			if (others.length === 0 && booleanMembers.length > 0 && stringMembers.length > 0) {
+			const primitive: NixType | undefined =
+				booleanMembers.length > 0 && numberMembers.length === 0
+					? { kind: "bool" }
+					: numberMembers.length > 0 && booleanMembers.length === 0
+						? { kind: "number" }
+						: undefined;
+			if (others.length === 0 && primitive !== undefined && stringMembers.length > 0) {
 				const enumValues = stringMembers.flatMap(member => (member.isStringLiteral() ? [member.value] : []));
-				return { kind: "oneOf", of: [{ kind: "bool" }, { kind: "enum", values: enumValues }] };
+				return { kind: "oneOf", of: [primitive, { kind: "enum", values: enumValues }] };
 			}
 		}
 
