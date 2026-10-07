@@ -106,6 +106,7 @@ in {
           defaultModel = "claude-code/claude-opus-5-5";
           defaultThinkingLevel = "high";
           quietStartup = true;
+          tuiMode = "regular";
           compaction.enabled = true;
           hideThinkingBlock = false;
           # Pi ships "dark" and "light" only; it has no Stylix target, so
