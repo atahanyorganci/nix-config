@@ -6,7 +6,8 @@
 # (`hostInventory.ssh.hostKey`); a configuration without a pin is trusted on
 # first use. A host already running the evaluated system is left untouched,
 # so re-running a deploy is cheap and never disturbs an up-to-date host. Set
-# NIXOS_DEPLOY_FORCE=1 to switch anyway.
+# NIXOS_DEPLOY_FORCE=1 to switch anyway, and NIXOS_SYSTEM to the system the
+# caller expects (as the stack's `Nix.NixOS` does) to refuse any other.
 LOG_PREFIX=nixos-deploy
 
 log() {
@@ -93,6 +94,12 @@ fi
 
 log "evaluating ${FLAKE_EXPR}"
 want="$(nix eval --raw ".#nixosConfigurations.${HOST_NAME}.config.system.build.toplevel.outPath")"
+
+if [[ -n ${NIXOS_SYSTEM:-} && $NIXOS_SYSTEM != "$want" ]]; then
+    log "${FLAKE_EXPR} evaluates to ${want}, not the expected ${NIXOS_SYSTEM}"
+    log "the flake changed since it was evaluated; plan and deploy again"
+    exit 1
+fi
 
 if [[ ${NIXOS_DEPLOY_FORCE:-} != 1 ]]; then
     # Both the running system and the boot profile must match: after a

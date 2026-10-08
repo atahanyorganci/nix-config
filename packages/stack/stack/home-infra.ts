@@ -15,7 +15,7 @@ import {
 	HomeInfra,
 	Inventory,
 	NameServers,
-	NixExpr,
+	Nix,
 	Observability,
 	Policies,
 	ReverseProxy,
@@ -33,46 +33,33 @@ const Me = Schema.Struct({
 	username: Schema.String,
 });
 
+// The flake root, relative to `packages/stack`, where Alchemy and the scripts
+// are launched from (as the package scripts and Justfile do).
 const REPO_ROOT = "../..";
 
 const peerLogicalId = (hostKey: string) => hostKey[0]!.toUpperCase() + hostKey.slice(1);
 
 export default HomeInfra.make(
 	{
-		providers: Layer.mergeAll(NetBird.providers(), NixExpr.NixExprProvider(), Axiom.providers()),
+		providers: Layer.mergeAll(NetBird.providers(), Nix.providers(), Axiom.providers()),
 		state: Cloudflare.state(),
 		secrets: [Doppler.Secrets({ project: "nix-config", config: "dev" })],
 	},
 	Effect.gen(function* () {
-		const infraExpr = yield* NixExpr.NixExpr("Infra", {
-			cwd: REPO_ROOT,
-			expression: ".#infra",
-		});
-		const infra = yield* NixExpr.decode(infraExpr, Infra);
+		const infraExpr = yield* Nix.Expr("Infra", { flakeRoot: REPO_ROOT, attr: "infra" });
+		const infra = yield* Nix.decode(infraExpr, Infra);
 
-		const meExpr = yield* NixExpr.NixExpr("Me", {
-			cwd: REPO_ROOT,
-			expression: ".#me",
-		});
-		const me = yield* NixExpr.decode(meExpr, Me);
+		const meExpr = yield* Nix.Expr("Me", { flakeRoot: REPO_ROOT, attr: "me" });
+		const me = yield* Nix.decode(meExpr, Me);
 
-		const inventoryExpr = yield* NixExpr.NixExpr("Inventory", {
-			cwd: REPO_ROOT,
-			expression: ".#inventory",
-		});
-		const inventory = yield* NixExpr.decode(inventoryExpr, Inventory.Inventory);
+		const inventoryExpr = yield* Nix.Expr("Inventory", { flakeRoot: REPO_ROOT, attr: "inventory" });
+		const inventory = yield* Nix.decode(inventoryExpr, Inventory.Inventory);
 
-		const httpServicesExpr = yield* NixExpr.NixExpr("HttpServices", {
-			cwd: REPO_ROOT,
-			expression: ".#httpServices",
-		});
-		const httpServices = yield* NixExpr.decode(httpServicesExpr, ReverseProxy.HttpServices);
+		const httpServicesExpr = yield* Nix.Expr("HttpServices", { flakeRoot: REPO_ROOT, attr: "httpServices" });
+		const httpServices = yield* Nix.decode(httpServicesExpr, ReverseProxy.HttpServices);
 
-		const nameServersExpr = yield* NixExpr.NixExpr("NameServers", {
-			cwd: REPO_ROOT,
-			expression: ".#nameServers",
-		});
-		const nameServers = yield* NixExpr.decode(nameServersExpr, NameServers.NameServers);
+		const nameServersExpr = yield* Nix.Expr("NameServers", { flakeRoot: REPO_ROOT, attr: "nameServers" });
+		const nameServers = yield* Nix.decode(nameServersExpr, NameServers.NameServers);
 
 		const accessMatrix = yield* Schema.decodeEffect(AccessMatrix.AccessMatrixFromFlake)({
 			httpServices,
@@ -327,8 +314,8 @@ export default HomeInfra.make(
 		// may call which models and records usage, cost and prompts. Synthesised
 		// from these objects, its endpoint gets its own DNS record and proxy ACL
 		// for the policies' source groups, so no mesh policy is needed for it.
-		const agentNetwork = yield* NixExpr.evaluate(
-			{ cwd: REPO_ROOT, expression: ".#agentNetwork" },
+		const agentNetwork = yield* Nix.evaluate(
+			{ flakeRoot: REPO_ROOT, attr: "agentNetwork" },
 			AgentNetwork.AgentNetwork,
 		).pipe(Effect.flatMap(AgentNetwork.validate));
 		let agentNetworkOutput:
@@ -438,8 +425,8 @@ export default HomeInfra.make(
 		// dashboards price tokens from the gateway's model catalog, and the
 		// monitors email the owner. The Axiom credentials (AXIOM_TOKEN,
 		// AXIOM_ORG_ID) load from Doppler.
-		const gatewayModels = yield* NixExpr.evaluate(
-			{ cwd: REPO_ROOT, expression: ".#agentGateway.models" },
+		const gatewayModels = yield* Nix.evaluate(
+			{ flakeRoot: REPO_ROOT, attr: "agentGateway.models" },
 			Observability.PricedModels,
 		);
 		const axiom = yield* Observability.deploy({ infra: infra.axiom, email: me.email, models: gatewayModels });

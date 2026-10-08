@@ -8,18 +8,18 @@ import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { NetbirdServer, NetbirdServerStack, NixExpr, Aws } from "../src/index.ts";
+import { NetbirdServer, NetbirdServerStack, Nix, Aws } from "../src/index.ts";
 
 /**
- * The repository root, relative to `packages/stack`. `NixExpr` resolves it
- * against the stack package itself; `Command.Exec` resolves it against the
- * working directory, so commands assume Alchemy is launched from
- * `packages/stack` (as the package scripts and Justfile do).
+ * The repository root, relative to `packages/stack`. `Nix` resources and
+ * `Command.Exec` resolve it against the working directory, so the stack
+ * assumes Alchemy is launched from `packages/stack` (as the package scripts
+ * and Justfile do).
  */
 const REPO_ROOT = "../..";
 
-// Flake values are evaluated while planning (`NixExpr.evaluate`), not kept as
-// `NixExpr` resources: each reaches state only through the props of the
+// Flake values are evaluated while planning (`Nix.evaluate`), not kept as
+// `Nix.Expr` resources: each reaches state only through the props of the
 // resources that use it, so a flake change shows up exactly where it lands,
 // and fields these schemas drop (login keys, shell, ...) never show up.
 
@@ -36,27 +36,6 @@ const Infra = Schema.Struct({
 	domain: Schema.String,
 	netbirdManagementDomain: Schema.String,
 });
-
-// A NixOS deploy is triggered by its host's system (see `hostSystem`), so it
-// hashes no repository files.
-const DEPLOY_MEMO = { include: [] as string[] };
-
-/**
- * The system a host's NixOS configuration evaluates to: its store path, which
- * changes exactly when the host's closure does. Passed to the host's deploy so
- * it re-runs only then: not for module edits, commits or lockfile bumps that
- * do not reach it (these hosts do not set `system.configurationRevision`).
- * `nixos-deploy` also skips a host already running this system, so a deploy
- * re-run after state is rebuilt leaves hosts untouched.
- */
-const hostSystem = (host: string) =>
-	NixExpr.evaluate(
-		{
-			cwd: REPO_ROOT,
-			expression: `.#nixosConfigurations.${host}.config.system.build.toplevel.outPath`,
-		},
-		Schema.String,
-	);
 
 /**
  * Saturn boots this Ubuntu 24.04 arm64 AMI once; `nixos-bootstrap` then
@@ -78,20 +57,15 @@ export default NetbirdServerStack.make(
 			Hetzner.providers(),
 			AWS.providers(),
 			NetBird.providers(),
-			NixExpr.NixExprProvider(),
+			Nix.providers(),
 		),
 		state: Cloudflare.state(),
 		secrets: [Doppler.Secrets({ project: "nix-config", config: "dev" })],
 	},
 	Effect.gen(function* () {
-		const [me, infra, systems] = yield* Effect.all([
-			NixExpr.evaluate({ cwd: REPO_ROOT, expression: ".#me" }, Me),
-			NixExpr.evaluate({ cwd: REPO_ROOT, expression: ".#infra" }, Infra),
-			Effect.all({
-				mars: hostSystem("mars"),
-				jupiter: hostSystem("jupiter"),
-				saturn: hostSystem("saturn"),
-			}),
+		const [me, infra] = yield* Effect.all([
+			Nix.evaluate({ flakeRoot: REPO_ROOT, attr: "me" }, Me),
+			Nix.evaluate({ flakeRoot: REPO_ROOT, attr: "infra" }, Infra),
 		]);
 
 		const deployKey = me.deployKey;
@@ -121,14 +95,12 @@ export default NetbirdServerStack.make(
 			cwd: REPO_ROOT,
 			memo: BOOTSTRAP_MEMO,
 		});
-		const marsNixos = yield* Command.Exec("MarsNixos", {
-			command: Output.map(
-				Output.all(marsBootstrap.hash, marsIp),
-				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#mars`,
-			),
-			cwd: REPO_ROOT,
-			env: { NIXOS_SYSTEM: systems.mars },
-			memo: DEPLOY_MEMO,
+		// Deploys when mars's configuration evaluates to a new system (see `Nix.NixOS`).
+		const marsNixos = yield* Nix.NixOS("MarsNixos", {
+			flakeRoot: REPO_ROOT,
+			configuration: "mars",
+			command: Output.map(marsIp, host => `nix run .#nixos-deploy -- atahan@${host} .#mars`),
+			after: marsBootstrap.hash,
 		});
 
 		const jupiterIpv4 = yield* Hetzner.PrimaryIp("JupiterIpv4", {
@@ -166,14 +138,11 @@ export default NetbirdServerStack.make(
 			cwd: REPO_ROOT,
 			memo: BOOTSTRAP_MEMO,
 		});
-		yield* Command.Exec("JupiterNixos", {
-			command: Output.map(
-				Output.all(jupiterNixosBootstrap.hash, jupiterIpv4.ip),
-				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#jupiter`,
-			),
-			cwd: REPO_ROOT,
-			env: { NIXOS_SYSTEM: systems.jupiter },
-			memo: DEPLOY_MEMO,
+		yield* Nix.NixOS("JupiterNixos", {
+			flakeRoot: REPO_ROOT,
+			configuration: "jupiter",
+			command: Output.map(jupiterIpv4.ip, host => `nix run .#nixos-deploy -- atahan@${host} .#jupiter`),
+			after: jupiterNixosBootstrap.hash,
 		});
 
 		const saturn = yield* Aws.exitNode({
@@ -190,14 +159,11 @@ export default NetbirdServerStack.make(
 			cwd: REPO_ROOT,
 			memo: BOOTSTRAP_MEMO,
 		});
-		yield* Command.Exec("SaturnNixos", {
-			command: Output.map(
-				Output.all(saturnBootstrap.hash, saturn.publicIp),
-				([, host]) => `nix run .#nixos-deploy -- atahan@${host} .#saturn`,
-			),
-			cwd: REPO_ROOT,
-			env: { NIXOS_SYSTEM: systems.saturn },
-			memo: DEPLOY_MEMO,
+		yield* Nix.NixOS("SaturnNixos", {
+			flakeRoot: REPO_ROOT,
+			configuration: "saturn",
+			command: Output.map(saturn.publicIp, host => `nix run .#nixos-deploy -- atahan@${host} .#saturn`),
+			after: saturnBootstrap.hash,
 		});
 
 		const zone = yield* Cloudflare.Zone.Zone("Domain", {
@@ -232,7 +198,7 @@ export default NetbirdServerStack.make(
 			// Order only: the management API needs its DNS record and Mars's NixOS
 			// install/rebuild. Setup's diff ignores this, so Mars deploys do not
 			// update `Admin`.
-			ready: Output.map(Output.all(netbirdRecord.content, marsNixos.hash), () => true),
+			ready: Output.map(Output.all(netbirdRecord.content, marsNixos.system), () => true),
 		});
 
 		return {
