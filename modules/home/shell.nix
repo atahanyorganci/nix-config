@@ -154,10 +154,27 @@
             # The default lives under `$TMPDIR`, which `nix develop` changes: clients there miss the
             # daemon, try to autostart one, and block every command on its pidfile lock.
             socket_path = "${config.xdg.dataHome}/atuin/atuin.sock";
+            # Atuin's default, set so the `onChange` hook below reads the same file.
+            pidfile_path = "${config.xdg.dataHome}/atuin/atuin-daemon.pid";
           };
           logs.dir = "${config.xdg.stateHome}/atuin/logs";
         };
       };
+      # An autostarted daemon keeps running across config changes. Atuin replaces one from another
+      # release itself, but it asks the old daemon to stop over `socket_path`: once that moves, every
+      # hook waits for the old daemon's pidfile lock until it times out (4s), twice per command.
+      # Stop the daemon when the config changes; the next hook autostarts one with the new config.
+      xdg.configFile."atuin/config.toml".onChange = lib.mkIf config.programs.atuin.enable ''
+        atuinPidfile=${lib.escapeShellArg config.programs.atuin.settings.daemon.pidfile_path}
+        if [[ -f $atuinPidfile ]]; then
+          atuinPid=$(head -n 1 "$atuinPidfile")
+          # The pidfile outlives the daemon, so check the PID still belongs to atuin.
+          if [[ $atuinPid =~ ^[0-9]+$ ]] \
+            && [[ $(${lib.getExe' pkgs.ps "ps"} -o comm= -p "$atuinPid") == *atuin ]]; then
+            run kill "$atuinPid"
+          fi
+        fi
+      '';
       programs.delta = {
         enable = true;
         enableGitIntegration = config.git.enable;
