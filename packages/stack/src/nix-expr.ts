@@ -1,4 +1,3 @@
-import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import { havePropsChanged, isResolved } from "alchemy/Diff";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
@@ -9,7 +8,6 @@ import * as State from "alchemy/State";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import { Hex } from "effect/encoding";
-import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
@@ -185,4 +183,4 @@ export const NixExprProvider = () =>
 			} satisfies NixExprAttributes;
 		}),
 		delete: () => Effect.void,
-	}).pipe(Layer.provide(NodeCrypto.layer));
+	});

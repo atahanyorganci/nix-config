@@ -1,12 +1,14 @@
 import * as NetBird from "@yorganci/netbird-alchemy";
+import * as AWS from "alchemy/AWS";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Command from "alchemy/Command";
 import * as Doppler from "alchemy/Doppler";
+import * as Hetzner from "alchemy/Hetzner";
 import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { Aws, Hetzner, NetbirdServer, NetbirdServerStack, NixExpr } from "../src/index.ts";
+import { NetbirdServer, NetbirdServerStack, NixExpr, Aws } from "../src/index.ts";
 
 /**
  * The repository root, relative to `packages/stack`. `NixExpr` resolves it
@@ -74,12 +76,8 @@ export default NetbirdServerStack.make(
 		providers: Layer.mergeAll(
 			Cloudflare.providers(),
 			Hetzner.providers(),
-			Aws.providers(),
+			AWS.providers(),
 			NetBird.providers(),
-			// No resource here is a `NixExpr` any more. The provider stays only so
-			// the next deploy can delete the `FlakeMe` and `Infra` rows earlier
-			// deploys created (a row without a provider fails the plan). Drop it
-			// once those rows are gone.
 			NixExpr.NixExprProvider(),
 		),
 		state: Cloudflare.state(),

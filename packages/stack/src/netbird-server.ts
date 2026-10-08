@@ -1,5 +1,5 @@
+import * as Hetzner from "alchemy/Hetzner";
 import * as Effect from "effect/Effect";
-import * as Hetzner from "./hetzner.ts";
 
 export interface NetbirdServerStackProps {
 	name: string;

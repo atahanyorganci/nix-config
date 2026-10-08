@@ -6,9 +6,6 @@ import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
 import * as String from "effect/String";
 
-export { providers } from "alchemy/AWS";
-export * as EC2 from "alchemy/AWS/EC2";
-
 export const ROOT_VOLUME_GIB = 30;
 
 const rootSshUserData = (publicKey: string) => `#cloud-config
