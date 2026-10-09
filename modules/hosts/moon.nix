@@ -5,6 +5,7 @@
 }: let
   user = config.flake.me;
   moonHomeConfiguration = {user, ...}: {
+    agents.enable = true;
     ffmpeg.enable = true;
     git = {
       enable = true;
