@@ -1,4 +1,38 @@
-{inputs, ...}: let
+{
+  inputs,
+  lib,
+  ...
+}: let
+  # The ports catppuccin/nix reads during evaluation (`lib.importTOML
+  # "${sources.starship}/..."`), fetched at the revision it pins for them
+  # (`pkgs/sources.json`) rather than built. Reading a build's output is
+  # import-from-derivation, and the build is for the host's platform, so
+  # evaluating a Linux host on macOS (as deploys do) would need a Linux
+  # builder. The ports commit what their build renders, and the build installs
+  # it unchanged, so the files are the same either way.
+  #
+  # Each port maps to the directory of its repository the build installs, and
+  # is read by:
+  #   - starship: the Home Manager starship port
+  #   - palette: the NixOS tty port (console colors) and Home Manager's skim
+  # A port added here must be read only as files: one used as a package (its
+  # binaries, or a build step) would lose that build.
+  evaluatedPorts = {
+    starship = "/themes";
+    palette = "";
+  };
+  pins = lib.importJSON "${inputs.catppuccin}/pkgs/sources.json";
+  evaluatedSources = lib.mapAttrs (port: dir: let
+    src = builtins.fetchTree {
+      type = "github";
+      owner = "catppuccin";
+      repo = port;
+      inherit (pins.${port}) rev;
+      narHash = pins.${port}.hash;
+    };
+  in "${src}${dir}")
+  evaluatedPorts;
+
   # Catppuccin wins wherever it and Stylix both theme an application, and
   # Stylix covers whatever Catppuccin has no port for, from the same palette
   # (see `stylix.nix`).
@@ -60,6 +94,7 @@
       # One flavor for the whole system: every port, at every level, and
       # Stylix's palette.
       flavor = "mocha";
+      sources = evaluatedSources;
     };
 
     home-manager = lib.optionalAttrs (options ? home-manager) {
@@ -70,6 +105,7 @@
           catppuccin = {
             inherit enable;
             inherit (config.catppuccin) flavor accent;
+            sources = evaluatedSources;
             # Papirus is Linux-only and refuses to evaluate on macOS, where
             # GTK is configured but there is nothing for it to theme.
             gtk.icon.enable = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin false;
