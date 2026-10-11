@@ -26,9 +26,16 @@ FLAKE_ROOT="${FLAKE_EXPR%%#*}"
 HOST_NAME="${FLAKE_EXPR#*#}"
 KNOWN_HOSTS="${NIXOS_KNOWN_HOSTS:?NIXOS_KNOWN_HOSTS must point at the pinned host keys}"
 
+# Our own connections, never the user's multiplexed one (whose host key check
+# would stand in for the pinned one), and without the GPG RemoteForward from
+# ~/.ssh/config: a forward taken by a deploy dies when the deploy ends, and
+# with it signing for every session on the host.
 SSH_OPTS=(
     -o ConnectTimeout=10
     -o BatchMode=yes
+    -o ControlMaster=no
+    -o ControlPath=none
+    -o ClearAllForwardings=yes
 )
 if grep -q "^${HOST_NAME} " "$KNOWN_HOSTS"; then
     # Check the key pinned for this configuration, whatever address it is
@@ -44,7 +51,7 @@ read -r -a host_key_opts <<< "$HOST_KEY_OPTS"
 SSH_OPTS+=("${host_key_opts[@]}")
 
 export TMPDIR="${TMPDIR:-/tmp}"
-export NIX_SSHOPTS="${NIX_SSHOPTS:-} ${HOST_KEY_OPTS} -o ControlMaster=auto -o ControlPath=/tmp/nr-%C -o ControlPersist=60"
+export NIX_SSHOPTS="${NIX_SSHOPTS:-} ${HOST_KEY_OPTS} -o ControlMaster=auto -o ControlPath=/tmp/nr-%C -o ControlPersist=60 -o ClearAllForwardings=yes"
 
 host_key_mismatch() {
     log "host key mismatch: ${SSH_TARGET} is not the ${HOST_NAME} pinned in the flake"

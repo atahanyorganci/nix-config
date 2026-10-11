@@ -18,7 +18,10 @@
           PubkeyAuthentication = true;
           # Authentication config
           MaxAuthTries = 3;
-          MaxSessions = 3;
+          # Per connection. Clients multiplex every terminal to a host over one
+          # connection (see the gpg Home Manager module), so this caps the
+          # number of open terminals, not concurrent logins.
+          MaxSessions = 16;
           LoginGraceTime = "20s";
           # Only allows known user
           AllowUsers = [user.username];

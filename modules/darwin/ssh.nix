@@ -19,7 +19,8 @@
           PubkeyAuthentication yes
           # Authentication config
           MaxAuthTries 3
-          MaxSessions 3
+          # Per connection; clients multiplex terminals over one connection.
+          MaxSessions 16
           LoginGraceTime 20s
           # Only allows known user
           AllowUsers ${user.username}

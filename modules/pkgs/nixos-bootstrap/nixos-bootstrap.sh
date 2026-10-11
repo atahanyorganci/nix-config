@@ -26,9 +26,14 @@ SSH_OPTS=(
     -o UserKnownHostsFile=/dev/null
     -o ConnectTimeout=10
     -o BatchMode=yes
+    # Own connections, without the GPG RemoteForward from ~/.ssh/config (see
+    # nixos-deploy).
+    -o ControlMaster=no
+    -o ControlPath=none
+    -o ClearAllForwardings=yes
 )
 export TMPDIR="${TMPDIR:-/tmp}"
-export NIX_SSHOPTS="${NIX_SSHOPTS:-} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=auto -o ControlPath=/tmp/nr-%C -o ControlPersist=60"
+export NIX_SSHOPTS="${NIX_SSHOPTS:-} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=auto -o ControlPath=/tmp/nr-%C -o ControlPersist=60 -o ClearAllForwardings=yes"
 
 KNOWN_HOSTS="${NIXOS_KNOWN_HOSTS:?NIXOS_KNOWN_HOSTS must point at the pinned host keys}"
 SECRETS="${NIXOS_SECRETS:?NIXOS_SECRETS must point at the secrets repository}"
@@ -142,6 +147,7 @@ run_nixos_anywhere() {
         --kexec-extra-flags "-c" \
         --ssh-option StrictHostKeyChecking=no \
         --ssh-option UserKnownHostsFile=/dev/null \
+        --ssh-option ClearAllForwardings=yes \
         --target-host "$SSH_TARGET" \
         "$@"
 }

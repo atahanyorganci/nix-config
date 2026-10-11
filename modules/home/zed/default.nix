@@ -40,6 +40,11 @@ in {
         lib.optional (lib.elem host target.ssh.hostNames) {
           inherit host;
           nickname = "${name} (${label})";
+          # Zed opens its own connection per project. Without this it would take
+          # the host's GPG forward (one fixed path, newest connection wins) and
+          # break signing for every session when the project closes. Signing
+          # from Zed terminals uses the terminals' shared connection instead.
+          args = ["-o" "ClearAllForwardings=yes"];
         };
     in
       entry "Local" "${name}.local" ++ entry "Netbird" "${name}.netbird.selfhosted";
