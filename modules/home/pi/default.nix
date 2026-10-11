@@ -77,19 +77,27 @@
     #     node_modules/@scope/pkg shadows the copy pi resolves internally.
     #   - build caches and tooling configs, which are pure closure bloat.
     #
-    # A single file is passed straight through: there is nothing to prune, and
-    # copying it into a directory would change how pi resolves it.
+    # A single file is copied as a file: there is nothing to prune, and
+    # wrapping it in a directory would change how pi resolves it.
+    #
+    # Which of the two `src` is gets decided by the builder, not during
+    # evaluation. A `src` inside a derivation's output (such as
+    # `${pkgs.yorganci-pi-extension}/web-search`) would have to be built just
+    # to be inspected, making the whole configuration unevaluable on any
+    # machine that cannot build for the host's platform: an x86_64-linux host
+    # could not even be evaluated from a Mac to deploy it.
     cleanExtension = extension:
-      if !(lib.pathIsDirectory extension.src)
-      then extension.src
-      else
-        pkgs.runCommand "pi-extension-${lib.strings.sanitizeDerivationName extension.name}" {
-          src = extension.src;
-          preferLocalBuild = true;
-        } ''
+      pkgs.runCommand "pi-extension-${lib.strings.sanitizeDerivationName extension.name}" {
+        src = extension.src;
+        preferLocalBuild = true;
+      } ''
+        if [ -d "$src" ]; then
           cp -R "$src" "$out"
           chmod -R u+w "$out"
-        '';
+        else
+          cp "$src" "$out"
+        fi
+      '';
 
     # Each file is tracked by a sidecar checksum of the last content Nix wrote.
     # That distinguishes "unchanged since activation" from "edited by hand or
