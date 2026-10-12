@@ -84,6 +84,7 @@ in {
           ];
           userSettings = {
             auto_update = false;
+            cli_default_open_behavior = "existing_window";
             ssh_connections = lib.optionals isAgentHolder (
               lib.concatLists (lib.mapAttrsToList connectionsFor managedTargets)
             );
