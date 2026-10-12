@@ -70,6 +70,7 @@
     homebrew.casks = [
       "fluidvoice"
       "spotify"
+      "vorssaint"
     ];
   };
 in {
