@@ -24,7 +24,6 @@ catalog:
   # Pinned to a rev because `api/` has no published release and its internal
   # layout is not covered by `exports`.
   "@imput/cobalt-api": "github:imputnet/cobalt#path:/api&a636575b09de1fc55d9b8cd98cac88f5f2f16b42"
-  "@distilled.cloud/aws": "1.0.0-rc.13"
   "@distilled.cloud/core": "1.0.0-rc.13"
   "@earendil-works/pi-ai": "1.0.2"
   "@earendil-works/pi-coding-agent": "1.0.2"
@@ -57,6 +56,10 @@ catalog:
   "vitest": "^5.0.3"
 patchedDependencies:
   "@imput/cobalt-api@11.7.1": patches/@imput__cobalt-api@11.7.1.patch
+  # Adds `blockDeviceMappings` to `EC2.Instance`, so Saturn's root volume is
+  # sized at launch instead of grown through raw EC2 calls afterwards. Drop it
+  # once Alchemy ships the option.
+  "alchemy@2.0.0-beta.80": patches/alchemy@2.0.0-beta.80.patch
 minimumReleaseAgeExclude:
   - "@alchemy.run/cloudflare-runtime@2.0.0-beta.80"
   - "@alchemy.run/floci@2.0.0-beta.80"

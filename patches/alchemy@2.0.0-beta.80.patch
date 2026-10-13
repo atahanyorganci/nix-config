@@ -1,0 +1,268 @@
+diff --git a/lib/AWS/EC2/Instance.d.ts b/lib/AWS/EC2/Instance.d.ts
+index 22214d9b36bf4a33d5e8368657ab33ac447b5fa8..5416b18e3ef2873790db41ae012e3f422d16d4c1 100644
+--- a/lib/AWS/EC2/Instance.d.ts
++++ b/lib/AWS/EC2/Instance.d.ts
+@@ -15,6 +15,8 @@ import type { PolicyStatement } from "../IAM/Policy.ts";
+ import type { Providers } from "../Providers.ts";
+ import type { RegionID } from "../Region.ts";
+ import { type Ec2HostRuntimeContext } from "./hosted.ts";
++import type { InstanceBlockDeviceMapping } from "./hosted.ts";
++export type { InstanceBlockDeviceMapping } from "./hosted.ts";
+ import type { SecurityGroupId } from "./SecurityGroup.ts";
+ import type { SubnetId } from "./Subnet.ts";
+ import type { VpcId } from "./Vpc.ts";
+@@ -60,6 +62,11 @@ export interface InstanceProps extends PlatformProps {
+      * Optional private IPv4 address for the primary interface.
+      */
+     privateIpAddress?: string;
++    /**
++     * Block devices to attach at launch, such as a larger root volume.
++     * Changing them replaces the instance.
++     */
++    blockDeviceMappings?: InstanceBlockDeviceMapping[];
+     /**
+      * Optional availability zone override.
+      */
+diff --git a/lib/AWS/EC2/Instance.js b/lib/AWS/EC2/Instance.js
+index 24d5bf52450329f177ac50de5405341b360dcb50..3bb227c836d2ab7d3c2cc512b5d581e7c0d211a0 100644
+--- a/lib/AWS/EC2/Instance.js
++++ b/lib/AWS/EC2/Instance.js
+@@ -233,6 +233,7 @@ export const InstanceProvider = () => Provider.effect(Instance, Effect.gen(funct
+                 associatePublicIpAddress: news.associatePublicIpAddress,
+                 privateIpAddress: news.privateIpAddress,
+                 availabilityZone: news.availabilityZone,
++                blockDeviceMappings: news.blockDeviceMappings,
+                 tags,
+             }, runtime),
+             MinCount: 1,
+@@ -295,7 +296,8 @@ export const InstanceProvider = () => Provider.effect(Instance, Effect.gen(funct
+                 olds.userData !== news.userData ||
+                 olds.associatePublicIpAddress !== news.associatePublicIpAddress ||
+                 olds.privateIpAddress !== news.privateIpAddress ||
+-                olds.availabilityZone !== news.availabilityZone) {
++                olds.availabilityZone !== news.availabilityZone ||
++                !deepEqual(olds.blockDeviceMappings ?? [], news.blockDeviceMappings ?? [])) {
+                 // A primary private IP cannot belong to two instances in the
+                 // same subnet. An omitted subnet may still resolve to that subnet.
+                 return reusesFixedPrivateIp
+diff --git a/lib/AWS/EC2/hosted.d.ts b/lib/AWS/EC2/hosted.d.ts
+index 97ab2918b03c5edde6601de3cfbab4316618c8bb..091fa4129426707837f04452b1fec4b6bb734bc1 100644
+--- a/lib/AWS/EC2/hosted.d.ts
++++ b/lib/AWS/EC2/hosted.d.ts
+@@ -21,6 +21,31 @@ export interface Ec2HostedBinding {
+     /** IAM policy statements attached to the instance profile role. */
+     policyStatements?: PolicyStatement[];
+ }
++/**
++ * A block device attached at launch. Most often used to resize the root
++ * volume, whose `deviceName` must match the AMI's root device (for example
++ * `/dev/sda1` on Ubuntu, `/dev/xvda` on Amazon Linux).
++ */
++export interface InstanceBlockDeviceMapping {
++    /** Device name, such as `/dev/sda1`. */
++    deviceName: string;
++    /** EBS volume settings for the device. */
++    ebs?: {
++        /** Volume size in GiB. */
++        volumeSize?: number;
++        /** Volume type, such as `gp3`. */
++        volumeType?: string;
++        /** Provisioned IOPS (`io1`, `io2`, `gp3`). */
++        iops?: number;
++        /** Throughput in MiB/s (`gp3`). */
++        throughput?: number;
++        /** Whether the volume is deleted with the instance. */
++        deleteOnTermination?: boolean;
++        /** Whether the volume is encrypted. */
++        encrypted?: boolean;
++    };
++}
++
+ /**
+  * Shared props for EC2-backed hosted runtimes (an Instance that bundles and
+  * runs an application entrypoint).
+@@ -44,6 +69,11 @@ export interface Ec2HostedProps extends PlatformProps {
+     associatePublicIpAddress?: boolean;
+     /** Static private IP address within the subnet. */
+     privateIpAddress?: string;
++    /**
++     * Block devices to attach at launch, such as a larger root volume.
++     * Changing them replaces the instance.
++     */
++    blockDeviceMappings?: InstanceBlockDeviceMapping[];
+     /** Availability Zone to launch into. */
+     availabilityZone?: string;
+     /** Tags applied to the instance. */
+@@ -102,7 +132,7 @@ export declare const createEc2HostedSupport: ({ stackName, stage, virtualEntryPl
+     resourceType: string;
+ }) => {
+     normalizeSecurityGroups: (groups?: readonly string[]) => string[];
+-    buildLaunchTemplateData: (news: Pick<Ec2HostedProps, "imageId" | "instanceType" | "keyName" | "subnetId" | "securityGroupIds" | "associatePublicIpAddress" | "privateIpAddress" | "availabilityZone" | "tags">, runtime: Pick<Ec2HostedRuntimeState, "userData" | "instanceProfileName">) => {
++    buildLaunchTemplateData: (news: Pick<Ec2HostedProps, "imageId" | "instanceType" | "keyName" | "subnetId" | "securityGroupIds" | "associatePublicIpAddress" | "privateIpAddress" | "availabilityZone" | "blockDeviceMappings" | "tags">, runtime: Pick<Ec2HostedRuntimeState, "userData" | "instanceProfileName">) => {
+         ImageId: string;
+         InstanceType: string;
+         KeyName: string | undefined;
+@@ -113,6 +143,17 @@ export declare const createEc2HostedSupport: ({ stackName, stage, virtualEntryPl
+         Placement: {
+             AvailabilityZone: string;
+         } | undefined;
++        BlockDeviceMappings: {
++            DeviceName: string;
++            Ebs: {
++                VolumeSize: number | undefined;
++                VolumeType: string | undefined;
++                Iops: number | undefined;
++                Throughput: number | undefined;
++                DeleteOnTermination: boolean | undefined;
++                Encrypted: boolean | undefined;
++            } | undefined;
++        }[] | undefined;
+         NetworkInterfaces: {
+             DeviceIndex: number;
+             SubnetId: any;
+diff --git a/lib/AWS/EC2/hosted.js b/lib/AWS/EC2/hosted.js
+index 9e1113ce27b6449c92d086ad4c9f77ce4c0bcf87..30de353312eb87c10fee310fb8cb01dc1e6bead1 100644
+--- a/lib/AWS/EC2/hosted.js
++++ b/lib/AWS/EC2/hosted.js
+@@ -503,6 +503,19 @@ systemctl enable --now ${unitName}.service
+                     AvailabilityZone: news.availabilityZone,
+                 }
+                 : undefined,
++            BlockDeviceMappings: news.blockDeviceMappings?.map((mapping) => ({
++                DeviceName: mapping.deviceName,
++                Ebs: mapping.ebs
++                    ? {
++                        VolumeSize: mapping.ebs.volumeSize,
++                        VolumeType: mapping.ebs.volumeType,
++                        Iops: mapping.ebs.iops,
++                        Throughput: mapping.ebs.throughput,
++                        DeleteOnTermination: mapping.ebs.deleteOnTermination,
++                        Encrypted: mapping.ebs.encrypted,
++                    }
++                    : undefined,
++            })),
+             NetworkInterfaces: network.networkInterfaces,
+             SubnetId: network.usePrimaryNetworkInterface ? undefined : news.subnetId,
+             SecurityGroupIds: network.usePrimaryNetworkInterface
+diff --git a/src/AWS/EC2/Instance.ts b/src/AWS/EC2/Instance.ts
+index 8ce696544f3c37700d7b91a124b3f454d5b25b88..046572c1ceed4de68d8cc29fba0176c77734d0cc 100644
+--- a/src/AWS/EC2/Instance.ts
++++ b/src/AWS/EC2/Instance.ts
+@@ -32,6 +32,8 @@ import {
+   createEc2HostedSupport,
+   type Ec2HostRuntimeContext,
+ } from "./hosted.ts";
++import type { InstanceBlockDeviceMapping } from "./hosted.ts";
++export type { InstanceBlockDeviceMapping } from "./hosted.ts";
+ import type { SecurityGroupId } from "./SecurityGroup.ts";
+ import type { SubnetId } from "./Subnet.ts";
+ import type { VpcId } from "./Vpc.ts";
+@@ -90,6 +92,11 @@ export interface InstanceProps extends PlatformProps {
+    * Optional private IPv4 address for the primary interface.
+    */
+   privateIpAddress?: string;
++  /**
++   * Block devices to attach at launch, such as a larger root volume.
++   * Changing them replaces the instance.
++   */
++  blockDeviceMappings?: InstanceBlockDeviceMapping[];
+   /**
+    * Optional availability zone override.
+    */
+@@ -605,6 +612,7 @@ export const InstanceProvider = () =>
+               associatePublicIpAddress: news.associatePublicIpAddress,
+               privateIpAddress: news.privateIpAddress,
+               availabilityZone: news.availabilityZone,
++              blockDeviceMappings: news.blockDeviceMappings,
+               tags,
+             },
+             runtime,
+@@ -692,7 +700,11 @@ export const InstanceProvider = () =>
+             olds.userData !== news.userData ||
+             olds.associatePublicIpAddress !== news.associatePublicIpAddress ||
+             olds.privateIpAddress !== news.privateIpAddress ||
+-            olds.availabilityZone !== news.availabilityZone
++            olds.availabilityZone !== news.availabilityZone ||
++            !deepEqual(
++              olds.blockDeviceMappings ?? [],
++              news.blockDeviceMappings ?? [],
++            )
+           ) {
+             // A primary private IP cannot belong to two instances in the
+             // same subnet. An omitted subnet may still resolve to that subnet.
+diff --git a/src/AWS/EC2/hosted.ts b/src/AWS/EC2/hosted.ts
+index 8e13323780352d4ed893c6103286b9a43c84af81..581dacd33346083e4b5eeb2f78d7c5d2e7ad9c4e 100644
+--- a/src/AWS/EC2/hosted.ts
++++ b/src/AWS/EC2/hosted.ts
+@@ -32,6 +32,31 @@ export interface Ec2HostedBinding {
+   policyStatements?: PolicyStatement[];
+ }
+ 
++/**
++ * A block device attached at launch. Most often used to resize the root
++ * volume, whose `deviceName` must match the AMI's root device (for example
++ * `/dev/sda1` on Ubuntu, `/dev/xvda` on Amazon Linux).
++ */
++export interface InstanceBlockDeviceMapping {
++  /** Device name, such as `/dev/sda1`. */
++  deviceName: string;
++  /** EBS volume settings for the device. */
++  ebs?: {
++    /** Volume size in GiB. */
++    volumeSize?: number;
++    /** Volume type, such as `gp3`. */
++    volumeType?: string;
++    /** Provisioned IOPS (`io1`, `io2`, `gp3`). */
++    iops?: number;
++    /** Throughput in MiB/s (`gp3`). */
++    throughput?: number;
++    /** Whether the volume is deleted with the instance. */
++    deleteOnTermination?: boolean;
++    /** Whether the volume is encrypted. */
++    encrypted?: boolean;
++  };
++}
++
+ /**
+  * Shared props for EC2-backed hosted runtimes (an Instance that bundles and
+  * runs an application entrypoint).
+@@ -55,6 +80,11 @@ export interface Ec2HostedProps extends PlatformProps {
+   associatePublicIpAddress?: boolean;
+   /** Static private IP address within the subnet. */
+   privateIpAddress?: string;
++  /**
++   * Block devices to attach at launch, such as a larger root volume.
++   * Changing them replaces the instance.
++   */
++  blockDeviceMappings?: InstanceBlockDeviceMapping[];
+   /** Availability Zone to launch into. */
+   availabilityZone?: string;
+   /** Tags applied to the instance. */
+@@ -799,6 +829,7 @@ systemctl enable --now ${unitName}.service
+       | "associatePublicIpAddress"
+       | "privateIpAddress"
+       | "availabilityZone"
++      | "blockDeviceMappings"
+       | "tags"
+     >,
+     runtime: Pick<Ec2HostedRuntimeState, "userData" | "instanceProfileName">,
+@@ -826,6 +857,19 @@ systemctl enable --now ${unitName}.service
+             AvailabilityZone: news.availabilityZone,
+           }
+         : undefined,
++      BlockDeviceMappings: news.blockDeviceMappings?.map((mapping) => ({
++        DeviceName: mapping.deviceName,
++        Ebs: mapping.ebs
++          ? {
++              VolumeSize: mapping.ebs.volumeSize,
++              VolumeType: mapping.ebs.volumeType,
++              Iops: mapping.ebs.iops,
++              Throughput: mapping.ebs.throughput,
++              DeleteOnTermination: mapping.ebs.deleteOnTermination,
++              Encrypted: mapping.ebs.encrypted,
++            }
++          : undefined,
++      })),
+       NetworkInterfaces: network.networkInterfaces,
+       SubnetId: network.usePrimaryNetworkInterface ? undefined : news.subnetId,
+       SecurityGroupIds: network.usePrimaryNetworkInterface

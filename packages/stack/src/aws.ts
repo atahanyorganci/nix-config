@@ -1,11 +1,13 @@
-import * as ec2 from "@distilled.cloud/aws/ec2";
-import * as Action from "alchemy/Action";
 import * as EC2 from "alchemy/AWS/EC2";
 import * as Namespace from "alchemy/Namespace";
+import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
-import * as Schedule from "effect/Schedule";
 import * as String from "effect/String";
 
+/**
+ * Root disk size. The Ubuntu AMIs ship an 8 GiB root, too small to install
+ * NixOS onto, so the volume is sized at launch instead.
+ */
 export const ROOT_VOLUME_GIB = 30;
 
 const rootSshUserData = (publicKey: string) => `#cloud-config
@@ -23,122 +25,44 @@ runcmd:
   - chmod 600 /root/.ssh/authorized_keys || true
 `;
 
-const describeInstance = (instanceId: string) =>
-	ec2.describeInstances({ InstanceIds: [instanceId] }).pipe(
-		Effect.map(result => (result.Reservations ?? []).flatMap(reservation => reservation.Instances ?? [])[0]),
-		Effect.flatMap(instance =>
-			instance ? Effect.succeed(instance) : Effect.die(new Error(`EC2 instance ${instanceId} not found`)),
-		),
-	);
-
-const rootVolumeId = (instance: ec2.Instance) => {
-	const rootName = instance.RootDeviceName;
-	const mapping =
-		(rootName ? instance.BlockDeviceMappings?.find(device => device.DeviceName === rootName) : undefined) ??
-		instance.BlockDeviceMappings?.[0];
-	const volumeId = mapping?.Ebs?.VolumeId;
-	if (!volumeId) {
-		return Effect.die(new Error(`EC2 instance ${instance.InstanceId ?? "unknown"} has no root EBS volume`));
-	}
-	return Effect.succeed(volumeId);
-};
-
-const volumeSizeGiB = (volumeId: string) =>
-	ec2.describeVolumes({ VolumeIds: [volumeId] }).pipe(
-		Effect.map(result => result.Volumes?.[0]?.Size),
-		Effect.flatMap(size =>
-			size !== undefined ? Effect.succeed(size) : Effect.die(new Error(`EBS volume ${volumeId} has no size`)),
-		),
-	);
-
-const latestModification = (volumeId: string) =>
-	ec2
-		.describeVolumesModifications({ VolumeIds: [volumeId] })
-		.pipe(Effect.map(result => result.VolumesModifications?.[0]));
-
-export const AssociateEip = Action.Action(
-	"AssociateEip",
-	Effect.fn(function* ({ allocationId, instanceId }: { allocationId: string; instanceId: string }) {
-		const result = yield* ec2.associateAddress({
-			AllocationId: allocationId,
-			InstanceId: instanceId,
-			AllowReassociation: true,
-		});
-		return {
-			allocationId,
-			instanceId,
-			associationId: result.AssociationId ?? "",
-		};
-	}),
-);
-
-export const GrowRootVolume = Action.Action(
-	"GrowRootVolume",
-	Effect.fn(function* ({ instanceId, sizeGiB }: { instanceId: string; sizeGiB: number }) {
-		const instance = yield* describeInstance(instanceId);
-		const volumeId = yield* rootVolumeId(instance);
-		const currentSize = yield* volumeSizeGiB(volumeId);
-		if (currentSize >= sizeGiB) {
-			return { volumeId, sizeGiB: currentSize };
-		}
-
-		yield* ec2.modifyVolume({ VolumeId: volumeId, Size: sizeGiB });
-
-		const modification = yield* latestModification(volumeId).pipe(
-			Effect.repeat({
-				schedule: Schedule.spaced("5 seconds"),
-				until: value => {
-					const state = value?.ModificationState;
-					return state === "optimizing" || state === "completed" || state === "failed";
-				},
-				times: 36,
-			}),
-		);
-		if (modification?.ModificationState === "failed") {
-			return yield* Effect.die(
-				new Error(`EBS volume ${volumeId} modification failed: ${modification.StatusMessage ?? "unknown error"}`),
-			);
-		}
-
-		const size = yield* volumeSizeGiB(volumeId);
-		if (size < sizeGiB) {
-			return yield* Effect.die(new Error(`EBS volume ${volumeId} is ${size} GiB after modify; wanted ${sizeGiB} GiB`));
-		}
-		return { volumeId, sizeGiB: size };
-	}),
-);
-
 export interface ExitNodeProps {
 	name: string;
 	publicKey: string;
 	imageId: string;
+	/**
+	 * The root device of `imageId` (`RootDeviceName` in `describe-images`).
+	 * It must match: under any other name AWS attaches a second, empty volume
+	 * and leaves the root at the AMI's size.
+	 */
+	rootDeviceName: string;
+	/**
+	 * The account's default VPC. The instance is launched without a subnet, so
+	 * AWS places it in the default subnet of `availabilityZone`, which assigns
+	 * public IPv4 addresses.
+	 */
+	vpcId: EC2.VpcId;
+	availabilityZone: string;
 	instanceType?: string;
-	cidrBlock?: string;
 }
 
 export const exitNode = Effect.fn("AwsExitNode")(function* ({
 	name,
 	publicKey,
 	imageId,
+	rootDeviceName,
+	vpcId,
+	availabilityZone,
 	instanceType = "t4g.medium",
-	cidrBlock = "10.88.0.0/16",
 }: ExitNodeProps) {
+	if (!/^vpc-[0-9a-f]{8}(?:[0-9a-f]{9})?$/.test(vpcId)) {
+		return yield* Effect.die(`${name}: ${vpcId} is not a VPC ID`);
+	}
+
 	return yield* Namespace.push(
 		String.pascalCase(name),
 		Effect.gen(function* () {
-			const network = yield* EC2.Network("Network", {
-				cidrBlock,
-				availabilityZones: 1,
-				nat: "none",
-				tags: { Name: name },
-			});
-			const subnetId = network.publicSubnetIds[0];
-			if (!subnetId) {
-				return yield* Effect.die(`AWS network for ${name} has no public subnet`);
-			}
-
 			const securityGroup = yield* EC2.SecurityGroup("SecurityGroup", {
-				vpcId: network.vpcId,
+				vpcId,
 				description: `${name} SSH and NetBird WireGuard`,
 				ingress: [
 					{
@@ -172,44 +96,41 @@ export const exitNode = Effect.fn("AwsExitNode")(function* ({
 				tags: { Name: name },
 			});
 
-			const eip = yield* EC2.EIP("Ipv4", {
-				domain: "vpc",
-				tags: { Name: `${name}-ipv4` },
-			});
-
-			const instance = yield* EC2.Instance("Instance", {
+			// No `subnetId` or `associatePublicIpAddress`: either one makes Alchemy
+			// build an explicit network interface, which needs a subnet. Without
+			// them AWS picks the zone's default subnet and its public IP.
+			const instance = yield* EC2.Instance("Server", {
 				imageId,
 				instanceType,
-				subnetId,
+				availabilityZone,
 				securityGroupIds: [securityGroup.groupId],
 				keyName: keyPair.keyName,
-				associatePublicIpAddress: true,
 				sourceDestCheck: false,
+				blockDeviceMappings: [
+					{
+						deviceName: rootDeviceName,
+						ebs: {
+							volumeSize: ROOT_VOLUME_GIB,
+							volumeType: "gp3",
+							deleteOnTermination: true,
+						},
+					},
+				],
 				userData: rootSshUserData(publicKey),
-				tags: {
-					Name: name,
-					PublicIp: eip.publicIp,
-				},
+				tags: { Name: name },
 			});
 
-			const associated = yield* AssociateEip({
-				allocationId: eip.allocationId,
-				instanceId: instance.instanceId,
-			});
-			const grown = yield* GrowRootVolume({
-				instanceId: instance.instanceId,
-				sizeGiB: ROOT_VOLUME_GIB,
-			});
+			// The auto-assigned address: it survives reboots but changes when the
+			// instance is stopped and started, or replaced.
+			const publicIp = Output.mapEffect((ip: string | undefined) =>
+				ip
+					? Effect.succeed(ip)
+					: Effect.die(
+							`${name} has no public IPv4 address; does the default subnet in ${availabilityZone} assign one?`,
+						),
+			)(instance.publicIpAddress);
 
-			return {
-				associated,
-				eip,
-				grown,
-				instance,
-				network,
-				publicIp: eip.publicIp,
-				securityGroup,
-			};
+			return { instance, publicIp, securityGroup };
 		}),
 	);
 });

@@ -45,6 +45,18 @@ const Infra = Schema.Struct({
  */
 const SATURN_AMI = "ami-03e774c3214166a53";
 
+/** `RootDeviceName` of `SATURN_AMI`; the root volume is sized through it. */
+const SATURN_ROOT_DEVICE = "/dev/sda1";
+
+/**
+ * The account's default VPC in us-east-2. Saturn launches into it rather than
+ * a VPC of its own, so it brings no network resources to create or tear down.
+ */
+const DEFAULT_VPC_ID = "vpc-018d997ddab8c22ca";
+
+/** Saturn's zone; its default subnet supplies the public IPv4 address. */
+const SATURN_AZ = "us-east-2a";
+
 // Bootstrapping installs NixOS once per server, so its memo tracks no
 // repository content: configuration changes must not re-run it. A server
 // replacement changes the command (new host) and runs it again.
@@ -149,13 +161,16 @@ export default NetbirdServerStack.make(
 			name: "saturn",
 			publicKey: deployKey,
 			imageId: SATURN_AMI,
+			rootDeviceName: SATURN_ROOT_DEVICE,
+			vpcId: DEFAULT_VPC_ID,
+			availabilityZone: SATURN_AZ,
 			instanceType: "t4g.medium",
 		});
 		const saturnBootstrap = yield* Command.Exec("SaturnNixosBootstrap", {
-			command: Output.map(
-				Output.all(saturn.grown, saturn.associated, saturn.publicIp),
-				([, , host]) => `nix run .#nixos-bootstrap -- root@${host} .#saturn saturn`,
-			),
+			command: Output.map(saturn.publicIp, host => `nix run .#nixos-bootstrap -- root@${host} .#saturn saturn`),
+			// Unused by the command. It ties the bootstrap to the instance, so a
+			// replacement runs it again even if AWS hands back the same address.
+			env: { SATURN_INSTANCE_ID: saturn.instance.instanceId },
 			cwd: REPO_ROOT,
 			memo: BOOTSTRAP_MEMO,
 		});

@@ -107,9 +107,6 @@ settings:
 
 catalogs:
   default:
-    '@distilled.cloud/aws':
-      specifier: 1.0.0-rc.13
-      version: 1.0.0-rc.13
     '@distilled.cloud/core':
       specifier: 1.0.0-rc.13
       version: 1.0.0-rc.13
@@ -182,6 +179,7 @@ overrides:
 
 patchedDependencies:
   '@imput/cobalt-api@11.7.1': 7716ce7203fb9347437995ed22088909f9dea11cf164140b223fdf7f475a812e
+  alchemy@2.0.0-beta.80: fca41a699fb929ac3f961aa82f0707827234b07e5a96c3d2f927b8d2d418e828
 
 importers:
 
@@ -231,7 +229,7 @@ importers:
         version: link:../netbird-api
       alchemy:
         specifier: 'catalog:'
-        version: 2.0.0-beta.80(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@effect/vitest@4.0.0(effect@4.0.0)(vitest@5.0.3(@types/node@22.20.4)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))))(@types/node@22.20.4)(effect@4.0.0)(hono@4.11.4)(typescript@7.0.2)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(ws@8.21.3)
+        version: 2.0.0-beta.80(patch_hash=fca41a699fb929ac3f961aa82f0707827234b07e5a96c3d2f927b8d2d418e828)(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@effect/vitest@4.0.0(effect@4.0.0)(vitest@5.0.3(@types/node@22.20.4)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))))(@types/node@22.20.4)(effect@4.0.0)(hono@4.11.4)(typescript@7.0.2)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(ws@8.21.3)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -377,9 +375,6 @@ importers:
 
   packages/stack:
     dependencies:
-      '@distilled.cloud/aws':
-        specifier: 'catalog:'
-        version: 1.0.0-rc.13(effect@4.0.0)
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0(effect@4.0.0)(redis@6.2.1)
@@ -394,7 +389,7 @@ importers:
         version: link:../netbird-api
       alchemy:
         specifier: 'catalog:'
-        version: 2.0.0-beta.80(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@effect/vitest@4.0.0(effect@4.0.0)(vitest@5.0.3(@types/node@24.13.6)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))))(@types/node@24.13.6)(effect@4.0.0)(typescript@7.0.2)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(ws@8.21.3)
+        version: 2.0.0-beta.80(patch_hash=fca41a699fb929ac3f961aa82f0707827234b07e5a96c3d2f927b8d2d418e828)(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@effect/vitest@4.0.0(effect@4.0.0)(vitest@5.0.3(@types/node@24.13.6)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))))(@types/node@24.13.6)(effect@4.0.0)(typescript@7.0.2)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(ws@8.21.3)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -4994,7 +4989,7 @@ snapshots:
 
   agent-base@9.0.0: {}
 
-  alchemy@2.0.0-beta.80(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@effect/vitest@4.0.0(effect@4.0.0)(vitest@5.0.3(@types/node@22.20.4)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))))(@types/node@22.20.4)(effect@4.0.0)(hono@4.11.4)(typescript@7.0.2)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(ws@8.21.3):
+  alchemy@2.0.0-beta.80(patch_hash=fca41a699fb929ac3f961aa82f0707827234b07e5a96c3d2f927b8d2d418e828)(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@effect/vitest@4.0.0(effect@4.0.0)(vitest@5.0.3(@types/node@22.20.4)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))))(@types/node@22.20.4)(effect@4.0.0)(hono@4.11.4)(typescript@7.0.2)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(ws@8.21.3):
     dependencies:
       '@alchemy.run/cloudflare-runtime': 2.0.0-beta.80(@distilled.cloud/cloudflare@1.0.0-rc.13(effect@4.0.0))(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@types/node@22.20.4)(effect@4.0.0)(rolldown@1.2.5)(typescript@7.0.2)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
       '@alchemy.run/floci': 2.0.0-beta.80(effect@4.0.0)
@@ -5048,7 +5043,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  alchemy@2.0.0-beta.80(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@effect/vitest@4.0.0(effect@4.0.0)(vitest@5.0.3(@types/node@24.13.6)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))))(@types/node@24.13.6)(effect@4.0.0)(typescript@7.0.2)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(ws@8.21.3):
+  alchemy@2.0.0-beta.80(patch_hash=fca41a699fb929ac3f961aa82f0707827234b07e5a96c3d2f927b8d2d418e828)(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@effect/vitest@4.0.0(effect@4.0.0)(vitest@5.0.3(@types/node@24.13.6)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))))(@types/node@24.13.6)(effect@4.0.0)(typescript@7.0.2)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(ws@8.21.3):
     dependencies:
       '@alchemy.run/cloudflare-runtime': 2.0.0-beta.80(@distilled.cloud/cloudflare@1.0.0-rc.13(effect@4.0.0))(@effect/platform-node@4.0.0(effect@4.0.0)(redis@6.2.1))(@types/node@24.13.6)(effect@4.0.0)(rolldown@1.2.5)(typescript@7.0.2)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
       '@alchemy.run/floci': 2.0.0-beta.80(effect@4.0.0)
