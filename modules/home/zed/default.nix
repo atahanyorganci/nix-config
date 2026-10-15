@@ -80,6 +80,7 @@ in {
             "templ"
             "terraform"
             "toml"
+            "tsgo"
             "xml"
           ];
           userSettings = {
@@ -97,6 +98,10 @@ in {
             colorize_brackets = false;
             ensure_final_newline_on_save = true;
             format_on_save = "on";
+            # Only Nix is formatted (see `languages.Nix`). Zed's defaults set a
+            # formatter or format-time code actions for Python, LaTeX and Go
+            # themselves, so those are switched off below as well.
+            formatter = "none";
             minimap.show = "never";
             remove_trailing_whitespace_on_save = true;
             show_edit_predictions = true;
@@ -121,18 +126,40 @@ in {
               shell.program = lib.getExe pkgs.${user.shell};
               font_size = 12;
             };
-            # Language servers and formatters are pinned to store paths so
-            # they work however Zed is launched, including from the Dock.
-            languages.Nix = {
-              language_servers = ["nil" "!nixd" "..."];
-              formatter.external = {
-                command = lib.getExe pkgs.alejandra;
-                arguments = ["--quiet" "--"];
+            languages = rec {
+              Nix = {
+                language_servers = ["nil" "!nixd" "..."];
+                formatter.external = {
+                  command = lib.getExe pkgs.alejandra;
+                  arguments = ["--quiet" "--"];
+                };
+                indent_guides.coloring = "fixed";
+                tab_size = 2;
               };
-              indent_guides.coloring = "fixed";
-              tab_size = 2;
+              TypeScript.language_servers = ["typescript-ls" "!vtsls" "!typescript-language-server" "..."];
+              TSX.language_servers = TypeScript.language_servers;
+              JavaScript.language_servers = TypeScript.language_servers;
+              Python = {
+                language_servers = ["ty" "!basedpyright" "..."];
+                formatter = "none";
+                code_actions_on_format."source.organizeImports.ruff" = false;
+              };
+              LaTeX.formatter = "none";
+              Go.code_actions_on_format."source.organizeImports" = false;
             };
-            lsp.nil.binary.path = lib.getExe pkgs.nil;
+            lsp = {
+              nil.binary.path = lib.getExe pkgs.nil;
+              typescript-ls.binary = {
+                path = lib.getExe pkgs.typescript;
+                arguments = ["--lsp" "--stdio"];
+              };
+              ty.binary = {
+                path = lib.getExe pkgs.ty;
+                arguments = ["server"];
+              };
+              rust-analyzer.binary.path = lib.getExe pkgs.rust-analyzer;
+              just-lsp.binary.path = lib.getExe pkgs.just-lsp;
+            };
           };
           userKeymaps = let
             # The key left of 1 on Apple ISO keyboards (VS Code's
