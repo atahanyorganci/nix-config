@@ -202,11 +202,13 @@
           '';
         };
         name = mkOption {
-          type = types.enum ["computer" "netbios"];
-          default = "computer";
+          type = types.enum ["hostname" "netbios"];
+          default = "hostname";
           description = ''
-            Name to advertise: the Mac's computer name (`scutil --get
-            ComputerName`), or Samba's upper-cased NetBIOS name.
+            Name to advertise: the host name (`scutil --get HostName`, e.g.
+            `venus`), or Samba's upper-cased NetBIOS name. Never the
+            computer name: macOS publishes its own `_device-info._tcp`
+            record under it, and resolves a clash by renaming the Mac.
           '';
         };
         model = mkOption {
@@ -265,7 +267,7 @@
 
           "multicast dns register" = cfg.bonjour.enable;
           "mdns name" =
-            if cfg.bonjour.name == "computer"
+            if cfg.bonjour.name == "hostname"
             then "mdns"
             else "netbios";
 

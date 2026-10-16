@@ -64,10 +64,10 @@ index be6eb88..ea546d8 100644
  			do_smb_resolve(resptr);
  
 diff --git a/source3/smbd/dnsregister.c b/source3/smbd/dnsregister.c
-index df18900..80903d2 100644
+index df18900..9bfc787 100644
 --- a/source3/smbd/dnsregister.c
 +++ b/source3/smbd/dnsregister.c
-@@ -25,11 +25,26 @@
+@@ -25,11 +25,32 @@
   * on ".local" domain via Multicast DNS & any
   * other unicast DNS domains available.
   *
@@ -82,6 +82,12 @@ index df18900..80903d2 100644
 + * All records share a single connection to mDNSResponder: one fd is
 + * watched, and deallocating the connection withdraws every record.
 + *
++ * Every record is registered under an explicit name with NoAutoRename.
++ * Registering under the default (NULL) name lets mDNSResponder resolve a
++ * conflict by renaming the Mac's computer name, and mDNSResponder already
++ * publishes <computer name>._device-info._tcp itself, so a default-named
++ * _device-info record conflicts with it on every probe.
++ *
   * Users use the smbclient -B (Browse) option to
   * browse for advertised SMB services.
   */
@@ -95,7 +101,7 @@ index df18900..80903d2 100644
  
  #ifdef WITH_DNSSD_SUPPORT
  
-@@ -38,24 +53,22 @@
+@@ -38,24 +59,22 @@
  struct dns_reg_state {
  	struct tevent_context *event_ctx;
  	uint16_t port;
@@ -128,7 +134,7 @@ index df18900..80903d2 100644
  
  	return 0;
  }
-@@ -86,6 +99,123 @@ static bool dns_register_smbd_schedule(struct dns_reg_state *dns_state,
+@@ -86,6 +105,129 @@ static bool dns_register_smbd_schedule(struct dns_reg_state *dns_state,
  	return true;
  }
  
@@ -140,6 +146,11 @@ index df18900..80903d2 100644
 +			       const char *domain,
 +			       void *context)
 +{
++	if (err == kDNSServiceErr_NameConflict) {
++		DBG_WARNING("mDNS name \"%s\" is taken for %s; not "
++			    "advertising it\n", name, regtype);
++		return;
++	}
 +	if (err != kDNSServiceErr_NoError) {
 +		DBG_WARNING("mDNS registration of %s failed (err %d)\n",
 +			    regtype, err);
@@ -160,7 +171,8 @@ index df18900..80903d2 100644
 +	DNSServiceRef ref = dns_state->conn_ref;
 +
 +	return DNSServiceRegister(&ref,
-+				  kDNSServiceFlagsShareConnection,
++				  kDNSServiceFlagsShareConnection |
++				  kDNSServiceFlagsNoAutoRename,
 +				  kDNSServiceInterfaceIndexAny,
 +				  name,
 +				  regtype,
@@ -252,14 +264,13 @@ index df18900..80903d2 100644
  static void dns_register_smbd_retry(struct tevent_context *ctx,
  				    struct tevent_timer *te,
  				    struct timeval now,
-@@ -93,44 +223,65 @@ static void dns_register_smbd_retry(struct tevent_context *ctx,
+@@ -93,44 +235,72 @@ static void dns_register_smbd_retry(struct tevent_context *ctx,
  {
  	struct dns_reg_state *dns_state = talloc_get_type_abort(private_data,
  					  struct dns_reg_state);
-+	/* NULL lets mDNSResponder use the computer name (and rename on
-+	 * conflicts); every record must use the same instance name so
-+	 * Finder can match _device-info and _adisk with _smb. */
-+	const char *name = NULL;
++	/* Every record must use the same instance name so Finder can match
++	 * _device-info and _adisk with _smb. */
++	char *name = NULL;
  	DNSServiceErrorType err;
 +	int fd;
  
@@ -267,12 +278,20 @@ index df18900..80903d2 100644
  
 +	switch (lp_mdns_name()) {
 +	case MDNS_NAME_MDNS:
++		/* Like avahi_client_get_host_name(): the host name, without
++		 * any domain. */
++		name = get_myname(dns_state);
 +		break;
 +	case MDNS_NAME_NETBIOS:
-+		name = lp_netbios_name();
++		name = talloc_strdup(dns_state, lp_netbios_name());
 +		break;
 +	default:
 +		DBG_ERR("Unhandled mdns_name %d\n", lp_mdns_name());
++		return;
++	}
++	if (name == NULL || name[0] == '\0') {
++		DBG_ERR("no name to register over mDNS\n");
++		TALLOC_FREE(name);
 +		return;
 +	}
 +
@@ -340,7 +359,15 @@ index df18900..80903d2 100644
  				       TEVENT_FD_READ,
  				       dns_register_smbd_fde_handler,
  				       dns_state);
-@@ -144,7 +295,9 @@ static void dns_register_smbd_retry(struct tevent_context *ctx,
+@@ -138,13 +308,17 @@ static void dns_register_smbd_retry(struct tevent_context *ctx,
+ 		goto retry;
+ 	}
+ 
++	TALLOC_FREE(name);
+ 	return;
+  retry:
++	TALLOC_FREE(name);
+ 	dns_register_smbd_schedule(dns_state,
  		timeval_current_ofs(DNS_REG_RETRY_INTERVAL, 0));
  }
  
@@ -351,7 +378,7 @@ index df18900..80903d2 100644
  static void dns_register_smbd_fde_handler(struct tevent_context *ev,
  					  struct tevent_fd *fde,
  					  uint16_t flags,
-@@ -154,19 +307,13 @@ static void dns_register_smbd_fde_handler(struct tevent_context *ev,
+@@ -154,19 +328,13 @@ static void dns_register_smbd_fde_handler(struct tevent_context *ev,
  					  struct dns_reg_state);
  	DNSServiceErrorType err;
  
@@ -374,7 +401,7 @@ index df18900..80903d2 100644
  }
  
  bool smbd_setup_mdns_registration(struct tevent_context *ev,
-@@ -181,7 +328,6 @@ bool smbd_setup_mdns_registration(struct tevent_context *ev,
+@@ -181,7 +349,6 @@ bool smbd_setup_mdns_registration(struct tevent_context *ev,
  	}
  	dns_state->event_ctx = ev;
  	dns_state->port = port;
