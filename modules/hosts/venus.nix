@@ -31,6 +31,7 @@
     zed.enable = true;
   };
   venusDarwinModule = {
+    config,
     pkgs,
     user,
     inputs,
@@ -89,7 +90,7 @@
       # Loopback, the LAN and the NetBird mesh (CGNAT range).
       hostsAllow = ["127.0.0.1" "192.168.1.0/24" "100.64.0.0/10"];
       bonjour.model = "Macmini9,1";
-      users.${user.username}.passwordFile = "/var/lib/samba-passwords/${user.username}";
+      users.${user.username}.passwordFile = config.sops.secrets."samba/${user.username}".path;
       shares.Media = {
         path = "/Volumes/Atahan/Videos";
         comment = "Movies and TV shows";
@@ -97,6 +98,8 @@
         writeList = [user.username];
       };
     };
+    # From `hosts/venus.yaml` in the secrets repository.
+    sops.secrets."samba/${user.username}" = {};
     # SSH
     ssh.enable = true;
     # Self-hosted NetBird mesh

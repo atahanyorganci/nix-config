@@ -167,11 +167,11 @@
     userModule = {
       options.passwordFile = mkOption {
         type = types.str;
-        example = "/var/lib/samba-passwords/alice";
+        example = literalExpression ''config.sops.secrets."samba/alice".path'';
         description = ''
-          File holding the user's SMB password, kept outside the Nix store.
-          It is read on every activation; the user must also exist as a
-          macOS account.
+          File holding the user's SMB password, kept outside the Nix store
+          (e.g. a sops-nix secret). It is read on every activation; the user
+          must also exist as a macOS account.
         '';
       };
     };
@@ -323,8 +323,10 @@
           launchctl bootout system/com.apple.smbd 2>/dev/null || true
         '';
 
-        # After nix-darwin created users and installed /etc/samba/smb.conf.
-        system.activationScripts.postActivation.text = ''
+        # After nix-darwin created users and installed /etc/samba/smb.conf,
+        # and after sops-nix (`mkAfter`, priority 1500) decrypted the
+        # password files.
+        system.activationScripts.postActivation.text = lib.mkOrder 1600 ''
           echo "Configuring Samba users..."
           ${concatStrings (mapAttrsToList (name: user: ''
               if ! id -u ${escapeShellArg name} >/dev/null 2>&1; then
