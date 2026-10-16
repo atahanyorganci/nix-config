@@ -1,0 +1,403 @@
+diff --git a/source3/client/dnsbrowse.c b/source3/client/dnsbrowse.c
+index be6eb88..ea546d8 100644
+--- a/source3/client/dnsbrowse.c
++++ b/source3/client/dnsbrowse.c
+@@ -59,13 +59,9 @@ static void do_smb_resolve(struct mdns_smbsrv_result *browsesrv)
+ {
+ 	DNSServiceRef mdns_conn_sdref = NULL;
+ 	int mdnsfd;
+-	int fdsetsz;
+ 	int ret;
+-	struct timeval tv;
+ 	DNSServiceErrorType err;
+ 
+-	TALLOC_CTX * ctx = talloc_tos();
+-
+ 	err = DNSServiceResolve(&mdns_conn_sdref, 0 /* flags */,
+ 		browsesrv->ifIndex,
+ 		browsesrv->serviceName, browsesrv->regType, browsesrv->domain,
+@@ -91,7 +87,6 @@ static void do_smb_resolve(struct mdns_smbsrv_result *browsesrv)
+ 		}
+ 	}
+ 
+-	TALLOC_FREE(fdset);
+ 	DNSServiceRefDeallocate(mdns_conn_sdref);
+ }
+ 
+@@ -124,14 +119,12 @@ do_smb_browse_reply(DNSServiceRef sdRef, DNSServiceFlags flags,
+ 		return;
+ 	}
+ 
+-	bresult = talloc_array(talloc_tos(), struct mdns_smbsrv_result, 1);
++	bresult = talloc_zero(talloc_tos(), struct mdns_smbsrv_result);
+ 	if (bresult == NULL) {
+ 		return;
+ 	}
+ 
+-	if (bstatep->listhead != NULL) {
+-		bresult->nextResult = bstatep->listhead;
+-	}
++	bresult->nextResult = bstatep->listhead;
+ 
+ 	bresult->serviceName = talloc_strdup(talloc_tos(), serviceName);
+ 	bresult->regType = talloc_strdup(talloc_tos(), regtype);
+@@ -143,11 +136,9 @@ do_smb_browse_reply(DNSServiceRef sdRef, DNSServiceFlags flags,
+ int do_smb_browse(void)
+ {
+ 	int mdnsfd;
+-	int fdsetsz;
+ 	int ret;
+ 	struct mdns_browse_state bstate;
+ 	struct mdns_smbsrv_result *resptr;
+-	struct timeval tv;
+ 	DNSServiceRef mdns_conn_sdref = NULL;
+ 	DNSServiceErrorType err;
+ 
+@@ -189,9 +180,6 @@ int do_smb_browse(void)
+ 	if (bstate.listhead != NULL) {
+ 		resptr = bstate.listhead;
+ 		while (resptr != NULL) {
+-			struct mdns_smbsrv_result *oldresptr;
+-			oldresptr = resptr;
+-
+ 			/* Resolve smb service instance */
+ 			do_smb_resolve(resptr);
+ 
+diff --git a/source3/smbd/dnsregister.c b/source3/smbd/dnsregister.c
+index df18900..80903d2 100644
+--- a/source3/smbd/dnsregister.c
++++ b/source3/smbd/dnsregister.c
+@@ -25,11 +25,26 @@
+  * on ".local" domain via Multicast DNS & any
+  * other unicast DNS domains available.
+  *
++ * Mirrors smbd/avahi_register.c, advertising:
++ *
++ *   _smb._tcp          the SMB service itself
++ *   _device-info._tcp  "model=" TXT record (fruit:model) that picks the
++ *                      icon macOS Finder shows for the server
++ *   _adisk._tcp        shares with "fruit:time machine = yes", so macOS
++ *                      offers them as Time Machine destinations
++ *
++ * All records share a single connection to mDNSResponder: one fd is
++ * watched, and deallocating the connection withdraws every record.
++ *
+  * Users use the smbclient -B (Browse) option to
+  * browse for advertised SMB services.
+  */
+ 
+-#define DNS_REG_RETRY_INTERVAL (5*60)  /* in seconds */
++#define DNS_REG_RETRY_INTERVAL (30)  /* in seconds */
++
++/* Records without a real endpoint point at the discard port, like Apple's
++ * own servers; port 0 would make them unbrowsable placeholders. */
++#define DNS_REG_PLACEHOLDER_PORT 9
+ 
+ #ifdef WITH_DNSSD_SUPPORT
+ 
+@@ -38,24 +53,22 @@
+ struct dns_reg_state {
+ 	struct tevent_context *event_ctx;
+ 	uint16_t port;
+-	DNSServiceRef srv_ref;
++	DNSServiceRef conn_ref;
+ 	struct tevent_timer *te;
+-	int fd;
+ 	struct tevent_fd *fde;
+ };
+ 
+ static int dns_reg_state_destructor(struct dns_reg_state *dns_state)
+ {
+-	if (dns_state->srv_ref != NULL) {
+-		/* Close connection to the mDNS daemon */
+-		DNSServiceRefDeallocate(dns_state->srv_ref);
+-		dns_state->srv_ref = NULL;
+-	}
+-
+-	/* Clear event handler */
++	/* Stop watching the fd before mDNSResponder's library closes it. */
+ 	TALLOC_FREE(dns_state->te);
+ 	TALLOC_FREE(dns_state->fde);
+-	dns_state->fd = -1;
++
++	if (dns_state->conn_ref != NULL) {
++		/* Withdraws every record registered on the connection. */
++		DNSServiceRefDeallocate(dns_state->conn_ref);
++		dns_state->conn_ref = NULL;
++	}
+ 
+ 	return 0;
+ }
+@@ -86,6 +99,123 @@ static bool dns_register_smbd_schedule(struct dns_reg_state *dns_state,
+ 	return true;
+ }
+ 
++static void dns_register_reply(DNSServiceRef sd_ref,
++			       DNSServiceFlags flags,
++			       DNSServiceErrorType err,
++			       const char *name,
++			       const char *regtype,
++			       const char *domain,
++			       void *context)
++{
++	if (err != kDNSServiceErr_NoError) {
++		DBG_WARNING("mDNS registration of %s failed (err %d)\n",
++			    regtype, err);
++		return;
++	}
++
++	DBG_NOTICE("registered mDNS service \"%s\" %s%s\n",
++		   name, regtype, domain);
++}
++
++static DNSServiceErrorType dns_register_service(struct dns_reg_state *dns_state,
++						const char *name,
++						const char *regtype,
++						uint16_t port,
++						TXTRecordRef *txt)
++{
++	/* Sharing the connection: the child ref starts as a copy of it. */
++	DNSServiceRef ref = dns_state->conn_ref;
++
++	return DNSServiceRegister(&ref,
++				  kDNSServiceFlagsShareConnection,
++				  kDNSServiceInterfaceIndexAny,
++				  name,
++				  regtype,
++				  NULL /* domain */,
++				  NULL /* SRV target host name */,
++				  htons(port),
++				  txt != NULL ? TXTRecordGetLength(txt) : 0,
++				  txt != NULL ? TXTRecordGetBytesPtr(txt) : NULL,
++				  dns_register_reply,
++				  dns_state);
++}
++
++static DNSServiceErrorType dns_register_device_info(struct dns_reg_state *dns_state,
++						    const char *name)
++{
++	const char *model = lp_parm_const_string(-1, "fruit", "model",
++						 "MacSamba");
++	TXTRecordRef txt;
++	DNSServiceErrorType err;
++
++	TXTRecordCreate(&txt, 0, NULL);
++	err = TXTRecordSetValue(&txt, "model", strlen(model), model);
++	if (err == kDNSServiceErr_NoError) {
++		err = dns_register_service(dns_state, name,
++					   "_device-info._tcp",
++					   DNS_REG_PLACEHOLDER_PORT, &txt);
++	}
++	TXTRecordDeallocate(&txt);
++
++	return err;
++}
++
++static DNSServiceErrorType dns_register_adisk(struct dns_reg_state *dns_state,
++					      const char *name)
++{
++	int num_services = lp_numservices();
++	TXTRecordRef txt;
++	DNSServiceErrorType err = kDNSServiceErr_NoError;
++	size_t dk = 0;
++	int snum;
++
++	TXTRecordCreate(&txt, 0, NULL);
++
++	for (snum = 0; snum < num_services; snum++) {
++		char key[32];
++		char *value = NULL;
++
++		if (!lp_snum_ok(snum) ||
++		    !lp_parm_bool(snum, "fruit", "time machine", false)) {
++			continue;
++		}
++
++		snprintf(key, sizeof(key), "dk%zu", dk++);
++		value = talloc_asprintf(dns_state, "adVN=%s,adVF=0x82",
++					lp_const_servicename(snum));
++		if (value == NULL) {
++			err = kDNSServiceErr_NoMemory;
++			goto done;
++		}
++		err = TXTRecordSetValue(&txt, key, strlen(value), value);
++		TALLOC_FREE(value);
++		if (err != kDNSServiceErr_NoError) {
++			goto done;
++		}
++	}
++
++	if (dk == 0) {
++		/* No Time Machine shares, nothing to advertise. */
++		goto done;
++	}
++
++	err = TXTRecordSetValue(&txt, "sys", strlen("adVF=0x100"),
++				"adVF=0x100");
++	if (err != kDNSServiceErr_NoError) {
++		goto done;
++	}
++
++	err = dns_register_service(dns_state, name, "_adisk._tcp",
++				   DNS_REG_PLACEHOLDER_PORT, &txt);
++	if (err == kDNSServiceErr_NoError) {
++		DBG_NOTICE("advertising %zu Time Machine share(s)\n", dk);
++	}
++
++done:
++	TXTRecordDeallocate(&txt);
++	return err;
++}
++
+ static void dns_register_smbd_retry(struct tevent_context *ctx,
+ 				    struct tevent_timer *te,
+ 				    struct timeval now,
+@@ -93,44 +223,65 @@ static void dns_register_smbd_retry(struct tevent_context *ctx,
+ {
+ 	struct dns_reg_state *dns_state = talloc_get_type_abort(private_data,
+ 					  struct dns_reg_state);
++	/* NULL lets mDNSResponder use the computer name (and rename on
++	 * conflicts); every record must use the same instance name so
++	 * Finder can match _device-info and _adisk with _smb. */
++	const char *name = NULL;
+ 	DNSServiceErrorType err;
++	int fd;
+ 
+ 	dns_reg_state_destructor(dns_state);
+ 
++	switch (lp_mdns_name()) {
++	case MDNS_NAME_MDNS:
++		break;
++	case MDNS_NAME_NETBIOS:
++		name = lp_netbios_name();
++		break;
++	default:
++		DBG_ERR("Unhandled mdns_name %d\n", lp_mdns_name());
++		return;
++	}
++
+ 	DEBUG(6, ("registering _smb._tcp service on port %d\n",
+ 		  dns_state->port));
+ 
+-	/* Register service with DNS. Connects with the mDNS
+-	 * daemon running on the local system to perform DNS
+-	 * service registration.
+-	 */
+-	err = DNSServiceRegister(&dns_state->srv_ref, 0 /* flags */,
+-			kDNSServiceInterfaceIndexAny,
+-			NULL /* service name */,
+-			"_smb._tcp" /* service type */,
+-			NULL /* domain */,
+-			"" /* SRV target host name */,
+-			htons(dns_state->port),
+-			0 /* TXT record len */,
+-			NULL /* TXT record data */,
+-			NULL /* callback func */,
+-			NULL /* callback context */);
+-
++	/* Connects with the mDNS daemon running on the local system. */
++	err = DNSServiceCreateConnection(&dns_state->conn_ref);
+ 	if (err != kDNSServiceErr_NoError) {
+-		/* Failed to register service. Schedule a re-try attempt.
+-		 */
+-		DEBUG(3, ("unable to register with mDNS (err %d)\n", err));
++		DEBUG(3, ("unable to connect to mDNSResponder (err %d)\n", err));
++		dns_state->conn_ref = NULL;
+ 		goto retry;
+ 	}
+ 
+-	dns_state->fd = DNSServiceRefSockFD(dns_state->srv_ref);
+-	if (dns_state->fd == -1) {
++	err = dns_register_service(dns_state, name, "_smb._tcp",
++				   dns_state->port, NULL);
++	if (err != kDNSServiceErr_NoError) {
++		DEBUG(3, ("unable to register _smb._tcp (err %d)\n", err));
++		goto retry;
++	}
++
++	err = dns_register_device_info(dns_state, name);
++	if (err != kDNSServiceErr_NoError) {
++		DEBUG(3, ("unable to register _device-info._tcp (err %d)\n",
++			  err));
++		goto retry;
++	}
++
++	err = dns_register_adisk(dns_state, name);
++	if (err != kDNSServiceErr_NoError) {
++		DEBUG(3, ("unable to register _adisk._tcp (err %d)\n", err));
++		goto retry;
++	}
++
++	fd = DNSServiceRefSockFD(dns_state->conn_ref);
++	if (fd == -1) {
+ 		goto retry;
+ 	}
+ 
+ 	dns_state->fde = tevent_add_fd(dns_state->event_ctx,
+ 				       dns_state,
+-				       dns_state->fd,
++				       fd,
+ 				       TEVENT_FD_READ,
+ 				       dns_register_smbd_fde_handler,
+ 				       dns_state);
+@@ -144,7 +295,9 @@ static void dns_register_smbd_retry(struct tevent_context *ctx,
+ 		timeval_current_ofs(DNS_REG_RETRY_INTERVAL, 0));
+ }
+ 
+-/* Processes reply from mDNS daemon. Returns true if a reply was received */
++/* Dispatches replies from the mDNS daemon. The records stay registered for
++ * as long as the connection is open; an error here means mDNSResponder
++ * went away (e.g. it restarted), so connect and register again. */
+ static void dns_register_smbd_fde_handler(struct tevent_context *ev,
+ 					  struct tevent_fd *fde,
+ 					  uint16_t flags,
+@@ -154,19 +307,13 @@ static void dns_register_smbd_fde_handler(struct tevent_context *ev,
+ 					  struct dns_reg_state);
+ 	DNSServiceErrorType err;
+ 
+-	err = DNSServiceProcessResult(dns_state->srv_ref);
++	err = DNSServiceProcessResult(dns_state->conn_ref);
+ 	if (err != kDNSServiceErr_NoError) {
+ 		DEBUG(3, ("failed to process mDNS result (err %d), re-trying\n",
+ 			    err));
+-		goto retry;
++		dns_register_smbd_schedule(dns_state,
++			timeval_current_ofs(DNS_REG_RETRY_INTERVAL, 0));
+ 	}
+-
+-	talloc_free(dns_state);
+-	return;
+-
+- retry:
+-	dns_register_smbd_schedule(dns_state,
+-		timeval_current_ofs(DNS_REG_RETRY_INTERVAL, 0));
+ }
+ 
+ bool smbd_setup_mdns_registration(struct tevent_context *ev,
+@@ -181,7 +328,6 @@ bool smbd_setup_mdns_registration(struct tevent_context *ev,
+ 	}
+ 	dns_state->event_ctx = ev;
+ 	dns_state->port = port;
+-	dns_state->fd = -1;
+ 
+ 	talloc_set_destructor(dns_state, dns_reg_state_destructor);
+ 
+diff --git a/source3/wscript b/source3/wscript
+index 9d7fc01..aa85afe 100644
+--- a/source3/wscript
++++ b/source3/wscript
+@@ -833,6 +833,14 @@ msg.msg_accrightslen = sizeof(fd);
+         conf.SET_TARGET_TYPE('avahi-common', 'EMPTY')
+         conf.SET_TARGET_TYPE('avahi-client', 'EMPTY')
+ 
++    # Apple's DNS-SD API (mDNSResponder) ships in libSystem on macOS, so
++    # smbd/dnsregister.c can advertise the server over Bonjour without Avahi.
++    if (host_os.rfind('darwin') > -1
++        and conf.CHECK_HEADERS('dns_sd.h')
++        and conf.CHECK_FUNCS('DNSServiceRegister DNSServiceCreateConnection TXTRecordCreate',
++                             headers='dns_sd.h')):
++        conf.DEFINE('WITH_DNSSD_SUPPORT', 1)
++
+     if Options.options.with_iconv:
+         conf.env.with_iconv = True
+         if not conf.CHECK_FUNCS_IN('iconv_open', 'iconv', headers='iconv.h'):
