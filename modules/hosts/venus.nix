@@ -83,6 +83,20 @@
       listen.ip = "0.0.0.0";
       options.enableBookUploading = true;
     };
+    # SMB file sharing (replaces Apple's File Sharing)
+    samba = {
+      enable = true;
+      # Loopback, the LAN and the NetBird mesh (CGNAT range).
+      hostsAllow = ["127.0.0.1" "192.168.1.0/24" "100.64.0.0/10"];
+      bonjour.model = "Macmini9,1";
+      users.${user.username}.passwordFile = "/var/lib/samba-passwords/${user.username}";
+      shares.Media = {
+        path = "/Volumes/Atahan/Videos";
+        comment = "Movies and TV shows";
+        validUsers = [user.username];
+        writeList = [user.username];
+      };
+    };
     # SSH
     ssh.enable = true;
     # Self-hosted NetBird mesh
