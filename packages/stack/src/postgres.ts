@@ -1,0 +1,35 @@
+import * as Alchemy from "alchemy";
+import * as Planetscale from "alchemy/Planetscale";
+import * as Effect from "effect/Effect";
+
+/**
+ * The cluster, and one role per app that connects to it.
+ *
+ * The cluster is retained: destroying the stack must never delete the data in
+ * it. PlanetScale returns a role's password only when it creates the role, so
+ * changing anything but a role's name replaces it with a fresh password, which
+ * then has to reach the host again.
+ */
+export const deploy = Effect.fn("deploy")(function* () {
+	const database = yield* Planetscale.PostgresDatabase("PostgresCluster", {
+		name: "infra",
+    region: {
+      slug: "eu-central"
+    },
+		clusterSize: "PS_5",
+		replicas: 0,
+	}).pipe(Alchemy.RemovalPolicy.retain());
+
+	const vaultwarden = yield* Planetscale.PostgresRole("VaultwardenRole", {
+		name: "vaultwarden",
+		database,
+		inheritedRoles: [],
+  });
+
+	return {
+		dashboard: database.htmlUrl,
+		roles: {
+			vaultwarden: vaultwarden.connectionUrl
+		},
+	};
+});

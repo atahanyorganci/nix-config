@@ -4,6 +4,7 @@ import * as Axiom from "alchemy/Axiom";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Doppler from "alchemy/Doppler";
 import * as Output from "alchemy/Output";
+import * as Planetscale from "alchemy/Planetscale";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -18,6 +19,7 @@ import {
 	Nix,
 	Observability,
 	Policies,
+	Postgres,
 	ReverseProxy,
 } from "../src/index.ts";
 
@@ -41,7 +43,7 @@ const peerLogicalId = (hostKey: string) => hostKey[0]!.toUpperCase() + hostKey.s
 
 export default HomeInfra.make(
 	{
-		providers: Layer.mergeAll(NetBird.providers(), Nix.providers(), Axiom.providers()),
+		providers: Layer.mergeAll(NetBird.providers(), Nix.providers(), Axiom.providers(), Planetscale.providers()),
 		state: Cloudflare.state(),
 		secrets: [Doppler.Secrets({ project: "nix-config", config: "dev" })],
 	},
@@ -429,7 +431,9 @@ export default HomeInfra.make(
 			{ flakeRoot: REPO_ROOT, attr: "agentGateway.models" },
 			Observability.PricedModels,
 		);
-		const axiom = yield* Observability.deploy({ infra: infra.axiom, email: me.email, models: gatewayModels });
+    const axiom = yield* Observability.deploy({ infra: infra.axiom, email: me.email, models: gatewayModels });
+
+		const postgres = yield* Postgres.deploy();
 
 		// Adopt the dashboard All→All policy, keep it disabled (default deny),
 		// and retain it so destroy never deletes the built-in rule.
@@ -450,6 +454,7 @@ export default HomeInfra.make(
 			},
 			...(agentNetworkOutput !== undefined ? { agentNetwork: agentNetworkOutput } : {}),
 			axiom,
+			postgres,
 		};
 	}).pipe(Effect.orDie),
 );
