@@ -91,11 +91,31 @@
       hostsAllow = ["127.0.0.1" "192.168.1.0/24" "100.64.0.0/10"];
       bonjour.model = "Macmini9,1";
       users.${user.username}.passwordFile = config.sops.secrets."samba/${user.username}".path;
-      shares.Media = {
-        path = "/Volumes/Atahan/Videos";
-        comment = "Movies and TV shows";
-        validUsers = [user.username];
-        writeList = [user.username];
+      shares = let
+        # Only atahan may connect, read or write.
+        private = {
+          validUsers = [user.username];
+          writeList = [user.username];
+        };
+      in {
+        Media =
+          private
+          // {
+            path = "/Volumes/Atahan/Videos";
+            comment = "Movies and TV shows";
+          };
+        Documents =
+          private
+          // {
+            path = "/Volumes/Atahan/Documents";
+            comment = "Documents on the external drive";
+          };
+        Downloads =
+          private
+          // {
+            path = "${config.users.users.${user.username}.home}/Downloads";
+            comment = "Downloads, including Transmission's";
+          };
       };
     };
     # From `hosts/venus.yaml` in the secrets repository.
