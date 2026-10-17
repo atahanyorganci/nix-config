@@ -78,6 +78,10 @@
     };
     searx.enable = true;
     atuin-server.enable = true;
+    vaultwarden = {
+      enable = true;
+      attachments = false;
+    };
     agent-gateway = {
       enable = true;
       # The reverse proxy dials mars's mesh address, so the listener has to exist
