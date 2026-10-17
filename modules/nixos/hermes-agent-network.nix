@@ -103,7 +103,7 @@ in {
       };
 
       effort = lib.mkOption {
-        type = lib.types.nullOr (lib.types.enum ["none" "low" "medium" "high" "xhigh"]);
+        type = lib.types.nullOr (lib.types.enum flakeConfig.agentGateway.efforts);
         default = null;
         example = "medium";
         description = ''

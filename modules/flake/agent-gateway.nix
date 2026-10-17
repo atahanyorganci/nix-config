@@ -6,7 +6,10 @@
   inherit (lib) types mkOption;
   infra = config.flake.infra;
 
-  allEfforts = ["none" "low" "medium" "high" "xhigh"];
+  # Every reasoning effort a model can list, shared with pi and Hermes.
+  allEfforts = ["none" "low" "medium" "high" "xhigh" "max"];
+  # What a model accepts unless it says otherwise; `max` is opt-in.
+  defaultEfforts = lib.remove "max" allEfforts;
 
   # USD per million tokens.
   rates = {
@@ -54,7 +57,7 @@
       maxTokens = mkOption {type = types.ints.positive;};
       efforts = mkOption {
         type = types.listOf (types.enum allEfforts);
-        default = allEfforts;
+        default = defaultEfforts;
         description = "Reasoning efforts the model accepts; empty for a model that does not reason.";
       };
       image = mkOption {
@@ -93,6 +96,12 @@ in {
       type = types.str;
       default = "https://ai.${infra.domain}";
       description = "The agent gateway on mars, serving the models under `/v1` and each account's limits under `/_/usage`.";
+    };
+    efforts = mkOption {
+      type = types.listOf types.str;
+      readOnly = true;
+      default = allEfforts;
+      description = "Every reasoning effort a model in `models` can accept.";
     };
     models = mkOption {
       type = types.listOf modelType;
@@ -170,6 +179,7 @@ in {
       name = "GPT-5.6-Terra";
       contextWindow = 1050000;
       maxTokens = 128000;
+      efforts = allEfforts;
       fast = true;
       cost = {
         input = 2;
@@ -192,6 +202,7 @@ in {
       name = "GPT-6-Luna";
       contextWindow = 1050000;
       maxTokens = 128000;
+      efforts = allEfforts;
       fast = true;
       cost = {
         input = 0.1;
@@ -214,6 +225,7 @@ in {
       name = "Claude Fable 5.1";
       contextWindow = 1000000;
       maxTokens = 128000;
+      efforts = lib.remove "none" allEfforts;
       cost = {
         input = 10;
         output = 50;
@@ -226,6 +238,7 @@ in {
       name = "Claude Opus 5.5";
       contextWindow = 1000000;
       maxTokens = 128000;
+      efforts = lib.remove "none" allEfforts;
       fast = true;
       cost = {
         input = 4;
@@ -239,6 +252,7 @@ in {
       name = "Claude Sonnet 5.5";
       contextWindow = 1000000;
       maxTokens = 128000;
+      efforts = lib.remove "none" allEfforts;
       cost = {
         input = 2;
         output = 10;

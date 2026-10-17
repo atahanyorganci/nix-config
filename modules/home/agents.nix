@@ -11,7 +11,8 @@ in {
     # account's limits under `/_/usage`.
     gateway = catalog.url;
 
-    allEfforts = ["none" "low" "medium" "high" "xhigh"];
+    # Pi's thinking levels mapped to the catalog's efforts (`catalog.efforts`).
+    # Pi's `minimal` has no effort, so it stays hidden.
     mkThinkingLevelMap = efforts:
       lib.mapAttrs (_: effort:
         if effort != null && lib.elem effort efforts
@@ -23,6 +24,7 @@ in {
         medium = "medium";
         high = "high";
         xhigh = "xhigh";
+        max = "max";
       };
 
     mkModel = {
@@ -31,7 +33,7 @@ in {
       contextWindow,
       maxTokens,
       cost ? null,
-      efforts ? allEfforts,
+      efforts ? catalog.efforts,
       image ? true,
       compat ? null,
     }: let
