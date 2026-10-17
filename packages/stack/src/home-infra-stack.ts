@@ -49,29 +49,16 @@ export interface HomeInfraAxiomOutput {
 	monitors: Record<string, string>;
 }
 
-export interface HomeInfraPostgresRoleOutput {
-	/** PlanetScale API id of the role. */
-	id: string;
-	/** Display name in the PlanetScale dashboard. */
-	name: string;
-	host: string;
-	/**
-	 * `<role>.<branch-id>`: what clients connect as, so PlanetScale can route
-	 * them. Inside Postgres the role is the part before the dot.
-	 */
-	username: string;
-	/** Returned once, when the role is created; encrypted in state. */
-	password: Redacted.Redacted<string>;
-}
-
 export interface HomeInfraPostgresOutput {
-	/** PlanetScale database name. */
-	database: string;
-	/** PlanetScale region slug. */
-	region: string;
-	htmlUrl: string;
-	/** App name -> its role; the app's logical database has the same name. */
-	roles: Record<string, HomeInfraPostgresRoleOutput>;
+	/** The PlanetScale dashboard page of the cluster. */
+	dashboard: string;
+	/**
+	 * App name -> its role's direct (port 5432) connection URL, verifying TLS
+	 * against the system CA store. It names PlanetScale's default `postgres`
+	 * database; point it at the app's own before use. Carries the role's
+	 * password, so it is encrypted in state.
+	 */
+	roles: Record<string, Redacted.Redacted<string>>;
 }
 
 export interface HomeInfraOutputs {

@@ -1,6 +1,8 @@
 import * as Alchemy from "alchemy";
+import * as Output from "alchemy/Output";
 import * as Planetscale from "alchemy/Planetscale";
 import * as Effect from "effect/Effect";
+import * as Redacted from "effect/Redacted";
 
 /**
  * The cluster, and one role per app that connects to it.
@@ -13,9 +15,9 @@ import * as Effect from "effect/Effect";
 export const deploy = Effect.fn("deploy")(function* () {
 	const database = yield* Planetscale.PostgresDatabase("PostgresCluster", {
 		name: "infra",
-    region: {
-      slug: "eu-central"
-    },
+		region: {
+			slug: "eu-central",
+		},
 		clusterSize: "PS_5",
 		replicas: 0,
 	}).pipe(Alchemy.RemovalPolicy.retain());
@@ -24,12 +26,18 @@ export const deploy = Effect.fn("deploy")(function* () {
 		name: "vaultwarden",
 		database,
 		inheritedRoles: [],
-  });
+	});
 
 	return {
 		dashboard: database.htmlUrl,
 		roles: {
-			vaultwarden: vaultwarden.connectionUrl
+			vaultwarden: vaultwarden.connectionUrl.pipe(
+				Output.map(connectionUrl => {
+					const url = new URL(Redacted.value(connectionUrl));
+					url.searchParams.set("sslrootcert", "system");
+					return Redacted.make(url.toString());
+				}),
+			),
 		},
 	};
 });

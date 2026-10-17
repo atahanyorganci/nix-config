@@ -431,7 +431,7 @@ export default HomeInfra.make(
 			{ flakeRoot: REPO_ROOT, attr: "agentGateway.models" },
 			Observability.PricedModels,
 		);
-    const axiom = yield* Observability.deploy({ infra: infra.axiom, email: me.email, models: gatewayModels });
+		const axiom = yield* Observability.deploy({ infra: infra.axiom, email: me.email, models: gatewayModels });
 
 		const postgres = yield* Postgres.deploy();
 
