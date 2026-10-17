@@ -15,20 +15,6 @@ import * as Schema from "effect/Schema";
 import * as Catalog from "../src/observability/catalog.ts";
 import { PricedModels } from "../src/observability/index.ts";
 
-/**
- * Runs every virtual field and every query of the Axiom catalog against the
- * live dataset, before HomeInfra creates them.
- *
- * Axiom rejects a query that names a field the dataset has not seen, and checks
- * a monitor's query when the monitor is created, so a query that reads a field
- * no record has yet carried fails the deploy. Queries use the virtual fields
- * by name; they do not exist until the deploy, so each is inlined here as an
- * `extend` after every reference to the dataset.
- *
- * Axiom credentials (`AXIOM_TOKEN`, `AXIOM_ORG_ID`) come from the environment,
- * which `doppler run` fills from Doppler.
- */
-
 const repoRoot = Effect.gen(function* () {
 	const path = yield* Path.Path;
 	return path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..", "..");
@@ -124,11 +110,10 @@ const check = Command.make("check-axiom-queries", { dataset, days }).pipe(
 	),
 );
 
-const program = Command.run(check, { version: "0.0.0" }).pipe(
+Command.run(check, { version: "0.0.0" }).pipe(
 	Effect.provide(FetchHttpClient.layer),
 	Effect.provide(NodeServices.layer),
 	Effect.scoped,
 	Effect.orDie,
+	NodeRuntime.runMain,
 );
-
-NodeRuntime.runMain(program as Effect.Effect<void>);
