@@ -9,7 +9,7 @@ export * as Nix from "./nix/index.ts";
 export * as Aws from "./aws.ts";
 export * as Observability from "./observability/index.ts";
 export * as Postgres from "./postgres.ts";
-export { HOME_INFRA_STACK, readHomeInfraAxiom, readHomeInfraGroupId } from "./home-infra-state.ts";
+export { HOME_INFRA_STACK, readHomeInfraGroupId } from "./home-infra-state.ts";
 export { NetbirdServerStack, type NetbirdServerStackOutputs } from "./netbird-server-stack.ts";
 export {
 	HomeInfra,

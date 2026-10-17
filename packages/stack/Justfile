@@ -27,11 +27,19 @@ verify *args:
 test *args:
     {{ doppler }} run -- {{ node }} scripts/test-netbird-network.ts {{ args }}
 
+# Write stack outputs (by path) or a value on stdin (-) into
+# nix-secrets/hosts/<host>.yaml: `just store-secret <host> <key>[=<path>|-]...`.
+# The checkout is --secrets DIR or $NIX_SECRETS_DIR. Needs the YubiKey and the
+# infra shell's sops; commit, lock and deploy afterwards.
+[doc("Write stack outputs, or a value on stdin, into nix-secrets/hosts/<host>.yaml")]
+store-secret *args:
+    {{ node }} scripts/store-secret.ts {{ args }}
+
 # Write the Axiom ingest token and endpoint (HomeInfra outputs) into
-# nix-secrets/hosts/<host>.yaml for the host's otel-collector. Needs the
-# YubiKey and the infra shell's sops; commit, lock and deploy afterwards.
-connect-axiom *args:
-    {{ node }} scripts/connect-axiom.ts {{ args }}
+# nix-secrets/hosts/<host>.yaml for the host's otel-collector.
+[doc("Write the Axiom ingest token and endpoint into nix-secrets/hosts/<host>.yaml")]
+connect-axiom host *args:
+    {{ node }} scripts/store-secret.ts {{ args }} {{ host }} axiom/endpoint axiom/ingest-token=axiom/token
 
 # Run the Axiom catalog's virtual fields and queries against the live dataset.
 # Axiom rejects a query naming a field it has not seen, so run this before a

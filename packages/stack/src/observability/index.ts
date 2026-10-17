@@ -4,7 +4,7 @@
  * Every host's `otel-collector` (`modules/nixos/otel-collector.nix`) ships
  * OpenTelemetry logs and traces to one dataset, authenticated with an
  * ingest-only token. The token and the dataset's OTLP endpoint are outputs of
- * the HomeInfra stack; `scripts/connect-axiom.ts` writes them to nix-secrets,
+ * the HomeInfra stack; `just connect-axiom <host>` writes them to nix-secrets,
  * where sops-nix installs them on a host.
  *
  * One `axiom:events:v1` dataset holds both signals: Axiom's Personal plan
