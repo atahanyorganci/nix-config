@@ -61,7 +61,8 @@
       tokenFile = config.sops.secrets."netbird-proxy/token".path;
       private = true;
     };
-    # hosts/mars.yaml in nix-secrets; connect-proxy.sh writes a new token there.
+    # hosts/mars.yaml in nix-secrets; `just connect-proxy mars-proxy mars` writes
+    # a new token there.
     sops.secrets."netbird-proxy/token" = {
       owner = "netbird-proxy";
       restartUnits = ["netbird-proxy.service"];

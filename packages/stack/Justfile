@@ -11,6 +11,8 @@ doppler := require("doppler")
 node := require("node")
 pnpm := require("pnpm")
 
+repo_root := parent_directory(parent_directory(justfile_directory()))
+
 plan *args:
     {{ pnpm }} exec alchemy plan --log-level all {{ args }}
 
@@ -40,6 +42,48 @@ store-secret *args:
 [doc("Write the Axiom ingest token and endpoint into nix-secrets/hosts/<host>.yaml")]
 connect-axiom host *args:
     {{ node }} scripts/store-secret.ts {{ args }} {{ host }} axiom/endpoint axiom/ingest-token=axiom/token
+
+# Provision NetBird reverse-proxy token <name> for <host> and write it into
+# nix-secrets/hosts/<host>.yaml, where sops-nix installs it for netbird-proxy.
+# Extra args go to store-secret (e.g. --secrets DIR).
+[doc("Provision a NetBird reverse-proxy token and write it into nix-secrets/hosts/<host>.yaml")]
+connect-proxy name host *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    enabled="$(nix eval --json '{{ repo_root }}#nixosConfigurations.{{ host }}.config.netbird-proxy.enable' 2>/dev/null || true)"
+    if [[ $enabled != true ]]; then
+        echo "{{ host }} is not a NixOS host running netbird-proxy" >&2
+        exit 1
+    fi
+    # Check the checkout, sops and the host before the token exists: one minted
+    # but not stored would be left behind in NetBird. (Its output stays: Effect
+    # reports a failure on stdout.)
+    {{ node }} scripts/store-secret.ts --dry-run {{ args }} {{ host }} netbird-proxy/token=-
+    line="$({{ doppler }} run -- {{ node }} scripts/create-proxy-token.ts '{{ name }}')"
+    token="${line#*$'\t'}"
+    if [[ -z $token || $token == "$line" ]]; then
+        echo "create-proxy-token returned no token for {{ name }}" >&2
+        exit 1
+    fi
+    # printf is a builtin, so the token is never a process argument.
+    printf '%s' "$token" | {{ node }} scripts/store-secret.ts {{ args }} {{ host }} netbird-proxy/token=-
+    echo "  3. just verify-proxy"
+
+# Fail unless the NetBird reverse-proxy cluster for infra.domain is online.
+verify-proxy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    domain="$(nix eval --raw '{{ repo_root }}#infra.domain')"
+    clusters="$({{ doppler }} run -- {{ node }} scripts/list-proxy-clusters.ts "$domain")"
+    echo "NetBird proxy clusters:"
+    while IFS= read -r line; do
+        if [[ -n $line ]]; then echo "  ${line//$'\t'/  }"; fi
+    done <<< "$clusters"
+    if ! awk -v d="$domain" -F'\t' '$1 == "online" && $2 == d { found = 1 } END { exit !found }' <<< "$clusters"; then
+        echo "proxy cluster $domain is not online; check journalctl -u netbird-proxy on the host" >&2
+        exit 1
+    fi
+    echo "proxy cluster $domain is online"
 
 # Run the Axiom catalog's virtual fields and queries against the live dataset.
 # Axiom rejects a query naming a field it has not seen, so run this before a
