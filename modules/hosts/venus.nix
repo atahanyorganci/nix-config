@@ -44,7 +44,7 @@
     # (`identities/venus/ssh_host_ed25519_key`, admins only). After reinstalling
     # macOS, restore it (nix-secrets README, "Restore an identity by hand")
     # rather than pinning a new one.
-    hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN6ZVEaeBBJO/0CieSAKNbFZz2Ob2WdRYwlDfvdwjHoe";
+    hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGDpJEGwfqm6Lsdj8Kpd8yKXU3Vd9sx7HAxpceVm4FFY";
     # Hostname
     networking.hostName = "venus";
     # Disable `nix-darwin` documentation
