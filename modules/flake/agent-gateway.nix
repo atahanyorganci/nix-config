@@ -18,10 +18,12 @@
     cacheRead = mkOption {
       type = types.nullOr types.number;
       default = null;
+      description = "Cache-read rate; `null` bills cached tokens at the input rate.";
     };
     cacheWrite = mkOption {
       type = types.nullOr types.number;
       default = null;
+      description = "Cache-write rate; `null` bills cache writes at the input rate.";
     };
   };
 
@@ -110,23 +112,6 @@ in {
     };
   };
 
-  # Prices are the vendors' API list prices, checked on 2026-10-05. The
-  # gateway's Codex and Claude Code subscriptions are not billed per token;
-  # these are what the same usage would cost on the API, which is what pi and
-  # NetBird report. Fast mode is 2x on both (`fastCostMultiplier`'s default).
-  #
-  # OpenAI (https://developers.openai.com/api/docs/pricing and each model's
-  # page): every GPT model here has a 1.05M window and 128k output. A prompt
-  # over 272k input tokens bills the whole request at 2x the input and cache
-  # rates and 1.5x output, hence the one tier each. Cache writes are 1.25x
-  # input.
-  #
-  # Anthropic (https://platform.claude.com/docs/en/about-claude/pricing):
-  # Claude 4.6 and later price the full 1M window flat, so these have no
-  # tier, and with no price break pi offers no smaller context profile.
-  # `cacheWrite` is the 5-minute write (1.25x input); a 1-hour write costs
-  # 2x. Cache reads are 0.025x input on Fable 5.1, 0.05x on Opus 5.5 and
-  # 0.1x on Sonnet 5.5.
   config.flake.agentGateway.models = [
     {
       id = "codex/gpt-6-astra";
@@ -256,8 +241,115 @@ in {
       cost = {
         input = 2;
         output = 10;
-        cacheRead = 0.2;
+        cacheRead = 0.1;
         cacheWrite = 2.5;
+      };
+    }
+    {
+      id = "claude-code/claude-haiku-5-5";
+      name = "Claude Haiku 5.5";
+      contextWindow = 1000000;
+      maxTokens = 128000;
+      cost = {
+        input = 0.1;
+        output = 0.5;
+        cacheRead = 0.01;
+        cacheWrite = 0.125;
+        tiers = [
+          {
+            inputTokensAbove = 100000;
+            input = 0.5;
+            output = 2.5;
+            cacheRead = 0.05;
+            cacheWrite = 0.625;
+          }
+        ];
+      };
+    }
+    {
+      id = "opencode/mimo-v2.6-pro";
+      name = "MiMo-V2.6-Pro";
+      contextWindow = 1048576;
+      maxTokens = 131072;
+      efforts = ["none" "low" "medium" "high"];
+      cost = {
+        input = 0.435;
+        output = 0.87;
+        cacheRead = 0.003625;
+      };
+    }
+    {
+      id = "opencode/qwen3.8-max";
+      name = "Qwen3.8 Max";
+      contextWindow = 1000000;
+      maxTokens = 131072;
+      efforts = ["low" "medium" "xhigh"];
+      cost = {
+        input = 2;
+        output = 6;
+        cacheRead = 0.25;
+        cacheWrite = 2.5;
+      };
+    }
+    {
+      id = "opencode/muse-spark-1.3-contributor";
+      name = "Muse Spark 1.3 Contributor";
+      contextWindow = 1048576;
+      maxTokens = 131072;
+      efforts = ["low" "medium" "high" "xhigh"];
+      cost = {
+        input = 0.1;
+        output = 0.2;
+        cacheRead = 0.002;
+      };
+    }
+    {
+      id = "opencode/glm-5.3";
+      name = "GLM-5.3";
+      contextWindow = 1000000;
+      maxTokens = 131072;
+      efforts = ["low" "high" "max"];
+      image = false;
+      cost = {
+        input = 1.4;
+        output = 4.4;
+        cacheRead = 0.26;
+      };
+    }
+    {
+      id = "opencode/kimi-k3";
+      name = "Kimi K3";
+      contextWindow = 1048576;
+      maxTokens = 131072;
+      efforts = ["max"];
+      cost = {
+        input = 3;
+        output = 15;
+        cacheRead = 0.3;
+      };
+    }
+    {
+      id = "opencode/deepseek-v4.1-flash";
+      name = "DeepSeek V4.1 Flash";
+      contextWindow = 1000000;
+      maxTokens = 384000;
+      efforts = ["low" "high" "max"];
+      cost = {
+        input = 0.15;
+        output = 0.6;
+        cacheRead = 0.003;
+      };
+    }
+    {
+      id = "opencode/mimo-v2.6-flash";
+      name = "MiMo-V2.6-Flash";
+      contextWindow = 1048576;
+      maxTokens = 131072;
+      efforts = ["none" "low" "medium" "high"];
+      cost = {
+        input = 0.14;
+        output = 0.28;
+        cacheRead = 0.0028;
       };
     }
   ];
