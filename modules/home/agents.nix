@@ -49,8 +49,15 @@ in {
 
     # Prices are USD per million tokens (`flake.agentGateway.models`): the base
     # rates, plus `tiers` that each take over above `inputTokensAbove`. Pi
-    # takes the same shape, minus the rates and tiers a model does not have.
-    piRates = lib.filterAttrs (_: rate: rate != null);
+    # takes the same shape, but its schema requires every rate, so a cache
+    # rate the catalog leaves unset is the input rate, as the stack's
+    # observability and NetBird price it.
+    piRates = rates:
+      rates
+      // {
+        cacheRead = lib.defaultTo rates.input rates.cacheRead;
+        cacheWrite = lib.defaultTo rates.input rates.cacheWrite;
+      };
     piCost = cost:
       piRates (removeAttrs cost ["tiers"])
       // lib.optionalAttrs (cost.tiers != []) {tiers = map piRates cost.tiers;};
