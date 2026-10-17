@@ -53,10 +53,10 @@ export interface HomeInfraPostgresOutput {
 	/** The PlanetScale dashboard page of the cluster. */
 	dashboard: string;
 	/**
-	 * App name -> its role's direct (port 5432) connection URL, verifying TLS
-	 * against the system CA store. It names PlanetScale's default `postgres`
-	 * database; point it at the app's own before use. Carries the role's
-	 * password, so it is encrypted in state.
+	 * App name -> its role's direct (port 5432) connection URL to the app's
+	 * logical database, which has the app's name, verifying TLS against the
+	 * system CA store. Carries the role's password, so it is encrypted in
+	 * state; `just store-secret` writes it to nix-secrets.
 	 */
 	roles: Record<string, Redacted.Redacted<string>>;
 }

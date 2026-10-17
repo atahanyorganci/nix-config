@@ -14,16 +14,19 @@
 		"lint:fix": "oxlint --fix ."
 	},
 	"dependencies": {
+		"@distilled.cloud/planetscale": "catalog:",
 		"@effect/platform-node": "catalog:",
 		"@types/node": "catalog:",
 		"@yorganci/netbird-alchemy": "workspace:*",
 		"@yorganci/netbird-api": "workspace:*",
 		"alchemy": "catalog:",
-		"effect": "catalog:"
+		"effect": "catalog:",
+		"pg": "catalog:"
 	},
 	"devDependencies": {
 		"@effect/language-service": "catalog:",
 		"@types/node": "catalog:",
+		"@types/pg": "catalog:",
 		"@yorganci/config": "workspace:*",
 		"oxfmt": "catalog:",
 		"oxlint": "catalog:",

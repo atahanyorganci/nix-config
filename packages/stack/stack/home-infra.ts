@@ -43,7 +43,13 @@ const peerLogicalId = (hostKey: string) => hostKey[0]!.toUpperCase() + hostKey.s
 
 export default HomeInfra.make(
 	{
-		providers: Layer.mergeAll(NetBird.providers(), Nix.providers(), Axiom.providers(), Planetscale.providers()),
+		providers: Layer.mergeAll(
+			NetBird.providers(),
+			Nix.providers(),
+			Axiom.providers(),
+			Planetscale.providers(),
+			Postgres.providers(),
+		),
 		state: Cloudflare.state(),
 		secrets: [Doppler.Secrets({ project: "nix-config", config: "dev" })],
 	},
