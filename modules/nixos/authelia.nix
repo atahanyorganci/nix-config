@@ -10,12 +10,24 @@ in {
     cfg = config.authelia;
     instance = config.services.authelia.instances.main;
     unit = "authelia-main";
-    url = "https://${cfg.key}.${infra.domain}";
+    inherit (cfg) url;
     secret = name: config.sops.secrets.${name}.path;
     placeholder = name: config.sops.placeholder.${name};
     # Authelia refuses an OpenID Connect provider without clients, so the
     # provider (and its signing key and HMAC secret) is on while there is one.
     oidc = cfg.oidc.clients != {};
+    # Clients whose secret digest is read from a file when Authelia starts.
+    secretFileClients = lib.filterAttrs (_: client: client.secretFile != null) cfg.oidc.clients;
+    credentialName = id: "oidc-client-${id}";
+    clientSettings = id: client:
+      {client_id = id;}
+      // lib.removeAttrs client ["secretFile"]
+      // lib.optionalAttrs (client.secretFile != null) {
+        # A template the provider's `template` filter (on whenever there are
+        # clients) fills from the systemd credential. Backquoted strings need
+        # no escaping in YAML, however the generator quotes the value.
+        client_secret = "{{ mustEnv `CREDENTIALS_DIRECTORY` | printf `%s/${credentialName id}` | secret }}";
+      };
     # Values written to nix-secrets once (see `enable`), never by a stack.
     generated =
       ["authelia/jwt-secret" "authelia/session-secret" "authelia/storage-encryption-key"]
@@ -56,26 +68,60 @@ in {
         description = "Mesh interface on which the port is reachable, for the reverse proxy.";
       };
 
+      url = lib.mkOption {
+        type = lib.types.str;
+        readOnly = true;
+        default = "https://${cfg.key}.${infra.domain}";
+        defaultText = lib.literalExpression ''"https://''${config.authelia.key}.''${infra.domain}"'';
+        description = "Public URL of the portal, which is also the OpenID Connect issuer.";
+      };
+
       oidc.clients = lib.mkOption {
-        type = lib.types.attrsOf (pkgs.formats.yaml {}).type;
+        type = lib.types.attrsOf (lib.types.submodule {
+          freeformType = (pkgs.formats.yaml {}).type;
+          options.secretFile = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            example = "/run/secrets/authelia/oidc/clients/example/secret-digest";
+            description = ''
+              File holding the client secret's digest, in place of
+              `client_secret`. Authelia reads it as a systemd credential when it
+              starts, so the digest stays out of the store with the plaintext.
+            '';
+          };
+        });
         default = {};
         example = lib.literalExpression ''
           {
-            netbird = {
-              client_name = "NetBird";
-              # `authelia crypto hash generate pbkdf2 --variant sha512 --random`
-              client_secret = "$pbkdf2-sha512$310000$…";
+            example = {
+              client_name = "Example";
+              # The digest of `authelia crypto hash generate pbkdf2 --variant sha512 --random`.
+              secretFile = config.sops.secrets."authelia/oidc/clients/example/secret-digest".path;
               authorization_policy = "two_factor";
-              redirect_uris = ["https://netbird.example.com/oauth2/callback/…"];
-              scopes = ["openid" "profile" "email" "groups"];
+              redirect_uris = ["https://example.com/oauth2/callback"];
+              scopes = ["openid" "profile" "email"];
             };
           }
         '';
         description = ''
           OpenID Connect clients by client ID, each in Authelia's own schema
-          (`identity_providers.oidc.clients`, without `client_id`). Secrets are
-          digests, which may sit in the store; the plaintext belongs to the
+          (`identity_providers.oidc.clients`, without `client_id`), plus
+          `secretFile`. A secret is a digest; the plaintext belongs to the
           client. No clients, no provider.
+        '';
+      };
+
+      oidc.claimsPolicies = lib.mkOption {
+        type = lib.types.attrsOf (pkgs.formats.yaml {}).type;
+        default = {};
+        example = {
+          id-token-profile.id_token = ["email" "email_verified" "name" "preferred_username"];
+        };
+        description = ''
+          Claims policies by name (`identity_providers.oidc.claims_policies`),
+          which a client selects with `claims_policy`. Since 4.39 ID tokens
+          carry only the standard claims; a client that reads profile or email
+          claims from the ID token, not userinfo, needs a policy adding them.
         '';
       };
     };
@@ -157,7 +203,13 @@ in {
             };
           }
           // lib.optionalAttrs oidc {
-            identity_providers.oidc.clients = lib.mapAttrsToList (id: client: {client_id = id;} // client) cfg.oidc.clients;
+            identity_providers.oidc =
+              {
+                clients = lib.mapAttrsToList clientSettings cfg.oidc.clients;
+              }
+              // lib.optionalAttrs (cfg.oidc.claimsPolicies != {}) {
+                claims_policies = cfg.oidc.claimsPolicies;
+              };
           };
       };
 
@@ -171,10 +223,12 @@ in {
           # Read by PID 1 before it drops to the service user, so it stays
           # root's alone.
           EnvironmentFile = config.sops.templates."authelia.env".path;
-          LoadCredential = [
-            "ldap-password:${secret "lldap/admin-password"}"
-            "postgres-password:${secret "authelia/postgres/password"}"
-          ];
+          LoadCredential =
+            [
+              "ldap-password:${secret "lldap/admin-password"}"
+              "postgres-password:${secret "authelia/postgres/password"}"
+            ]
+            ++ lib.mapAttrsToList (id: client: "${credentialName id}:${client.secretFile}") secretFileClients;
         };
       };
 

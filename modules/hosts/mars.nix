@@ -55,6 +55,8 @@
       enable = true;
       acmeEmail = user.email;
       enableAgentNetwork = true;
+      # "Authelia" on NetBird's login page, next to local users.
+      authelia.enable = true;
     };
     netbird-proxy = {
       enable = true;
