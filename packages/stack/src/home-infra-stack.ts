@@ -79,6 +79,13 @@ export interface HomeInfraPostgresOutput {
 	roles: Record<string, HomeInfraPostgresRoleOutput>;
 }
 
+export interface HomeInfraIdentityProviderOutput {
+	/** NetBird's ID for the provider, which is also the embedded IdP's connector ID. */
+	idpId: string;
+	/** Redirect URI the provider's client must allow. */
+	redirectUrl: string;
+}
+
 export interface HomeInfraOutputs {
 	peers: Record<string, HomeInfraPeerOutput>;
 	groups: Record<string, HomeInfraGroupOutput>;
@@ -93,6 +100,8 @@ export interface HomeInfraOutputs {
 	agentNetwork?: HomeInfraAgentNetworkOutput;
 	axiom: HomeInfraAxiomOutput;
 	postgres: HomeInfraPostgresOutput;
+	/** `flake.identityProviders` key -> the provider NetBird offers at login. */
+	identityProviders: Record<string, HomeInfraIdentityProviderOutput>;
 }
 
 export class HomeInfra extends Alchemy.Stack<HomeInfra, HomeInfraOutputs>()("HomeInfra") {}

@@ -14,6 +14,7 @@ import {
 	AccessMatrix,
 	AgentNetwork,
 	HomeInfra,
+	IdentityProviders,
 	Inventory,
 	NameServers,
 	Nix,
@@ -21,6 +22,7 @@ import {
 	Policies,
 	Postgres,
 	ReverseProxy,
+	Sops,
 } from "../src/index.ts";
 
 const Infra = Schema.Struct({
@@ -441,6 +443,30 @@ export default HomeInfra.make(
 
 		const postgres = yield* Postgres.deploy();
 
+		// Login providers for NetBird's embedded IdP, declared by the hosts that
+		// run them. Each client secret is decrypted from its host's nix-secrets
+		// file at the revision the flake locks, the one that host deploys, so
+		// planning needs the YubiKey. NetBird checks the issuer on create and
+		// update: deploy the host first.
+		const identityProviderConfigs = yield* Nix.evaluate(
+			{ flakeRoot: REPO_ROOT, attr: "identityProviders" },
+			IdentityProviders.IdentityProviders,
+		);
+		const identityProviders: Record<
+			string,
+			{ idpId: NetBird.IdentityProvider["idpId"]; redirectUrl: NetBird.IdentityProvider["redirectUrl"] }
+		> = {};
+		for (const plan of yield* IdentityProviders.plans(identityProviderConfigs)) {
+			const idp = yield* NetBird.IdentityProvider(`${String.pascalCase(plan.providerKey)}IdentityProvider`, {
+				name: plan.cfg.name,
+				type: plan.cfg.type,
+				issuer: plan.cfg.issuer,
+				clientId: plan.cfg.clientId,
+				clientSecret: yield* Sops.decrypt(plan.secretsFile, plan.cfg.clientSecret),
+			});
+			identityProviders[plan.providerKey] = { idpId: idp.idpId, redirectUrl: idp.redirectUrl };
+		}
+
 		// Adopt the dashboard All→All policy, keep it disabled (default deny),
 		// and retain it so destroy never deletes the built-in rule.
 		yield* NetBird.Policy("DisableDefault", {
@@ -461,6 +487,7 @@ export default HomeInfra.make(
 			...(agentNetworkOutput !== undefined ? { agentNetwork: agentNetworkOutput } : {}),
 			axiom,
 			postgres,
+			identityProviders,
 		};
 	}).pipe(Effect.orDie),
 );
