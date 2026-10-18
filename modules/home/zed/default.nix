@@ -119,7 +119,10 @@ in {
             # Panels
             agent.dock = "right";
             collaboration_panel.dock = "left";
-            git_panel.dock = "left";
+            git_panel = {
+              dock = "left";
+              group_by = "staging";
+            };
             outline_panel.dock = "left";
             project_panel.dock = "left";
             terminal = {
