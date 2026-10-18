@@ -27,10 +27,10 @@
           mmv
           gitleaks
           btop
-          # Nix LSP
+          # Nix LSP
           nixd
           nil
-          # Just LSP
+          # Just LSP
           just-lsp
         ]
         ++ (
