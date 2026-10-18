@@ -121,6 +121,8 @@
       enable = true;
       setupKeyFile = "/var/lib/netbird-client/setup.key";
     };
+    # rclone remotes; credentials from `rclone/*` in `hosts/mercury.yaml`.
+    rclone.enable = true;
     # Home Assistant: NetBird for mesh peers, Pangolin for public HTTPS.
     home-assistant = {
       enable = true;

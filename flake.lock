@@ -1072,11 +1072,11 @@
     "secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1792311137,
-        "narHash": "sha256-2ybiQdbzL1w6j9eC+GJztmpyW8cWp6giuVC09nia0O8=",
+        "lastModified": 1792315282,
+        "narHash": "sha256-19R+wOBuK2tGuNE96GcbOMBexBzj87CEvUwYx/4FHcw=",
         "owner": "atahanyorganci",
         "repo": "nix-secrets",
-        "rev": "e793d4f0bc4b83bd07eb11dcbb33c51205b67270",
+        "rev": "b36526cbecd23c8b444a9e42d52143a341bb7297",
         "type": "github"
       },
       "original": {

@@ -122,6 +122,8 @@
     };
     # From `hosts/venus.yaml` in the secrets repository.
     sops.secrets."samba/${user.username}" = {};
+    # rclone remotes; credentials from `rclone/*` in `hosts/venus.yaml`.
+    rclone.enable = true;
     # SSH
     ssh.enable = true;
     # Self-hosted NetBird mesh

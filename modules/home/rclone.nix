@@ -6,8 +6,10 @@
     };
   };
   secretName = remote: option: "rclone/${remote}/${builtins.replaceStrings ["_"] ["-"] option}";
-in {
-  flake.modules.darwin.rclone = {
+  # The host side, the same on nix-darwin and NixOS: decrypts each remote's
+  # credentials from the host's secrets file (`hosts/<host>.yaml`, which must
+  # hold them) and turns on the Home Manager module that reads them.
+  systemModule = {
     config,
     user,
     ...
@@ -20,6 +22,9 @@ in {
       home-manager.users.${user.username}.rclone.enable = true;
     };
   };
+in {
+  flake.modules.darwin.rclone = systemModule;
+  flake.modules.nixos.rclone = systemModule;
   flake.modules.homeManager.rclone = {
     config,
     osConfig,
