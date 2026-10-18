@@ -77,12 +77,18 @@ interface Admin {
  * Runs `use` with a role inheriting `postgres`, made for it and deleted after
  * it, the way Alchemy runs a PlanetScale database's migrations. No admin
  * credential is kept in state.
+ *
+ * Left unnamed, as Alchemy's are, so PlanetScale gives each a unique name:
+ * role names are unique per branch, app databases reconcile concurrently, and
+ * a role whose delete failed keeps its name until its TTL runs out. The branch
+ * is copied field by field: callers pass the whole props, and spreading them
+ * would send the app's `name`, which its own role already has.
  */
 const withAdminRole = <A, E, R>(target: Target, use: (admin: Admin) => Effect.Effect<A, E, R>) => {
+	const branch = { organization: target.organization, database: target.database, branch: target.branch };
 	const acquire = Effect.gen(function* () {
 		const role = yield* ps.createRole({
-			...target,
-			name: "alchemy-app-database",
+			...branch,
 			ttl: ADMIN_ROLE_TTL_SECONDS,
 			inherited_roles: ["postgres"],
 		});
@@ -97,7 +103,7 @@ const withAdminRole = <A, E, R>(target: Target, use: (admin: Admin) => Effect.Ef
 		} satisfies Admin;
 	});
 	const release = (admin: Admin) =>
-		ps.deleteRole({ ...target, id: admin.id, successor: "postgres" }).pipe(
+		ps.deleteRole({ ...branch, id: admin.id, successor: "postgres" }).pipe(
 			Effect.asVoid,
 			Effect.catchTag("NotFound", () => Effect.void),
 			Effect.retry({ schedule: Schedule.max([Schedule.exponential("500 millis"), Schedule.recurs(5)]) }),
