@@ -5,10 +5,13 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { AppDatabase } from "./AppDatabase.ts";
 
+/** Postgres itself, as in a role's `connectionUrl`; PgBouncer listens on 6432. */
+const DIRECT_PORT = 5432;
+
 /**
  * An app's role and its logical database, both named after the app; returns
- * the role's direct connection URL to the database, verifying TLS against the
- * system CA store.
+ * how the app reaches the database over a direct connection: the parts, and a
+ * libpq URL verifying TLS against the system CA store.
  *
  * The role inherits no built-in roles: those apply to every logical database
  * in the cluster, while the role owns what it creates in its own.
@@ -29,15 +32,22 @@ const app = Effect.fn("app")(function* (logicalId: string, name: string, databas
 		role: role.username.pipe(Output.map(username => username.slice(0, username.lastIndexOf(".")))),
 	});
 
-	return role.connectionUrl.pipe(
-		Output.map(connectionUrl => {
-			const url = new URL(Redacted.value(connectionUrl));
-			// PlanetScale's URL names its default `postgres` database.
-			url.pathname = `/${name}`;
-			url.searchParams.set("sslrootcert", "system");
-			return Redacted.make(url.toString());
-		}),
-	);
+	return {
+		host: role.host,
+		port: DIRECT_PORT,
+		database: name,
+		username: role.username,
+		password: role.password,
+		url: role.connectionUrl.pipe(
+			Output.map(connectionUrl => {
+				const url = new URL(Redacted.value(connectionUrl));
+				// PlanetScale's URL names its default `postgres` database.
+				url.pathname = `/${name}`;
+				url.searchParams.set("sslrootcert", "system");
+				return Redacted.make(url.toString());
+			}),
+		),
+	};
 });
 
 /**
@@ -63,6 +73,10 @@ export const deploy = Effect.fn("deploy")(function* () {
 		dashboard: database.htmlUrl,
 		roles: {
 			vaultwarden: yield* app("Vaultwarden", "vaultwarden", database),
+			// Authelia's storage: 2FA devices, passkeys, OIDC consents and tokens, bans.
+			authelia: yield* app("Authelia", "authelia", database),
+			// LLDAP's directory: the users and groups Authelia authenticates against.
+			lldap: yield* app("Lldap", "lldap", database),
 		},
 	};
 });

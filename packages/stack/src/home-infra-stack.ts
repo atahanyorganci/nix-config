@@ -49,16 +49,34 @@ export interface HomeInfraAxiomOutput {
 	monitors: Record<string, string>;
 }
 
+/**
+ * How an app reaches its logical database, which has the app's name: its
+ * role's direct (port 5432) connection, which PlanetScale only accepts over
+ * TLS. `just store-secret` writes the values an app needs to nix-secrets.
+ */
+export interface HomeInfraPostgresRoleOutput {
+	host: string;
+	port: number;
+	/** The app's logical database. */
+	database: string;
+	/** `<role>.<branch-id>`. */
+	username: string;
+	/** Encrypted in state. */
+	password: Redacted.Redacted<string>;
+	/**
+	 * libpq URL verifying TLS against the system CA store (`sslrootcert=system`,
+	 * libpq 16 and later). Carries the password, so it is encrypted in state.
+	 * Clients that are not libpq build their own from the parts: sqlx (LLDAP)
+	 * reads `sslrootcert` as a file path, and Authelia takes no URL at all.
+	 */
+	url: Redacted.Redacted<string>;
+}
+
 export interface HomeInfraPostgresOutput {
 	/** The PlanetScale dashboard page of the cluster. */
 	dashboard: string;
-	/**
-	 * App name -> its role's direct (port 5432) connection URL to the app's
-	 * logical database, which has the app's name, verifying TLS against the
-	 * system CA store. Carries the role's password, so it is encrypted in
-	 * state; `just store-secret` writes it to nix-secrets.
-	 */
-	roles: Record<string, Redacted.Redacted<string>>;
+	/** App name -> how it reaches its logical database. */
+	roles: Record<string, HomeInfraPostgresRoleOutput>;
 }
 
 export interface HomeInfraOutputs {

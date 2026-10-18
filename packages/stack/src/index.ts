@@ -21,4 +21,5 @@ export {
 	type HomeInfraOwnerOutput,
 	type HomeInfraPeerOutput,
 	type HomeInfraPostgresOutput,
+	type HomeInfraPostgresRoleOutput,
 } from "./home-infra-stack.ts";

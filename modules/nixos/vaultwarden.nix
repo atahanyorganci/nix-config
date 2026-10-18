@@ -13,7 +13,7 @@ in {
         a Vaultwarden server keeping its vault in the infra Postgres cluster
         (HomeInfra's `postgres.roles.vaultwarden`). It needs
         `vaultwarden/database-url` in the host's nix-secrets file (`just
-        store-secret <host> vaultwarden/database-url=postgres/roles/vaultwarden`)
+        store-secret <host> vaultwarden/database-url=postgres/roles/vaultwarden/url`)
         before it is enabled: sops-nix fails activation on a missing key
       '';
 
