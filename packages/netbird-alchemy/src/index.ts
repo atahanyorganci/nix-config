@@ -6,6 +6,7 @@ export * from "./ApiKey/index.ts";
 export * from "./AuthProvider.ts";
 export * from "./Credentials.ts";
 export * from "./Group/index.ts";
+export * from "./IdentityProvider/index.ts";
 export * from "./NameserverGroup/index.ts";
 export * from "./Network/index.ts";
 export * from "./NetworkResource/index.ts";

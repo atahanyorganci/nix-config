@@ -11,6 +11,7 @@ import { ApiKey, ApiKeyProvider } from "./ApiKey/ApiKey.ts";
 import { NetBirdAuth } from "./AuthProvider.ts";
 import * as Credentials from "./Credentials.ts";
 import { Group, GroupProvider } from "./Group/Group.ts";
+import { IdentityProvider, IdentityProviderProvider } from "./IdentityProvider/IdentityProvider.ts";
 import { NameserverGroup, NameserverGroupProvider } from "./NameserverGroup/NameserverGroup.ts";
 import { Network, NetworkProvider } from "./Network/Network.ts";
 import { NetworkResource, NetworkResourceProvider } from "./NetworkResource/NetworkResource.ts";
@@ -65,6 +66,7 @@ export const providers = () =>
 			AgentNetworkProvider,
 			ApiKey,
 			Group,
+			IdentityProvider,
 			NameserverGroup,
 			Network,
 			NetworkResource,
@@ -88,6 +90,7 @@ export const providers = () =>
 				AgentNetworkProviderProvider(),
 				ApiKeyProvider(),
 				GroupProvider(),
+				IdentityProviderProvider(),
 				NameserverGroupProvider(),
 				NetworkProvider(),
 				NetworkResourceProvider(),
