@@ -72,6 +72,7 @@
       enable = true;
       package = pkgs.netbird-app;
     };
+    rclone.enable = true;
     homebrew.casks = [
       "fluidvoice"
       "spotify"
