@@ -58,6 +58,30 @@ in {
           Access and Agent Network mesh endpoints; public reverse-proxy services remain available.
         '';
       };
+
+      proxyProtocol = {
+        enable = lib.mkEnableOption ''
+          PROXY protocol on the main listener (NB_PROXY_PROXY_PROTOCOL). The
+          proxy then sees each visitor's address, sent by its TCP front in a
+          PROXY header, instead of the front's own; netbird-server's Traefik
+          passthrough sends one while this is on. Backends get the visitor in
+          X-Forwarded-For, and access logs, country restrictions and CrowdSec
+          see it. Private services are unaffected: they are served on the
+          embedded client's own listeners
+        '';
+
+        trustedProxies = lib.mkOption {
+          type = lib.types.nonEmptyListOf lib.types.str;
+          default = ["127.0.0.1/32"];
+          description = ''
+            Sources that must send a PROXY header (NB_PROXY_TRUSTED_PROXIES); one
+            from anywhere else is ignored. The proxy also keeps X-Forwarded-*
+            headers from these sources, which is why they are only set with PROXY
+            protocol: without it every connection comes from Traefik, and clients
+            could forge their own.
+          '';
+        };
+      };
     };
 
     config = lib.mkIf cfg.enable {
@@ -125,7 +149,11 @@ in {
               "XDG_STATE_HOME=${stateDir}/.local/state"
               "XDG_DATA_HOME=${stateDir}/.local/share"
             ]
-            ++ lib.optional cfg.private "NB_PROXY_PRIVATE=true";
+            ++ lib.optional cfg.private "NB_PROXY_PRIVATE=true"
+            ++ lib.optionals cfg.proxyProtocol.enable [
+              "NB_PROXY_PROXY_PROTOCOL=true"
+              "NB_PROXY_TRUSTED_PROXIES=${lib.concatStringsSep "," cfg.proxyProtocol.trustedProxies}"
+            ];
 
           StateDirectory = "netbird-proxy";
           StateDirectoryMode = "0750";

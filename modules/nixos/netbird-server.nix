@@ -18,6 +18,9 @@ in {
     stunPort = 3478;
     # Avoid Traefik's historical default API port (:8080).
     dashboardPort = 8090;
+    # The passthrough targets the local netbird-proxy, which then expects a
+    # PROXY header on every connection from Traefik.
+    passthroughProxyProtocol = config.netbird-proxy.enable && config.netbird-proxy.proxyProtocol.enable;
 
     # Placeholders are replaced at service start so secrets stay out of the Nix store.
     configTemplate = pkgs.writeText "netbird-server-config.yaml" ''
@@ -307,18 +310,30 @@ in {
             };
           }
           // lib.optionalAttrs cfg.enableProxyPassthrough {
-            tcp = {
-              routers.proxy-passthrough = {
-                entryPoints = ["websecure"];
-                rule = "HostSNI(`*`)";
-                service = "proxy-tls";
-                priority = 1;
-                tls.passthrough = true;
+            tcp =
+              {
+                routers.proxy-passthrough = {
+                  entryPoints = ["websecure"];
+                  rule = "HostSNI(`*`)";
+                  service = "proxy-tls";
+                  priority = 1;
+                  tls.passthrough = true;
+                };
+                services.proxy-tls.loadBalancer =
+                  {
+                    servers = [
+                      {address = "127.0.0.1:8443";}
+                    ];
+                  }
+                  // lib.optionalAttrs passthroughProxyProtocol {
+                    serversTransport = "netbird-proxy";
+                  };
+              }
+              // lib.optionalAttrs passthroughProxyProtocol {
+                # TLS passthrough hides the client from the proxy, which would
+                # otherwise see every visitor as 127.0.0.1.
+                serversTransports.netbird-proxy.proxyProtocol.version = 2;
               };
-              services.proxy-tls.loadBalancer.servers = [
-                {address = "127.0.0.1:8443";}
-              ];
-            };
           };
       };
 

@@ -60,6 +60,9 @@
       enable = true;
       tokenFile = config.sops.secrets."netbird-proxy/token".path;
       private = true;
+      # Real client addresses through Traefik's passthrough, for Authelia's
+      # login protection and the proxy's access logs.
+      proxyProtocol.enable = true;
     };
     # hosts/mars.yaml in nix-secrets; `just connect-proxy mars-proxy mars` writes
     # a new token there.
