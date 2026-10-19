@@ -4,6 +4,7 @@ in {
   flake.modules.nixos.lldap = {
     lib,
     config,
+    pkgs,
     ...
   }: let
     cfg = config.lldap;
@@ -100,11 +101,27 @@ in {
         environmentFile = config.sops.templates."lldap.env".path;
       };
 
-      systemd.services.lldap.serviceConfig.LoadCredential = [
-        "jwt-secret:${secret "lldap/jwt-secret"}"
-        "key-seed:${secret "lldap/key-seed"}"
-        "admin-password:${secret "lldap/admin-password"}"
-      ];
+      systemd.services.lldap.serviceConfig = {
+        LoadCredential = [
+          "jwt-secret:${secret "lldap/jwt-secret"}"
+          "key-seed:${secret "lldap/key-seed"}"
+          "admin-password:${secret "lldap/admin-password"}"
+        ];
+        # LLDAP opens its ports once it has reached and migrated the database,
+        # seconds after it starts. Started means LDAP answers, so a unit after
+        # it finds it up: Authelia's startup check dials it and exits on a
+        # refusal.
+        ExecStartPost = pkgs.writeShellScript "lldap-wait-for-ldap" ''
+          while kill -0 "$MAINPID" 2>/dev/null; do
+            if (exec 3<>/dev/tcp/127.0.0.1/${toString cfg.ldapPort}) 2>/dev/null; then
+              exit 0
+            fi
+            sleep 0.2
+          done
+          echo "lldap exited before LDAP answered" >&2
+          exit 1
+        '';
+      };
 
       sops.secrets = lib.genAttrs (generated ++ postgres) (_: {
         restartUnits = ["lldap.service"];
