@@ -1,6 +1,4 @@
-{config, ...}: let
-  infra = config.flake.infra;
-in {
+{...}: {
   flake.modules.darwin.arr-stack = {
     config,
     lib,
@@ -98,12 +96,9 @@ in {
           knownProxies = ["100.64.0.0/10"];
           oidc = {
             enable = true;
-            secretFile = "/var/lib/jellyfin-oidc/client-secret";
-            providerName = "netbird";
-            endpoint = "https://${infra.netbirdManagementDomain}/oauth2";
-            clientId = "jellyfin";
+            publicUrl = "https://watch.${cfg.domain}";
             usernameClaim = "email";
-            # Keep admin when signing in with NetBird email.
+            # Keep admin when signing in with the LLDAP email.
             canonicalUsername = user.email;
             canonicalUserId = "5A8A2446-9984-479D-BBBC-8D86EDFBA8D0";
           };

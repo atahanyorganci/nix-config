@@ -17,6 +17,13 @@
       ;
     inherit (lib.types) listOf path str;
     cfg = config.services.jellyfin;
+    # Authelia's client for Jellyfin. The secret is in nix-secrets twice: in
+    # this host's file for the plugin, and as a PBKDF2 digest in the Authelia
+    # host's file (`secretDigest`).
+    ssoSecret = "authelia/oidc/clients/${cfg.oidc.clientId}/secret";
+    ssoSecretDigest = "${ssoSecret}-digest";
+    ssoSecretFile = config.sops.secrets.${ssoSecret}.path;
+    agentLabel = config.launchd.user.agents.jellyfin.serviceConfig.Label;
     ssoPlugin = pkgs.stdenvNoCC.mkDerivation rec {
       pname = "jellyfin-plugin-sso";
       version = "4.0.0.3";
@@ -91,7 +98,7 @@
             </key>
             <value>
               <PluginConfiguration>
-                <OidEndpoint>${lib.escapeXML cfg.oidc.endpoint}</OidEndpoint>
+                <OidEndpoint>${lib.escapeXML cfg.oidc.issuer}</OidEndpoint>
                 <OidClientId>${lib.escapeXML cfg.oidc.clientId}</OidClientId>
                 <OidSecret>@oidcSecret@</OidSecret>
                 <Enabled>true</Enabled>
@@ -110,7 +117,6 @@
                 <RoleClaim>groups</RoleClaim>
                 <OidScopes>
                   <string>email</string>
-                  <string>groups</string>
                 </OidScopes>
                 ${oidcCanonicalLinks}
                 <DefaultUsernameClaim>${lib.escapeXML cfg.oidc.usernameClaim}</DefaultUsernameClaim>
@@ -118,6 +124,7 @@
                 <DisableHttps>false</DisableHttps>
                 <DoNotValidateEndpoints>false</DoNotValidateEndpoints>
                 <DoNotValidateIssuerName>false</DoNotValidateIssuerName>
+                <DisablePushedAuthorization>true</DisablePushedAuthorization>
                 <SchemeOverride>${lib.escapeXML cfg.oidc.schemeOverride}</SchemeOverride>
               </PluginConfiguration>
             </value>
@@ -176,25 +183,40 @@
           '';
         };
         oidc = {
-          enable = mkEnableOption "Jellyfin OIDC SSO via NetBird embedded IdP";
-          secretFile = mkOption {
-            type = path;
-            default = "/var/lib/jellyfin-oidc/client-secret";
-            description = "OIDC client secret (must match the Dex client in NetBird idp.db).";
+          enable = mkEnableOption "Jellyfin sign-in through OpenID Connect (jellyfin-plugin-sso)";
+          publicUrl = mkOption {
+            type = str;
+            example = "https://watch.example.com";
+            description = ''
+              Jellyfin's public origin. The plugin builds its redirect URI from
+              the request (and `schemeOverride`), so the one registered with
+              the issuer comes from this.
+            '';
           };
           providerName = mkOption {
             type = str;
-            default = "netbird";
-            description = "Provider key used in /sso/OID/redirect/<name> paths.";
+            default = "authelia";
+            description = "Provider key: sign-in starts at `<publicUrl>/sso/OID/start/<name>`.";
           };
-          endpoint = mkOption {
+          issuer = mkOption {
             type = str;
-            description = "OIDC issuer (must expose /.well-known/openid-configuration).";
+            default = config.oidcIssuer;
+            defaultText = lib.literalExpression "config.oidcIssuer";
+            description = ''
+              OIDC issuer. It defaults to the flake's Authelia (`oidcIssuer`),
+              which then gets the client registered (`oidcClients`).
+            '';
           };
           clientId = mkOption {
             type = str;
             default = "jellyfin";
-            description = "OIDC client ID registered in NetBird's embedded IdP.";
+            description = "OIDC client ID.";
+          };
+          groups = mkOption {
+            type = listOf str;
+            default = [];
+            example = ["media"];
+            description = "LLDAP groups whose members may sign in; empty lets every user in.";
           };
           usernameClaim = mkOption {
             type = str;
@@ -221,7 +243,27 @@
     };
 
     config = mkIf cfg.enable {
-      system.activationScripts.postActivation.text = ''
+      sops.secrets = mkIf cfg.oidc.enable {${ssoSecret} = {};};
+
+      # Confidential. The plugin's client (Duende OidcClient 6.0.1) always uses
+      # PKCE, posts its secret in the body, and reads the user from userinfo,
+      # so the default ID token is enough. Its pushed authorization requests
+      # would send the secret in a Basic header instead, and a client has one
+      # authentication method, so the plugin's configuration turns PAR off.
+      # Sign-in starts at `/sso/OID/start/<name>`, which comes back to
+      # `/sso/OID/redirect/<name>` (the legacy `/p/` and `/r/` are unused).
+      oidcClients = mkIf (cfg.oidc.enable && cfg.oidc.issuer == config.oidcIssuer) {
+        ${cfg.oidc.clientId} = {
+          name = "Jellyfin";
+          secretDigest = ssoSecretDigest;
+          redirectUris = ["${cfg.oidc.publicUrl}/sso/OID/redirect/${cfg.oidc.providerName}"];
+          inherit (cfg.oidc) groups;
+          settings.token_endpoint_auth_method = "client_secret_post";
+        };
+      };
+
+      # After sops-nix (`mkAfter`, priority 1500) installed the client secret.
+      system.activationScripts.postActivation.text = lib.mkOrder 1600 ''
         echo "Creating Jellyfin directories..."
         mkdir -p '${cfg.dataDir}' && chown -R '${user.username}' '${cfg.dataDir}'
         mkdir -p '${cfg.configDir}' && chown -R '${user.username}' '${cfg.configDir}'
@@ -250,15 +292,31 @@
           chmod -R u+rwX "$plugin_dir"
           chown -R '${user.username}' "$plugin_dir"
 
-          if [ ! -f '${cfg.oidc.secretFile}' ]; then
-            echo "Jellyfin OIDC client secret file missing: ${cfg.oidc.secretFile}" >&2
+          if [ ! -f '${ssoSecretFile}' ]; then
+            echo "Jellyfin OIDC client secret file missing: ${ssoSecretFile}" >&2
             exit 1
           fi
 
           config_xml='${cfg.dataDir}/plugins/configurations/SSO-Auth.xml'
-          install -m 600 '${oidcConfigTemplate}' "$config_xml"
-          ${getExe pkgs.replace-secret} '@oidcSecret@' '${cfg.oidc.secretFile}' "$config_xml"
-          chown '${user.username}' "$config_xml"
+          rendered="$(mktemp "$config_xml.XXXXXX")"
+          install -m 600 '${oidcConfigTemplate}' "$rendered"
+          ${getExe pkgs.replace-secret} '@oidcSecret@' '${ssoSecretFile}' "$rendered"
+          chown '${user.username}' "$rendered"
+          # Jellyfin reads plugin configuration once, at start, and writes back
+          # what it holds whenever it changes it (a new SSO user's link). So it
+          # restarts when the configuration or the plugin is new, rather than
+          # running on, and bringing back, the old one.
+          stamp="$plugin_dir/.nix-config.sha256"
+          want="$({ cat "$rendered"; echo '${ssoPlugin}'; } | ${pkgs.coreutils}/bin/sha256sum | cut -d ' ' -f 1)"
+          mv -f "$rendered" "$config_xml"
+          if [ "$(cat "$stamp" 2>/dev/null)" != "$want" ]; then
+            echo "Restarting Jellyfin for its new SSO configuration..."
+            if launchctl kickstart -k "gui/$(id -u '${user.username}')/${agentLabel}"; then
+              printf '%s\n' "$want" >"$stamp"
+            else
+              echo "warning: could not restart Jellyfin; it keeps its old SSO configuration until it restarts" >&2
+            fi
+          fi
         ''}
       '';
 
