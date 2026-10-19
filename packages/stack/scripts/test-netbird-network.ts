@@ -29,13 +29,14 @@ const BLOCKED_PROBE_DOMAIN = "doubleclick.net";
 const REQUIRED_GROUPS = ["Admin", "Users", "Servers", "Agents", "Proxy", "All"] as const;
 
 /** Core allow policies that must stay enabled under default-deny. */
-const REQUIRED_POLICIES = [
-	"allow-admin-tcp",
-	"allow-admin-udp",
-	"allow-admin-icmp",
-	"allow-admin-ssh",
-	"allow-admin-proxy-tcp",
-] as const;
+const REQUIRED_POLICIES = ["allow-admin-ssh", "allow-admin-proxy-tcp"] as const;
+
+/**
+ * Blanket access people's devices must not have: they reach hosts only through
+ * the reverse proxy, SSH (Admin), the mesh nameserver and declared mesh
+ * services, so backends can trust the proxy's identity headers.
+ */
+const FORBIDDEN_POLICIES = ["allow-admin-tcp", "allow-admin-udp", "allow-admin-icmp"] as const;
 
 const timeoutFlag = Flag.Int("timeout-ms").pipe(
 	Flag.withDescription("Per-domain HTTPS probe timeout in milliseconds"),
@@ -341,6 +342,15 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 					name: `policy:${policyName}`,
 					ok: policy?.enabled === true,
 					detail: policy === undefined ? "missing" : `enabled=${policy.enabled}`,
+				});
+			}
+
+			for (const policyName of FORBIDDEN_POLICIES) {
+				const policy = policies.find(entry => entry.name === policyName);
+				checks.push({
+					name: `no-policy:${policyName}`,
+					ok: policy === undefined || policy.enabled === false,
+					detail: policy === undefined ? "absent" : `present, enabled=${policy.enabled}`,
 				});
 			}
 

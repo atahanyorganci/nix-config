@@ -1,6 +1,7 @@
 export * as NetbirdServer from "./netbird-server.ts";
 export * as ReverseProxy from "./reverse-proxy.ts";
 export * as NameServers from "./name-servers.ts";
+export * as MeshServices from "./mesh-services.ts";
 export * as Inventory from "./inventory.ts";
 export * as AccessMatrix from "./access-matrix.ts";
 export * as AgentNetwork from "./agent-network.ts";

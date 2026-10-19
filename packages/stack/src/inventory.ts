@@ -15,6 +15,16 @@ export const PEER_GROUP_NAMES: ReadonlyArray<NetBirdGroupName> = ["Servers", "Ag
 export const isPeerGroupName = (value: NetBirdGroupName): boolean =>
 	(PEER_GROUP_NAMES as ReadonlyArray<string>).includes(value);
 
+/**
+ * Login roles: people's devices. They reach services through the reverse
+ * proxy, never a host's ports directly; the only exceptions are SSH (Admin),
+ * the mesh nameserver and a host's declared `meshServices`.
+ */
+export const LOGIN_GROUP_NAMES: ReadonlyArray<NetBirdGroupName> = ["Admin", "Users"];
+
+export const isLoginGroupName = (value: string): boolean =>
+	(LOGIN_GROUP_NAMES as ReadonlyArray<string>).includes(value);
+
 export const isNetBirdGroupName = (value: string): value is NetBirdGroupName =>
 	(ZERO_TRUST_GROUP_NAMES as ReadonlyArray<string>).includes(value);
 

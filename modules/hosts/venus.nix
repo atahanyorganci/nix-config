@@ -86,6 +86,12 @@
       listen.ip = "0.0.0.0";
       options.enableBookUploading = true;
     };
+    # SMB over the mesh, for Admin devices away from home; on the LAN it needs
+    # no rule.
+    meshServices.smb = {
+      port = 445;
+      groups = ["Admin"];
+    };
     # SMB file sharing (replaces Apple's File Sharing)
     samba = {
       enable = true;

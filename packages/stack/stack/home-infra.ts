@@ -16,6 +16,7 @@ import {
 	HomeInfra,
 	IdentityProviders,
 	Inventory,
+	MeshServices,
 	NameServers,
 	Nix,
 	Observability,
@@ -71,9 +72,13 @@ export default HomeInfra.make(
 		const nameServersExpr = yield* Nix.Expr("NameServers", { flakeRoot: REPO_ROOT, attr: "nameServers" });
 		const nameServers = yield* Nix.decode(nameServersExpr, NameServers.NameServers);
 
+		const meshServicesExpr = yield* Nix.Expr("MeshServices", { flakeRoot: REPO_ROOT, attr: "meshServices" });
+		const meshServices = yield* Nix.decode(meshServicesExpr, MeshServices.MeshServices);
+
 		const accessMatrix = yield* Schema.decodeEffect(AccessMatrix.AccessMatrixFromFlake)({
 			httpServices,
 			nameServers,
+			meshServices,
 		});
 
 		if (Object.keys(httpServices).length === 0 && Object.keys(nameServers).length === 0) {
@@ -410,8 +415,10 @@ export default HomeInfra.make(
 			};
 		}
 
+		// People's devices reach hosts only through the reverse proxy, SSH
+		// (Admin), the mesh nameserver and declared mesh services: no blanket
+		// access, so backends can trust the proxy's identity headers.
 		const allowRules = [
-			...Policies.adminAllowAllRules(),
 			...Policies.adminSshRules(),
 			...Policies.adminProxyRules(),
 			...Policies.serverSshRules(),

@@ -19,45 +19,11 @@ export type PolicyRuleSpec = Omit<PolicyRule, "sources" | "destinations"> & {
 	destinationGroups: ReadonlyArray<string>;
 };
 
-export const adminAllowAllRules = (): ReadonlyArray<PolicyRuleSpec> => [
-	{
-		name: "admin-tcp",
-		description: "Admins may reach all peers over TCP",
-		enabled: true,
-		action: "accept",
-		bidirectional: false,
-		protocol: "tcp",
-		// TCP/22 is the dedicated admin-ssh rule. A catch-all that includes 22
-		// makes NetBird treat SSH as wildcard access when peer SSH is enabled.
-		portRanges: [
-			{ start: 1, end: 21 },
-			{ start: 23, end: 65535 },
-		],
-		sourceGroups: ["Admin"],
-		destinationGroups: [ALL_GROUP_NAME],
-	},
-	{
-		name: "admin-udp",
-		description: "Admins may reach all peers over UDP",
-		enabled: true,
-		action: "accept",
-		bidirectional: false,
-		protocol: "udp",
-		sourceGroups: ["Admin"],
-		destinationGroups: [ALL_GROUP_NAME],
-	},
-	{
-		name: "admin-icmp",
-		description: "Admins may reach all peers over ICMP",
-		enabled: true,
-		action: "accept",
-		bidirectional: false,
-		protocol: "icmp",
-		sourceGroups: ["Admin"],
-		destinationGroups: [ALL_GROUP_NAME],
-	},
-];
-
+/**
+ * SSH is the one port every host keeps open to Admin devices: deploys and
+ * administration run over it. People otherwise reach hosts only through the
+ * reverse proxy, the mesh nameserver and declared mesh services.
+ */
 export const adminSshRules = (): ReadonlyArray<PolicyRuleSpec> => [
 	{
 		name: "admin-ssh",

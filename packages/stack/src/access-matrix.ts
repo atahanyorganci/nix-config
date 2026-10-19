@@ -2,7 +2,8 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
-import { PROXY_GROUP_NAME, PolicySourceGroupName, isPolicySourceGroupName } from "./inventory.ts";
+import { PROXY_GROUP_NAME, PolicySourceGroupName, isLoginGroupName, isPolicySourceGroupName } from "./inventory.ts";
+import { MeshServices, type MeshService } from "./mesh-services.ts";
 import { NameServers, type NameServerPlan } from "./name-servers.ts";
 import { HttpServices, type HttpHost, type HttpService } from "./reverse-proxy.ts";
 
@@ -20,9 +21,6 @@ export type AccessMatrixEntry = typeof AccessMatrixEntry.Type;
 
 export const AccessMatrix = Schema.Array(AccessMatrixEntry);
 export type AccessMatrix = typeof AccessMatrix.Type;
-
-/** Exposed HTTP services without explicit `expose.accessGroups` are admin-only on the mesh. */
-const DEFAULT_HTTP_SOURCE_GROUPS: ReadonlyArray<string> = ["Admin"];
 
 /** Resolvers answer over UDP and fall back to TCP for large responses. */
 const DNS_PROTOCOLS: ReadonlyArray<AccessMatrixProtocol> = ["udp", "tcp"];
@@ -45,15 +43,21 @@ const sourceGroups = (
 	return Effect.succeed([...new Set(groups.filter(isPolicySourceGroupName))]);
 };
 
+/**
+ * An HTTP service's port is reached over the mesh by the reverse proxy, which
+ * checks `expose.accessGroups` itself, and by machine groups among them (e.g.
+ * Servers calling an API). People's devices (login groups) go through the
+ * proxy only: a backend that trusts the proxy's identity headers must not be
+ * reachable by anyone who could forge them.
+ */
 const httpEntries = (hostKey: string, serviceKey: string, cfg: HttpService) =>
 	Effect.gen(function* () {
-		// The reverse proxy reaches every exposed service over the mesh, so its
-		// group is always a source alongside the configured groups.
-		const configured = [
-			...(cfg.expose.accessGroups.length > 0 ? cfg.expose.accessGroups : DEFAULT_HTTP_SOURCE_GROUPS),
+		const label = `${hostKey}.${serviceKey}.expose.accessGroups`;
+		yield* sourceGroups(label, cfg.expose.accessGroups);
+		const allowedSourceGroups = yield* sourceGroups(label, [
+			...cfg.expose.accessGroups.filter(group => !isLoginGroupName(group)),
 			PROXY_GROUP_NAME,
-		];
-		const allowedSourceGroups = yield* sourceGroups(`${hostKey}.${serviceKey}.expose.accessGroups`, configured);
+		]);
 		const entry: AccessMatrixEntry = {
 			host: hostKey,
 			service: serviceKey,
@@ -79,6 +83,20 @@ const dnsEntries = (plan: NameServerPlan) =>
 		);
 	});
 
+/** A declared mesh service is reachable directly from exactly its groups. */
+const meshEntries = (hostKey: string, serviceKey: string, cfg: MeshService) =>
+	Effect.gen(function* () {
+		const allowedSourceGroups = yield* sourceGroups(`${hostKey}.meshServices.${serviceKey}.groups`, cfg.groups);
+		const entry: AccessMatrixEntry = {
+			host: hostKey,
+			service: serviceKey,
+			port: cfg.port,
+			protocol: cfg.protocol,
+			allowedSourceGroups,
+		};
+		return [entry];
+	});
+
 const nameServerPlansFrom = (nameServers: typeof NameServers.Type): Array<NameServerPlan> => {
 	const plans: Array<NameServerPlan> = [];
 	for (const [hostKey, host] of Object.entries(nameServers)) {
@@ -94,9 +112,10 @@ const encodeForbidden = <T, E>(message: string) => SchemaGetter.forbidden<T, E>(
 export const AccessMatrixFromFlake = Schema.Struct({
 	httpServices: HttpServices,
 	nameServers: NameServers,
+	meshServices: MeshServices,
 }).pipe(
 	Schema.decodeTo(AccessMatrix, {
-		decode: SchemaGetter.transformEffect(({ httpServices, nameServers }) =>
+		decode: SchemaGetter.transformEffect(({ httpServices, nameServers, meshServices }) =>
 			Effect.gen(function* () {
 				const entries: Array<AccessMatrixEntry> = [];
 
@@ -109,6 +128,12 @@ export const AccessMatrixFromFlake = Schema.Struct({
 
 				for (const plan of nameServerPlansFrom(nameServers)) {
 					entries.push(...(yield* dnsEntries(plan)));
+				}
+
+				for (const [hostKey, host] of Object.entries(meshServices)) {
+					for (const [serviceKey, cfg] of Object.entries(host.services)) {
+						entries.push(...(yield* meshEntries(hostKey, serviceKey, cfg)));
+					}
 				}
 
 				entries.sort(
