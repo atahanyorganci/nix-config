@@ -88,6 +88,9 @@
     vaultwarden = {
       enable = true;
       attachments = false;
+      # "Use single sign-on" through Authelia; email and master password
+      # logins stay until every account has linked itself.
+      sso.enable = true;
     };
     # Single sign-on: Authelia at auth.<domain>, against users and groups in
     # LLDAP (admin UI at ldap.<domain>, Admin only).

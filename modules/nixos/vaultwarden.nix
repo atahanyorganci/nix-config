@@ -7,6 +7,12 @@ in {
     ...
   }: let
     cfg = config.vaultwarden;
+    # Authelia's client for Vaultwarden. Both live on this host, so its
+    # nix-secrets file holds the secret twice: the plaintext for Vaultwarden,
+    # and its digest for Authelia.
+    ssoClientId = "vaultwarden";
+    ssoSecret = "authelia/oidc/clients/${ssoClientId}/secret";
+    ssoSecretDigest = "${ssoSecret}-digest";
   in {
     options.vaultwarden = {
       enable = lib.mkEnableOption ''
@@ -60,60 +66,141 @@ in {
           per organization).
         '';
       };
-    };
 
-    config = lib.mkIf cfg.enable {
-      services.vaultwarden = {
-        enable = true;
-        dbBackend = "postgresql";
-        # The web vault and WebAuthn need the public HTTPS origin, which the
-        # reverse proxy terminates.
-        domain = "${cfg.key}.${infra.domain}";
-        config = {
-          # The reverse proxy dials the host's mesh address; the firewall keeps
-          # the port off every other interface.
-          ROCKET_ADDRESS = "0.0.0.0";
-          ROCKET_PORT = cfg.port;
-          SIGNUPS_ALLOWED = cfg.openRegistration;
-          # Null leaves Vaultwarden's own default: no limit.
-          USER_ATTACHMENT_LIMIT =
-            if cfg.attachments
-            then null
-            else 0;
-          ORG_ATTACHMENT_LIMIT =
-            if cfg.attachments
-            then null
-            else 0;
-        };
-        # Read by PID 1 for EnvironmentFile before it drops to the service user,
-        # so it stays root's alone.
-        environmentFile = config.sops.templates."vaultwarden.env".path;
-      };
-
-      # A role's direct URL to its own database, verifying TLS against the
-      # system CA store (`sslrootcert=system`, libpq 16 and later). Vaultwarden
-      # migrates the schema itself on start.
-      sops.secrets."vaultwarden/database-url" = {};
-      sops.templates."vaultwarden.env" = {
-        content = ''
-          DATABASE_URL=${config.sops.placeholder."vaultwarden/database-url"}
+      sso = {
+        enable = lib.mkEnableOption ''
+          logging in through Authelia, on this host, over OpenID Connect. SSO
+          replaces the email step only: the master password still decrypts the
+          vault. A first SSO login creates an account, or joins the existing one
+          with the same (verified) email. It needs the client secret in the
+          host's nix-secrets file as `authelia/oidc/clients/vaultwarden/secret`
+          (plaintext, for Vaultwarden) and `…/secret-digest` (its PBKDF2
+          digest, for Authelia)
         '';
-        restartUnits = ["vaultwarden.service"];
-      };
 
-      # Private like every service on the proxy: NetBird's identity layer
-      # decides who reaches the login page, Vaultwarden's accounts the rest.
-      httpServices.${cfg.key} = {
-        inherit (cfg) port;
-        expose = {
-          enable = true;
-          private = true;
-          inherit (cfg) accessGroups;
+        only = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = ''
+            Refuse email and master password logins, so every login goes
+            through Authelia (SSO_ONLY). Turn on once every account has logged
+            in with SSO once, which links it.
+          '';
         };
-        auth.type = "none";
       };
-
-      networking.firewall.interfaces.${cfg.interface}.allowedTCPPorts = [cfg.port];
     };
+
+    config = lib.mkIf cfg.enable (lib.mkMerge [
+      (lib.mkIf cfg.sso.enable {
+        assertions = [
+          {
+            assertion = config.authelia.enable;
+            message = "vaultwarden.sso: Authelia must run on this host too; enable `authelia`.";
+          }
+        ];
+
+        services.vaultwarden.config = {
+          SSO_ENABLED = true;
+          SSO_ONLY = cfg.sso.only;
+          SSO_AUTHORITY = config.authelia.url;
+          SSO_CLIENT_ID = ssoClientId;
+          SSO_SCOPES = "email profile";
+          SSO_PKCE = true;
+          # Only LLDAP's users reach Authelia, and only NetBird's groups reach
+          # the vault, so a first SSO login may create an account.
+          SSO_SIGNUPS_ALLOWED = true;
+          SSO_SIGNUPS_MATCH_EMAIL = true;
+          # SSO for the login, Vaultwarden's own sessions after it (2 h access,
+          # 7 days idle refresh): Authelia's refresh tokens last 90 minutes,
+          # which would sign the apps out every time they sit idle that long.
+          SSO_AUTH_ONLY_NOT_SESSION = true;
+        };
+
+        authelia.oidc.clients.${ssoClientId} = {
+          client_name = "Vaultwarden";
+          secretFile = config.sops.secrets.${ssoSecretDigest}.path;
+          public = false;
+          authorization_policy = "two_factor";
+          # Choosing single sign-on on Vaultwarden's login page is the consent.
+          consent_mode = "implicit";
+          require_pkce = true;
+          pkce_challenge_method = "S256";
+          # Vaultwarden derives it from DOMAIN.
+          redirect_uris = ["https://${config.services.vaultwarden.domain}/identity/connect/oidc-signin"];
+          scopes = ["openid" "profile" "email"];
+          response_types = ["code"];
+          # Sessions are Vaultwarden's own, so no refresh tokens.
+          grant_types = ["authorization_code"];
+          # Vaultwarden reads email and name from userinfo, so the default,
+          # minimal ID token is enough; an opaque access token comes with
+          # `expires_in`, which Vaultwarden falls back to.
+          access_token_signed_response_alg = "none";
+          userinfo_signed_response_alg = "none";
+          token_endpoint_auth_method = "client_secret_basic";
+        };
+
+        sops.secrets = {
+          ${ssoSecret}.restartUnits = ["vaultwarden.service"];
+          ${ssoSecretDigest}.restartUnits = ["authelia-main.service"];
+        };
+      })
+      {
+        services.vaultwarden = {
+          enable = true;
+          dbBackend = "postgresql";
+          # The web vault and WebAuthn need the public HTTPS origin, which the
+          # reverse proxy terminates.
+          domain = "${cfg.key}.${infra.domain}";
+          config = {
+            # The reverse proxy dials the host's mesh address; the firewall keeps
+            # the port off every other interface.
+            ROCKET_ADDRESS = "0.0.0.0";
+            ROCKET_PORT = cfg.port;
+            SIGNUPS_ALLOWED = cfg.openRegistration;
+            # Null leaves Vaultwarden's own default: no limit.
+            USER_ATTACHMENT_LIMIT =
+              if cfg.attachments
+              then null
+              else 0;
+            ORG_ATTACHMENT_LIMIT =
+              if cfg.attachments
+              then null
+              else 0;
+          };
+          # Read by PID 1 for EnvironmentFile before it drops to the service user,
+          # so it stays root's alone.
+          environmentFile = config.sops.templates."vaultwarden.env".path;
+        };
+
+        # A role's direct URL to its own database, verifying TLS against the
+        # system CA store (`sslrootcert=system`, libpq 16 and later). Vaultwarden
+        # migrates the schema itself on start.
+        sops.secrets."vaultwarden/database-url" = {};
+        sops.templates."vaultwarden.env" = {
+          content =
+            ''
+              DATABASE_URL=${config.sops.placeholder."vaultwarden/database-url"}
+            ''
+            + lib.optionalString cfg.sso.enable ''
+              SSO_CLIENT_SECRET=${config.sops.placeholder.${ssoSecret}}
+            '';
+          restartUnits = ["vaultwarden.service"];
+        };
+
+        # Private like every service on the proxy: NetBird's identity layer
+        # decides who reaches the login page, Vaultwarden's accounts the rest.
+        httpServices.${cfg.key} = {
+          inherit (cfg) port;
+          expose = {
+            enable = true;
+            private = true;
+            inherit (cfg) accessGroups;
+          };
+          auth.type = "none";
+        };
+
+        networking.firewall.interfaces.${cfg.interface}.allowedTCPPorts = [cfg.port];
+      }
+    ]);
   };
 }
