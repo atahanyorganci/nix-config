@@ -15,7 +15,7 @@
       mkPackageOption
       optionalString
       ;
-    inherit (lib.types) listOf path str;
+    inherit (lib.types) bool lines listOf nullOr path str;
     cfg = config.services.jellyfin;
     # Authelia's client for Jellyfin. The secret is in nix-secrets twice: in
     # this host's file for the plugin, and as a PBKDF2 digest in the Authelia
@@ -70,6 +70,33 @@
         cfg.knownProxies}
       mv "$tmp" "$path"
     '';
+
+    # The login disclaimer and custom CSS, while either is set; the rest of
+    # branding.xml (the splash screen) stays the dashboard's.
+    brandingManaged = cfg.branding.loginDisclaimer != "" || cfg.branding.customCss != "";
+    updateBranding = pkgs.writeShellScript "jellyfin-update-branding" ''
+      set -euo pipefail
+      path="$1"
+      tmp="$(mktemp)"
+      if [ -s "$path" ]; then
+        ${getExe pkgs.xmlstarlet} ed \
+          -d '/BrandingOptions/LoginDisclaimer' \
+          -d '/BrandingOptions/CustomCss' \
+          "$path" >"$tmp"
+      else
+        printf '%s\n' \
+          '<?xml version="1.0" encoding="utf-8"?>' \
+          '<BrandingOptions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">' \
+          '</BrandingOptions>' >"$tmp"
+      fi
+      ${getExe pkgs.xmlstarlet} ed -L \
+        -s '/BrandingOptions' -t elem -n LoginDisclaimer -v ${lib.escapeShellArg cfg.branding.loginDisclaimer} \
+        -s '/BrandingOptions' -t elem -n CustomCss -v ${lib.escapeShellArg cfg.branding.customCss} \
+        "$tmp"
+      mv "$tmp" "$path"
+    '';
+
+    ssoStartUrl = "${cfg.oidc.publicUrl}/sso/OID/start/${cfg.oidc.providerName}";
 
     oidcCanonicalLinks =
       if cfg.oidc.canonicalUsername != "" && cfg.oidc.canonicalUserId != ""
@@ -132,6 +159,12 @@
         </OidConfigs>
       </PluginConfiguration>
     '';
+
+    # What activation writes that Jellyfin reads only at start.
+    restartInputs =
+      lib.optional (cfg.knownProxies != []) updateKnownProxies
+      ++ lib.optional brandingManaged updateBranding
+      ++ lib.optionals cfg.oidc.enable [oidcConfigTemplate ssoPlugin];
   in {
     options = {
       services.jellyfin = {
@@ -182,8 +215,43 @@
             (e.g. NetBird CGNAT so forwarded headers are trusted).
           '';
         };
+        branding = {
+          loginDisclaimer = mkOption {
+            type = lines;
+            default = "";
+            description = ''
+              Markdown or HTML on the login page (Dashboard, Branding). While
+              it or `customCss` is set, activation writes both into
+              branding.xml, over what the dashboard saved.
+            '';
+          };
+          customCss = mkOption {
+            type = lines;
+            default = "";
+            description = "CSS for every page (Dashboard, Branding).";
+          };
+        };
         oidc = {
           enable = mkEnableOption "Jellyfin sign-in through OpenID Connect (jellyfin-plugin-sso)";
+          loginButton = mkOption {
+            type = nullOr str;
+            default = "Sign in with Authelia";
+            description = ''
+              Label of a button on the login page that starts sign-in (in
+              `branding.loginDisclaimer`), or null for none.
+            '';
+          };
+          passwordLogin = mkOption {
+            type = bool;
+            default = true;
+            description = ''
+              Offer password sign-in on the web login page: the form, the user
+              tiles, "Manual Login" and "Forgot Password". Off, custom CSS
+              hides them, leaving the sign-in button and Quick Connect. That is
+              cosmetic: the API, and so the apps' own login screens, still take
+              passwords, though the accounts the plugin creates have random ones.
+            '';
+          };
           publicUrl = mkOption {
             type = str;
             example = "https://watch.example.com";
@@ -243,7 +311,46 @@
     };
 
     config = mkIf cfg.enable {
+      assertions = [
+        {
+          assertion = cfg.oidc.enable && !cfg.oidc.passwordLogin -> cfg.oidc.loginButton != null;
+          message = "services.jellyfin.oidc: without `passwordLogin`, the login page needs a `loginButton`.";
+        }
+      ];
+
       sops.secrets = mkIf cfg.oidc.enable {${ssoSecret} = {};};
+
+      # The plugin's README button: a form, since the login page opens the
+      # disclaimer's links in a new tab. Full width (the disclaimer's container
+      # is a flex box that shrinks it) and above Quick Connect.
+      services.jellyfin.branding = mkIf cfg.oidc.enable {
+        loginDisclaimer = mkIf (cfg.oidc.loginButton != null) (lib.mkBefore ''
+          <form action="${lib.escapeXML ssoStartUrl}">
+          <button class="raised block emby-button button-submit">${lib.escapeXML cfg.oidc.loginButton}</button>
+          </form>
+        '');
+        customCss = lib.mkMerge [
+          (mkIf (cfg.oidc.loginButton != null) ''
+            #loginPage .readOnlyContent {
+              display: flex;
+              flex-direction: column;
+            }
+            #loginPage .loginDisclaimerContainer {
+              display: block;
+              order: -1;
+              margin-top: 0;
+            }
+          '')
+          (mkIf (!cfg.oidc.passwordLogin) ''
+            #loginPage .manualLoginForm,
+            #loginPage .visualLoginForm,
+            #loginPage .btnManual,
+            #loginPage .btnForgotPassword {
+              display: none !important;
+            }
+          '')
+        ];
+      };
 
       # Confidential. The plugin's client (Duende OidcClient 6.0.1) always uses
       # PKCE, posts its secret in the body, and reads the user from userinfo,
@@ -276,6 +383,11 @@
           ${updateKnownProxies} '${cfg.configDir}/network.xml'
           chown '${user.username}' '${cfg.configDir}/network.xml'
         ''}
+        ${optionalString brandingManaged ''
+          echo "Updating Jellyfin branding..."
+          ${updateBranding} '${cfg.configDir}/branding.xml'
+          chown '${user.username}' '${cfg.configDir}/branding.xml'
+        ''}
         ${optionalString cfg.oidc.enable ''
           echo "Installing Jellyfin SSO (OIDC) plugin..."
           # Remove previous Remote Auth / SSO-entry leftovers.
@@ -302,19 +414,22 @@
           install -m 600 '${oidcConfigTemplate}' "$rendered"
           ${getExe pkgs.replace-secret} '@oidcSecret@' '${ssoSecretFile}' "$rendered"
           chown '${user.username}' "$rendered"
-          # Jellyfin reads plugin configuration once, at start, and writes back
-          # what it holds whenever it changes it (a new SSO user's link). So it
-          # restarts when the configuration or the plugin is new, rather than
-          # running on, and bringing back, the old one.
-          stamp="$plugin_dir/.nix-config.sha256"
-          want="$({ cat "$rendered"; echo '${ssoPlugin}'; } | ${pkgs.coreutils}/bin/sha256sum | cut -d ' ' -f 1)"
           mv -f "$rendered" "$config_xml"
+        ''}
+        ${optionalString (restartInputs != []) ''
+          # Jellyfin reads these only when it starts, and writes back what it
+          # holds whenever it changes one itself (a new SSO user's link). So it
+          # restarts when one is new, rather than running on, and bringing
+          # back, the old one. Store paths change with their contents; the
+          # client secret is not in the store.
+          stamp='${cfg.dataDir}/.nix-config.sha256'
+          want="$({ echo '${toString restartInputs}'; ${optionalString cfg.oidc.enable "cat '${ssoSecretFile}';"} } | ${pkgs.coreutils}/bin/sha256sum | cut -d ' ' -f 1)"
           if [ "$(cat "$stamp" 2>/dev/null)" != "$want" ]; then
-            echo "Restarting Jellyfin for its new SSO configuration..."
+            echo "Restarting Jellyfin for its new configuration..."
             if launchctl kickstart -k "gui/$(id -u '${user.username}')/${agentLabel}"; then
               printf '%s\n' "$want" >"$stamp"
             else
-              echo "warning: could not restart Jellyfin; it keeps its old SSO configuration until it restarts" >&2
+              echo "warning: could not restart Jellyfin; it keeps its old configuration until it restarts" >&2
             fi
           fi
         ''}

@@ -97,6 +97,8 @@
           oidc = {
             enable = true;
             publicUrl = "https://watch.${cfg.domain}";
+            # Sign-in through Authelia only; the apps use Quick Connect.
+            passwordLogin = false;
             usernameClaim = "email";
             # Keep admin when signing in with the LLDAP email.
             canonicalUsername = user.email;
