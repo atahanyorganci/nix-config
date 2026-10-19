@@ -293,7 +293,8 @@
           auth_header = {
             username_header = cfg.usernameHeader;
             allow_bypass_login = true;
-            debug = true;
+            # On, it logs every login request's headers.
+            debug = false;
           };
           http = {
             server_host = "0.0.0.0";
