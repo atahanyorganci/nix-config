@@ -45,8 +45,9 @@ in {
         type = lib.types.bool;
         default = false;
         description = ''
-          Let anyone who reaches the service create an account. Off, accounts
-          come only from organization invitations.
+          Let anyone who reaches the service create an account with email and
+          master password. Off, accounts come only from invitations, or with
+          `sso` only from single sign-on.
         '';
       };
 
@@ -109,6 +110,12 @@ in {
           # Only LLDAP's users reach Authelia, and only NetBird's groups reach
           # the vault, so a first SSO login may create an account.
           SSO_SIGNUPS_ALLOWED = true;
+          # The way in for an address without an account would otherwise be an
+          # invitation (organization or emergency access), registered with
+          # email and master password. Off, accounts come from SSO alone,
+          # existing ones can still be invited, and the web vault drops
+          # "Create account".
+          INVITATIONS_ALLOWED = false;
           SSO_SIGNUPS_MATCH_EMAIL = true;
           # SSO for the login, Vaultwarden's own sessions after it (2 h access,
           # 7 days idle refresh): Authelia's refresh tokens last 90 minutes,
