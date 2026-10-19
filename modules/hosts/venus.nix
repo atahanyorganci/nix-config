@@ -84,7 +84,17 @@
     calibre-web = {
       enable = true;
       listen.ip = "0.0.0.0";
-      options.enableBookUploading = true;
+      options = {
+        enableBookUploading = true;
+        # Logged in as the NetBird user the reverse proxy vouches for: its
+        # email is the Calibre-Web username. Only the proxy reaches the port
+        # over the mesh, and the header from any other address is dropped.
+        reverseProxyAuth = {
+          enable = true;
+          header = "X-NetBird-User";
+          trustedProxies = ["100.64.0.0/10"];
+        };
+      };
     };
     # SMB over the mesh, for Admin devices away from home; on the LAN it needs
     # no rule.

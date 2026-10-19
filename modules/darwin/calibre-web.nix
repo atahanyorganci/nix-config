@@ -41,6 +41,10 @@
           else "0"
         }"
         "config_reverse_proxy_login_header_name = '${cfg.options.reverseProxyAuth.header}'"
+        "config_reverse_proxy_trusted_ips = '${concatStringsSep "," cfg.options.reverseProxyAuth.trustedProxies}'"
+        # The secret is stored encrypted with Calibre-Web's own key, which the
+        # store cannot produce; source addresses are the boundary instead.
+        "config_reverse_proxy_use_shared_secret = 0"
         "config_logfile = '${logDir}/calibre-web.log'"
       ]
       ++ optional (
@@ -126,7 +130,19 @@
             type = types.str;
             default = "";
             description = ''
-              Auth proxy header name.
+              Auth proxy header name. Its value is matched, ignoring case,
+              against Calibre-Web usernames; no account is created for an
+              unknown one, which gets the login form.
+            '';
+          };
+          trustedProxies = mkOption {
+            type = types.listOf types.str;
+            default = ["127.0.0.1" "::1"];
+            example = ["100.64.0.0/10"];
+            description = ''
+              Addresses or CIDRs the header is accepted from; Calibre-Web
+              drops it from any other source. Every source in them must be
+              unable to forge it: only the proxy may reach the port.
             '';
           };
         };
