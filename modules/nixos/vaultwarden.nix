@@ -7,9 +7,9 @@ in {
     ...
   }: let
     cfg = config.vaultwarden;
-    # Authelia's client for Vaultwarden. Both live on this host, so its
-    # nix-secrets file holds the secret twice: the plaintext for Vaultwarden,
-    # and its digest for Authelia.
+    # Authelia's client for Vaultwarden. The secret is in nix-secrets twice:
+    # the plaintext in this host's file, for Vaultwarden, and its digest in the
+    # Authelia host's, for Authelia.
     ssoClientId = "vaultwarden";
     ssoSecret = "authelia/oidc/clients/${ssoClientId}/secret";
     ssoSecretDigest = "${ssoSecret}-digest";
@@ -70,13 +70,13 @@ in {
 
       sso = {
         enable = lib.mkEnableOption ''
-          logging in through Authelia, on this host, over OpenID Connect. SSO
-          replaces the email step only: the master password still decrypts the
-          vault. A first SSO login creates an account, or joins the existing one
-          with the same (verified) email. It needs the client secret in the
-          host's nix-secrets file as `authelia/oidc/clients/vaultwarden/secret`
-          (plaintext, for Vaultwarden) and `…/secret-digest` (its PBKDF2
-          digest, for Authelia)
+          logging in through the flake's Authelia (`oidcIssuer`) over OpenID
+          Connect. SSO replaces the email step only: the master password still
+          decrypts the vault. A first SSO login creates an account, or joins
+          the existing one with the same (verified) email. It needs the client
+          secret as `authelia/oidc/clients/vaultwarden/secret` in this host's
+          nix-secrets file (plaintext, for Vaultwarden) and `…/secret-digest`
+          in the Authelia host's (its PBKDF2 digest)
         '';
 
         only = lib.mkOption {
@@ -93,17 +93,10 @@ in {
 
     config = lib.mkIf cfg.enable (lib.mkMerge [
       (lib.mkIf cfg.sso.enable {
-        assertions = [
-          {
-            assertion = config.authelia.enable;
-            message = "vaultwarden.sso: Authelia must run on this host too; enable `authelia`.";
-          }
-        ];
-
         services.vaultwarden.config = {
           SSO_ENABLED = true;
           SSO_ONLY = cfg.sso.only;
-          SSO_AUTHORITY = config.authelia.url;
+          SSO_AUTHORITY = config.oidcIssuer;
           SSO_CLIENT_ID = ssoClientId;
           SSO_SCOPES = "email profile";
           SSO_PKCE = true;
@@ -123,33 +116,18 @@ in {
           SSO_AUTH_ONLY_NOT_SESSION = true;
         };
 
-        authelia.oidc.clients.${ssoClientId} = {
-          client_name = "Vaultwarden";
-          secretFile = config.sops.secrets.${ssoSecretDigest}.path;
-          public = false;
-          authorization_policy = "two_factor";
-          # Choosing single sign-on on Vaultwarden's login page is the consent.
-          consent_mode = "implicit";
-          require_pkce = true;
-          pkce_challenge_method = "S256";
+        # Confidential, with PKCE. Vaultwarden reads email and name from
+        # userinfo, so the default, minimal ID token is enough; an opaque
+        # access token comes with `expires_in`, which Vaultwarden falls back
+        # to. Sessions are Vaultwarden's own, so no refresh tokens.
+        oidcClients.${ssoClientId} = {
+          name = "Vaultwarden";
+          secretDigest = ssoSecretDigest;
           # Vaultwarden derives it from DOMAIN.
-          redirect_uris = ["https://${config.services.vaultwarden.domain}/identity/connect/oidc-signin"];
-          scopes = ["openid" "profile" "email"];
-          response_types = ["code"];
-          # Sessions are Vaultwarden's own, so no refresh tokens.
-          grant_types = ["authorization_code"];
-          # Vaultwarden reads email and name from userinfo, so the default,
-          # minimal ID token is enough; an opaque access token comes with
-          # `expires_in`, which Vaultwarden falls back to.
-          access_token_signed_response_alg = "none";
-          userinfo_signed_response_alg = "none";
-          token_endpoint_auth_method = "client_secret_basic";
+          redirectUris = ["https://${config.services.vaultwarden.domain}/identity/connect/oidc-signin"];
         };
 
-        sops.secrets = {
-          ${ssoSecret}.restartUnits = ["vaultwarden.service"];
-          ${ssoSecretDigest}.restartUnits = ["authelia-main.service"];
-        };
+        sops.secrets.${ssoSecret}.restartUnits = ["vaultwarden.service"];
       })
       {
         services.vaultwarden = {

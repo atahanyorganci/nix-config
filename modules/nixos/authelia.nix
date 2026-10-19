@@ -1,5 +1,8 @@
 {config, ...}: let
   infra = config.flake.infra;
+  # Every host, this one included: each declares the clients its services
+  # need (`oidcClients`), and Authelia registers them all.
+  allSystems = config.flake.nixosConfigurations // config.flake.darwinConfigurations;
 in {
   flake.modules.nixos.authelia = {
     lib,
@@ -19,6 +22,46 @@ in {
     # Clients whose secret digest is read from a file when Authelia starts.
     secretFileClients = lib.filterAttrs (_: client: client.secretFile != null) cfg.oidc.clients;
     credentialName = id: "oidc-client-${id}";
+
+    # Every host's `oidcClients`, merged; the list keeps duplicates for the
+    # uniqueness check.
+    declaredByHost = lib.mapAttrs (_: system: system.config.oidcClients) allSystems;
+    declared = lib.foldl' lib.mergeAttrs {} (lib.attrValues declaredByHost);
+    declaredIds = lib.concatMap lib.attrNames (lib.attrValues declaredByHost);
+    # A client's own claims and authorization policies are named after it.
+    policyName = id: "client-${id}";
+    toClient = id: client:
+      {
+        client_name = client.name;
+        inherit (client) public scopes;
+        authorization_policy =
+          if client.groups == []
+          then "two_factor"
+          else policyName id;
+        # Choosing to sign in through Authelia on the service is the consent.
+        consent_mode = "implicit";
+        redirect_uris = client.redirectUris;
+        response_types = ["code"];
+        grant_types = ["authorization_code"];
+        token_endpoint_auth_method =
+          if client.public
+          then "none"
+          else "client_secret_basic";
+        access_token_signed_response_alg = "none";
+        userinfo_signed_response_alg = "none";
+      }
+      // lib.optionalAttrs client.pkce {
+        require_pkce = true;
+        pkce_challenge_method = "S256";
+      }
+      // lib.optionalAttrs (client.idTokenClaims != []) {
+        claims_policy = policyName id;
+      }
+      // lib.optionalAttrs (client.secretDigest != null) {
+        secretFile = secret client.secretDigest;
+      }
+      // client.settings;
+    digestSecrets = lib.unique (lib.filter (key: key != null) (lib.mapAttrsToList (_: client: client.secretDigest) declared));
     clientSettings = id: client:
       {client_id = id;}
       // lib.removeAttrs client ["secretFile"]
@@ -107,7 +150,29 @@ in {
           OpenID Connect clients by client ID, each in Authelia's own schema
           (`identity_providers.oidc.clients`, without `client_id`), plus
           `secretFile`. A secret is a digest; the plaintext belongs to the
-          client. No clients, no provider.
+          client. No clients, no provider. Every host's `oidcClients` end up
+          here; set this directly only for what they cannot express.
+        '';
+      };
+
+      oidc.authorizationPolicies = lib.mkOption {
+        type = lib.types.attrsOf (pkgs.formats.yaml {}).type;
+        default = {};
+        example = {
+          admins = {
+            default_policy = "deny";
+            rules = [
+              {
+                policy = "two_factor";
+                subject = ["group:admin"];
+              }
+            ];
+          };
+        };
+        description = ''
+          Authorization policies by name
+          (`identity_providers.oidc.authorization_policies`), which a client
+          selects with `authorization_policy` to let in only some users.
         '';
       };
 
@@ -127,12 +192,42 @@ in {
     };
 
     config = lib.mkIf cfg.enable {
-      assertions = [
-        {
-          assertion = config.lldap.enable;
-          message = "authelia: users and groups come from LLDAP on the same host; enable `lldap` too.";
-        }
-      ];
+      assertions =
+        [
+          {
+            assertion = config.lldap.enable;
+            message = "authelia: users and groups come from LLDAP on the same host; enable `lldap` too.";
+          }
+          {
+            assertion = lib.length declaredIds == lib.length (lib.unique declaredIds);
+            message = "authelia: an OpenID Connect client ID is declared on more than one host (`oidcClients`).";
+          }
+        ]
+        ++ lib.mapAttrsToList (id: client: {
+          assertion =
+            if client.public
+            then client.secretDigest == null && client.pkce
+            else client.secretDigest != null;
+          message = "authelia: client `${id}` must be public with PKCE and no secret, or confidential with `secretDigest`.";
+        })
+        declared;
+
+      authelia.oidc = {
+        clients = lib.mapAttrs toClient declared;
+        claimsPolicies = lib.mapAttrs' (id: client: lib.nameValuePair (policyName id) {id_token = client.idTokenClaims;}) (
+          lib.filterAttrs (_: client: client.idTokenClaims != []) declared
+        );
+        authorizationPolicies = lib.mapAttrs' (id: client:
+          lib.nameValuePair (policyName id) {
+            default_policy = "deny";
+            rules = [
+              {
+                policy = "two_factor";
+                subject = map (group: "group:${group}") client.groups;
+              }
+            ];
+          }) (lib.filterAttrs (_: client: client.groups != []) declared);
+      };
 
       # Sessions survive Authelia restarts and deploys. Socket only, run as
       # Authelia's user so the socket is its own.
@@ -209,6 +304,9 @@ in {
               }
               // lib.optionalAttrs (cfg.oidc.claimsPolicies != {}) {
                 claims_policies = cfg.oidc.claimsPolicies;
+              }
+              // lib.optionalAttrs (cfg.oidc.authorizationPolicies != {}) {
+                authorization_policies = cfg.oidc.authorizationPolicies;
               };
           };
       };
@@ -233,7 +331,7 @@ in {
       };
 
       sops.secrets =
-        lib.genAttrs (generated ++ postgres) (_: {
+        lib.genAttrs (generated ++ postgres ++ digestSecrets) (_: {
           restartUnits = ["${unit}.service"];
         })
         // {

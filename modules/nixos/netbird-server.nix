@@ -23,47 +23,30 @@ in {
     passthroughProxyProtocol = config.netbird-proxy.enable && config.netbird-proxy.proxyProtocol.enable;
 
     # Authelia's client for the embedded IdP. The secret is in nix-secrets
-    # twice: the plaintext for the stack, which gives it to NetBird, and its
-    # digest for Authelia.
+    # twice: the plaintext in this host's file, for the stack, which gives it
+    # to NetBird, and its digest in the Authelia host's, for Authelia.
     autheliaSecret = "authelia/oidc/clients/netbird/secret";
     autheliaSecretDigest = "${autheliaSecret}-digest";
     autheliaIntegration = {
-      assertions = [
-        {
-          assertion = config.authelia.enable;
-          message = "netbird-server.authelia: Authelia must run on this host too; enable `authelia`.";
-        }
-      ];
-
-      authelia.oidc.clients.netbird = {
-        client_name = "NetBird";
-        secretFile = config.sops.secrets.${autheliaSecretDigest}.path;
-        public = false;
-        authorization_policy = "two_factor";
-        # Choosing the provider on NetBird's login page is the consent.
-        consent_mode = "implicit";
+      oidcClients.netbird = {
+        name = "NetBird";
+        secretDigest = autheliaSecretDigest;
         # The embedded IdP gives every connector this one callback.
-        redirect_uris = ["https://${cfg.domain}/oauth2/callback"];
-        # What the embedded IdP's generic OIDC connector requests: no groups.
+        redirectUris = ["https://${cfg.domain}/oauth2/callback"];
+        # What the embedded IdP's generic OIDC connector requests: no groups,
+        # and no PKCE.
         scopes = ["openid" "profile" "email"];
-        # The connector reads the user from the ID token alone, never userinfo,
-        # and refuses one without `name`.
-        claims_policy = "netbird";
-        response_types = ["code"];
-        grant_types = ["authorization_code"];
-        token_endpoint_auth_method = "client_secret_basic";
-        userinfo_signed_response_alg = "none";
+        pkce = false;
+        # The connector reads the user from the ID token alone, never
+        # userinfo, and refuses one without `name`.
+        idTokenClaims = ["email" "email_verified" "name" "preferred_username"];
       };
-
-      authelia.oidc.claimsPolicies.netbird.id_token = ["email" "email_verified" "name" "preferred_username"];
-
-      sops.secrets.${autheliaSecretDigest}.restartUnits = ["authelia-main.service"];
 
       # Created by the HomeInfra stack, which reads the plaintext secret from
       # this host's nix-secrets file.
       identityProviders.authelia = {
         inherit (cfg.authelia) name;
-        issuer = config.authelia.url;
+        issuer = config.oidcIssuer;
         clientId = "netbird";
         clientSecret = autheliaSecret;
       };
@@ -242,12 +225,12 @@ in {
 
       authelia = {
         enable = lib.mkEnableOption ''
-          Authelia, on this host, as a login provider for NetBird's embedded IdP:
-          an OpenID Connect client `netbird` in Authelia, and the provider in
+          the flake's Authelia (`oidcIssuer`) as a login provider for NetBird's
+          embedded IdP: an OpenID Connect client `netbird`, and the provider in
           NetBird, which the HomeInfra stack creates. It needs the client secret
-          in the host's nix-secrets file as `authelia/oidc/clients/netbird/secret`
-          (plaintext, for the stack) and `authelia/oidc/clients/netbird/secret-digest`
-          (its PBKDF2 digest, for Authelia). Deploy the host before the stack:
+          as `authelia/oidc/clients/netbird/secret` in this host's nix-secrets
+          file (plaintext, for the stack) and `…/secret-digest` in the Authelia
+          host's (its PBKDF2 digest). Deploy the Authelia host before the stack:
           NetBird checks the issuer when the provider is created
         '';
 
