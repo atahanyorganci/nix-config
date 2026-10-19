@@ -76,9 +76,16 @@
       environmentFiles = [config.sops.secrets."hermes/env".path];
       dashboard = {
         enable = true;
-        host = "127.0.0.1";
+        # Off loopback so Hermes's own login engages (it trusts any loopback
+        # bind). The firewall still keeps 9120 closed: only Caddy's mesh
+        # listener (bind.port) is reachable, and it dials 127.0.0.1.
+        host = "0.0.0.0";
         port = 9120;
-        auth.type = "none";
+        # Through the flake's Authelia, for LLDAP's `admin` group only.
+        auth = {
+          type = "oidc";
+          oidc.groups = ["admin"];
+        };
         bind = {
           interface = "nb-wt0";
           port = 9119;
@@ -86,6 +93,9 @@
         };
         expose = {
           key = "hermes";
+          # Still NetBird-only: with a login of its own, the module would
+          # otherwise expose it publicly.
+          private = true;
           accessGroups = ["Admin"];
         };
       };

@@ -227,17 +227,31 @@ in {
           issuer = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
-            description = "OIDC issuer URL.";
+            description = ''
+              OIDC issuer URL. With `auth.type = "oidc"` it defaults to the
+              flake's Authelia (`oidcIssuer`), which then gets the client
+              registered (`oidcClients`).
+            '';
           };
           clientId = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
-            description = "OIDC public client ID.";
+            description = ''OIDC public client ID; `"hermes"` with `auth.type = "oidc"`.'';
           };
           scopes = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
             description = "OIDC scopes (default: openid profile email).";
+          };
+          groups = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [];
+            example = ["admin"];
+            description = ''
+              LLDAP groups whose members may log in, enforced by the flake's
+              Authelia when it is the issuer. Hermes itself lets in anyone the
+              issuer authenticates. Empty allows every user.
+            '';
           };
         };
       };
@@ -505,6 +519,40 @@ in {
       # Auto-deploy Caddy + httpServices when bind.interface is set.
       # Do not use ConditionPathExists on the mesh iface: systemd skips the
       # unit forever if NetBird comes up after multi-user.target.
+      # The flake's Authelia by default, which registers the client this host
+      # declares: a public one, so there is no secret anywhere.
+      (lib.mkIf (cfg.auth.type == "oidc") {
+        services.hermes-agent.dashboard.auth.oidc = {
+          issuer = lib.mkDefault config.oidcIssuer;
+          clientId = lib.mkDefault "hermes";
+        };
+
+        assertions = [
+          {
+            assertion = publicUrl != null;
+            message = ''
+              services.hermes-agent.dashboard.auth.type = "oidc" needs a public
+              URL for the callback: set bind.interface or publicUrl.
+            '';
+          }
+        ];
+
+        oidcClients = lib.mkIf (cfg.auth.oidc.issuer == config.oidcIssuer && cfg.auth.oidc.clientId != null && publicUrl != null) {
+          ${cfg.auth.oidc.clientId} = {
+            name = "Hermes";
+            public = true;
+            redirectUris = ["${publicUrl}/auth/callback"];
+            scopes =
+              if cfg.auth.oidc.scopes != null
+              then lib.filter (scope: scope != "") (lib.splitString " " cfg.auth.oidc.scopes)
+              else ["openid" "profile" "email"];
+            # Hermes reads the user from the ID token, never userinfo.
+            idTokenClaims = ["email" "email_verified" "name" "preferred_username"];
+            inherit (cfg.auth.oidc) groups;
+          };
+        };
+      })
+
       (lib.mkIf bindActive {
         systemd.services =
           {
