@@ -1,0 +1,76 @@
+--- a/proxy/internal/proxy/reverseproxy.go
++++ b/proxy/internal/proxy/reverseproxy.go
+@@ -710,15 +710,30 @@
+ }
+ 
+ // stripSessionCookie removes the proxy's session cookie from the outgoing
+-// request while preserving all other cookies.
++// request while preserving all other cookies byte for byte. The raw header is
++// split on ";" instead of parsed: net/http drops cookies whose values are not
++// RFC 6265 tokens (such as Python's quoted values with \073 escapes), so
++// re-serialising the parsed cookies would silently lose them.
+ func stripSessionCookie(r *httputil.ProxyRequest) {
+-	cookies := r.In.Cookies()
++	lines := r.In.Header.Values("Cookie")
+ 	r.Out.Header.Del("Cookie")
+-	for _, c := range cookies {
+-		if c.Name != auth.SessionCookieName {
+-			r.Out.AddCookie(c)
++	kept := make([]string, 0, len(lines))
++	for _, line := range lines {
++		for _, pair := range strings.Split(line, ";") {
++			pair = strings.TrimSpace(pair)
++			if pair == "" {
++				continue
++			}
++			name, _, _ := strings.Cut(pair, "=")
++			if strings.TrimSpace(name) == auth.SessionCookieName {
++				continue
++			}
++			kept = append(kept, pair)
+ 		}
+ 	}
++	if len(kept) > 0 {
++		r.Out.Header.Set("Cookie", strings.Join(kept, "; "))
++	}
+ }
+ 
+ // stripSessionTokenQuery removes the OIDC session_token query parameter from
+--- a/proxy/internal/proxy/reverseproxy_test.go
++++ b/proxy/internal/proxy/reverseproxy_test.go
+@@ -218,6 +218,35 @@
+ 
+ 		assert.Empty(t, pr.Out.Header.Get("Cookie"))
+ 	})
++
++	t.Run("preserves cookie values net/http cannot parse", func(t *testing.T) {
++		pr := newProxyRequest(t, "http://example.com/", "1.2.3.4:5000")
++		// Python's http.cookies quotes a value containing ";" and escapes it as \073.
++		pr.In.Header.Add("Cookie", `nb_session=jwt-token; __Host-hermes_session_pkce="provider=self-hosted\073state=abc\073verifier=def"; theme=dark`)
++
++		rewrite(pr)
++
++		assert.Equal(t, `__Host-hermes_session_pkce="provider=self-hosted\073state=abc\073verifier=def"; theme=dark`, pr.Out.Header.Get("Cookie"))
++	})
++
++	t.Run("merges multiple Cookie headers", func(t *testing.T) {
++		pr := newProxyRequest(t, "http://example.com/", "1.2.3.4:5000")
++		pr.In.Header.Add("Cookie", "a=1; nb_session=jwt-token")
++		pr.In.Header.Add("Cookie", "b=2")
++
++		rewrite(pr)
++
++		assert.Equal(t, []string{"a=1; b=2"}, pr.Out.Header.Values("Cookie"))
++	})
++
++	t.Run("drops the header when only the session cookie is sent", func(t *testing.T) {
++		pr := newProxyRequest(t, "http://example.com/", "1.2.3.4:5000")
++		pr.In.Header.Add("Cookie", "nb_session=jwt-token")
++
++		rewrite(pr)
++
++		assert.Empty(t, pr.Out.Header.Values("Cookie"))
++	})
+ }
+ 
+ func TestRewriteFunc_SessionTokenQueryStripping(t *testing.T) {

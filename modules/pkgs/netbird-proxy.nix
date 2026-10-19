@@ -18,6 +18,12 @@
 
       vendorHash = "sha256-2lM0KtyU3RxA7KJtM10JslMpyHmgqxQ23B1Ieq986Y8=";
 
+      # Forward backend cookies verbatim. Upstream reparses the Cookie header
+      # to drop its own `nb_session`, and net/http silently discards values
+      # that are not RFC 6265 tokens, such as the quoted, `\073`-escaped ones
+      # Python writes (Hermes's PKCE state cookie never reached the callback).
+      patches = [../../patches/netbird/proxy-preserve-cookies.patch];
+
       proxyVendor = true;
 
       subPackages = ["proxy/cmd/proxy"];
