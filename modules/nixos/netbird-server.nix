@@ -87,7 +87,7 @@ in {
         disableGeoliteUpdate: false
         auth:
           issuer: "https://${cfg.domain}/oauth2"
-          localAuthDisabled: false
+          localAuthDisabled: ${lib.boolToString cfg.localAuthDisabled}
           signKeyRefreshEnabled: true
           sessionCookieEncryptionKey: "@sessionCookieKey@"
           dashboardRedirectURIs:
@@ -257,10 +257,34 @@ in {
           description = "Name on the button NetBird's login page offers for Authelia.";
         };
       };
+
+      localAuthDisabled = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Turn off the embedded IdP's local users (email and password): the
+          login page offers only external providers, and NetBird refuses to
+          create or invite local users. The server will not start unless a
+          provider already exists, and providers only come from the API (the
+          stack), so a new installation starts with this off and turns it on
+          once its provider is in place. Service-user tokens keep working; they
+          never use the login page.
+        '';
+      };
     };
 
     config = lib.mkIf cfg.enable (lib.mkMerge [
       (lib.mkIf cfg.authelia.enable autheliaIntegration)
+      {
+        assertions = [
+          {
+            # The provider itself is in the embedded IdP's storage, which Nix
+            # cannot see; one declared here is the closest check.
+            assertion = !cfg.localAuthDisabled || config.identityProviders != {};
+            message = "netbird-server.localAuthDisabled: no identity provider is declared on this host (`identityProviders`), so nobody could log in.";
+          }
+        ];
+      }
       {
         users.users.netbird = {
           isSystemUser = true;

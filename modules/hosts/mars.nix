@@ -55,8 +55,10 @@
       enable = true;
       acmeEmail = user.email;
       enableAgentNetwork = true;
-      # "Authelia" on NetBird's login page, next to local users.
+      # Authelia is NetBird's only login: local users are off. Recovery without
+      # it is the stack's service-user token, and SSH.
       authelia.enable = true;
+      localAuthDisabled = true;
     };
     netbird-proxy = {
       enable = true;
