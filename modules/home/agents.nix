@@ -126,6 +126,11 @@ in {
             else "dark";
         };
 
+        # Ctrl+T toggles thinking blocks and persists the result to
+        # settings.json, which then counts as a local edit and blocks later
+        # activations from updating the file. Keep them always visible.
+        keybindings."app.thinking.toggle" = [];
+
         # fetch-content shells out to all four: ImageMagick to validate and
         # downscale images, poppler to pull figures out of PDFs, gh to read
         # GitHub through the API instead of its rendered pages, and ffmpeg to
