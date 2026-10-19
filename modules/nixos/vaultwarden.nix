@@ -89,6 +89,14 @@ in {
           '';
         };
       };
+
+      smtp.enable = lib.mkEnableOption ''
+        email (new-device sign-in notices, emergency access) through the SMTP
+        relay (NetbirdServer's `smtp`), from `infra.mailDomain`. It needs
+        `smtp/{host,username,password}` in the host's nix-secrets file (`just
+        store-secret <host> --stack NetbirdServer smtp/host smtp/username
+        smtp/password`)
+      '';
     };
 
     config = lib.mkIf cfg.enable (lib.mkMerge [
@@ -129,6 +137,20 @@ in {
 
         sops.secrets.${ssoSecret}.restartUnits = ["vaultwarden.service"];
       })
+      (lib.mkIf cfg.smtp.enable {
+        # STARTTLS on the submission port; host and credentials come from
+        # vaultwarden.env.
+        services.vaultwarden.config = {
+          SMTP_PORT = 587;
+          SMTP_SECURITY = "starttls";
+          SMTP_FROM = "vault@${infra.mailDomain}";
+          SMTP_FROM_NAME = "Vaultwarden";
+        };
+
+        sops.secrets = lib.genAttrs ["smtp/host" "smtp/username" "smtp/password"] (_: {
+          restartUnits = ["vaultwarden.service"];
+        });
+      })
       {
         services.vaultwarden = {
           enable = true;
@@ -168,6 +190,11 @@ in {
             ''
             + lib.optionalString cfg.sso.enable ''
               SSO_CLIENT_SECRET=${config.sops.placeholder.${ssoSecret}}
+            ''
+            + lib.optionalString cfg.smtp.enable ''
+              SMTP_HOST=${config.sops.placeholder."smtp/host"}
+              SMTP_USERNAME=${config.sops.placeholder."smtp/username"}
+              SMTP_PASSWORD=${config.sops.placeholder."smtp/password"}
             '';
           restartUnits = ["vaultwarden.service"];
         };

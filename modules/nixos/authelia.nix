@@ -77,6 +77,8 @@ in {
       ++ lib.optionals oidc ["authelia/oidc/hmac-secret" "authelia/oidc/issuer-private-key"];
     # HomeInfra's `postgres.roles.authelia`, written by `just store-secret`.
     postgres = ["authelia/postgres/host" "authelia/postgres/username" "authelia/postgres/password"];
+    # NetbirdServer's `smtp`, shared by every service on the host that mails.
+    smtp = ["smtp/host" "smtp/username" "smtp/password"];
   in {
     options.authelia = {
       enable = lib.mkEnableOption ''
@@ -118,6 +120,14 @@ in {
         defaultText = lib.literalExpression ''"https://''${config.authelia.key}.''${infra.domain}"'';
         description = "Public URL of the portal, which is also the OpenID Connect issuer.";
       };
+
+      smtp.enable = lib.mkEnableOption ''
+        mailing one-time codes and password reset links through the SMTP relay
+        (NetbirdServer's `smtp`), from `infra.mailDomain`. Off, they land in a
+        file in the state directory. It needs `smtp/{host,username,password}`
+        in the host's nix-secrets file (`just store-secret <host> --stack
+        NetbirdServer smtp/host smtp/username smtp/password`)
+      '';
 
       oidc.clients = lib.mkOption {
         type = lib.types.attrsOf (lib.types.submodule {
@@ -251,10 +261,14 @@ in {
             oidcIssuerPrivateKeyFile = secret "authelia/oidc/issuer-private-key";
           };
         # The other two secrets, as credentials loaded below.
-        environmentVariables = {
-          AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE = "%d/ldap-password";
-          AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE = "%d/postgres-password";
-        };
+        environmentVariables =
+          {
+            AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE = "%d/ldap-password";
+            AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE = "%d/postgres-password";
+          }
+          // lib.optionalAttrs cfg.smtp.enable {
+            AUTHELIA_NOTIFIER_SMTP_PASSWORD_FILE = "%d/smtp-password";
+          };
         settings =
           {
             theme = "auto";
@@ -289,8 +303,12 @@ in {
             };
             # Address, username and TLS server name come from authelia.env.
             storage.postgres.database = "authelia";
-            # Until there is SMTP: one-time codes and reset links land here.
-            notifier.filesystem.filename = "/var/lib/${unit}/notifications.txt";
+            # One-time codes and reset links, by email or into a file. The
+            # relay's address and username come from authelia.env.
+            notifier =
+              if cfg.smtp.enable
+              then {smtp.sender = "Authelia <auth@${infra.mailDomain}>";}
+              else {filesystem.filename = "/var/lib/${unit}/notifications.txt";};
             totp.issuer = infra.domain;
             webauthn = {
               display_name = infra.domain;
@@ -326,12 +344,13 @@ in {
               "ldap-password:${secret "lldap/admin-password"}"
               "postgres-password:${secret "authelia/postgres/password"}"
             ]
+            ++ lib.optional cfg.smtp.enable "smtp-password:${secret "smtp/password"}"
             ++ lib.mapAttrsToList (id: client: "${credentialName id}:${client.secretFile}") secretFileClients;
         };
       };
 
       sops.secrets =
-        lib.genAttrs (generated ++ postgres ++ digestSecrets) (_: {
+        lib.genAttrs (generated ++ postgres ++ digestSecrets ++ lib.optionals cfg.smtp.enable smtp) (_: {
           restartUnits = ["${unit}.service"];
         })
         // {
@@ -340,14 +359,20 @@ in {
         };
 
       # Settings Authelia takes from the environment: PlanetScale's host and the
-      # role's username, which only the stack knows. TLS is verified against
-      # the system CA store.
+      # role's username, and the relay's host and username, which only the
+      # stacks know. TLS is verified against the system CA store; the relay
+      # takes STARTTLS on the submission port.
       sops.templates."authelia.env" = {
-        content = ''
-          AUTHELIA_STORAGE_POSTGRES_ADDRESS=tcp://${placeholder "authelia/postgres/host"}:5432
-          AUTHELIA_STORAGE_POSTGRES_USERNAME=${placeholder "authelia/postgres/username"}
-          AUTHELIA_STORAGE_POSTGRES_TLS_SERVER_NAME=${placeholder "authelia/postgres/host"}
-        '';
+        content =
+          ''
+            AUTHELIA_STORAGE_POSTGRES_ADDRESS=tcp://${placeholder "authelia/postgres/host"}:5432
+            AUTHELIA_STORAGE_POSTGRES_USERNAME=${placeholder "authelia/postgres/username"}
+            AUTHELIA_STORAGE_POSTGRES_TLS_SERVER_NAME=${placeholder "authelia/postgres/host"}
+          ''
+          + lib.optionalString cfg.smtp.enable ''
+            AUTHELIA_NOTIFIER_SMTP_ADDRESS=submission://${placeholder "smtp/host"}:587
+            AUTHELIA_NOTIFIER_SMTP_USERNAME=${placeholder "smtp/username"}
+          '';
         restartUnits = ["${unit}.service"];
       };
 

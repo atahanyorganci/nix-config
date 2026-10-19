@@ -94,11 +94,15 @@
         enable = true;
         only = true;
       };
+      smtp.enable = true;
     };
     # Single sign-on: Authelia at auth.<domain>, against users and groups in
     # LLDAP (admin UI at ldap.<domain>, Admin only).
     lldap.enable = true;
-    authelia.enable = true;
+    authelia = {
+      enable = true;
+      smtp.enable = true;
+    };
     agent-gateway = {
       enable = true;
       # The reverse proxy dials mars's mesh address, so the listener has to exist
