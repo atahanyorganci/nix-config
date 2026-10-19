@@ -31,6 +31,15 @@ in {
         options = {
           domain = lib.mkOption {type = lib.types.str;};
           netbirdManagementDomain = lib.mkOption {type = lib.types.str;};
+          mailDomain = lib.mkOption {
+            type = lib.types.str;
+            description = ''
+              Domain the hosts' mail (Authelia's codes and links, Vaultwarden's
+              notices) is sent from. The NetbirdServer stack verifies it with
+              SES and publishes its DKIM, MAIL FROM and DMARC records. A
+              subdomain, so the apex stays free for a mailbox.
+            '';
+          };
           axiom.dataset = lib.mkOption {
             type = lib.types.strMatching "[A-Za-z0-9-]{1,128}";
             description = ''
@@ -56,6 +65,7 @@ in {
   config.flake.infra = rec {
     domain = "yorganci.dev";
     netbirdManagementDomain = "netbird.${domain}";
+    mailDomain = "mail.${domain}";
     axiom.dataset = "otel";
   };
 }

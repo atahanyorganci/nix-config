@@ -21,6 +21,15 @@ export interface NetbirdServerStackOutputs {
 		email: string;
 		password: Redacted.Redacted<string>;
 	};
+	/** SES's SMTP relay for mail from `infra.mailDomain` (STARTTLS on `port`). */
+	smtp: {
+		host: string;
+		port: number;
+		username: string;
+		password: Redacted.Redacted<string>;
+		domain: string;
+		verified: boolean;
+	};
 }
 
 export class NetbirdServerStack extends Alchemy.Stack<NetbirdServerStack, NetbirdServerStackOutputs>()(

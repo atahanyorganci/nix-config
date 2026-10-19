@@ -8,7 +8,7 @@ import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { NetbirdServer, NetbirdServerStack, Nix, Aws } from "../src/index.ts";
+import { NetbirdServer, NetbirdServerStack, Nix, Aws, Ses } from "../src/index.ts";
 
 /**
  * The repository root, relative to `packages/stack`. `Nix` resources and
@@ -35,6 +35,7 @@ const Me = Schema.Struct({
 const Infra = Schema.Struct({
 	domain: Schema.String,
 	netbirdManagementDomain: Schema.String,
+	mailDomain: Schema.String,
 });
 
 /**
@@ -184,6 +185,16 @@ export default NetbirdServerStack.make(
 		const zone = yield* Cloudflare.Zone.Zone("Domain", {
 			name: infra.domain,
 		});
+
+		// The hosts' mail goes out through SES in the AWS provider's region,
+		// which the SMTP endpoint, password and MAIL FROM records depend on.
+		const smtp = yield* Ses.smtpRelay({
+			domain: infra.mailDomain,
+			zoneId: zone.zoneId,
+			region: yield* yield* AWS.Region,
+			// Until SES grants production access: verified addresses only.
+			sandboxRecipients: [me.email],
+		});
 		const netbirdRecord = yield* Cloudflare.DNS.Record("NetbirdDnsRecord", {
 			zoneId: zone.zoneId,
 			name: infra.netbirdManagementDomain,
@@ -235,6 +246,7 @@ export default NetbirdServerStack.make(
 				email: setup.email,
 				password: setup.password,
 			},
+			smtp,
 		};
 	}),
 );
