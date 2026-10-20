@@ -352,5 +352,40 @@ in {
         cacheRead = 0.0028;
       };
     }
+    {
+      id = "opencode/longcat-2.5-preview-free";
+      name = "LongCat 2.5 Preview Free";
+      contextWindow = 1000000;
+      maxTokens = 131072;
+      # Thinking is an on/off toggle rather than an effort scale.
+      efforts = ["none" "high"];
+      cost = {
+        input = 0;
+        output = 0;
+      };
+    }
+    {
+      id = "opencode/minimax-m3.1-flash-free";
+      name = "MiniMax M3.1 Flash Free";
+      contextWindow = 1000000;
+      maxTokens = 512000;
+      efforts = ["low" "medium" "high" "xhigh" "max"];
+      cost = {
+        input = 0;
+        output = 0;
+      };
+    }
+    {
+      id = "opencode/beam-free";
+      name = "Beam Free";
+      contextWindow = 1048576;
+      maxTokens = 131072;
+      efforts = ["low" "medium" "high" "xhigh" "max"];
+      image = false;
+      cost = {
+        input = 0;
+        output = 0;
+      };
+    }
   ];
 }
