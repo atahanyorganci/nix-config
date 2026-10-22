@@ -82,6 +82,7 @@ in {
             "toml"
             "tsgo"
             "xml"
+            "swift"
           ];
           userSettings = {
             auto_update = false;
