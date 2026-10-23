@@ -93,6 +93,13 @@ in {
             # Otherwise Zed also lists every alias in ~/.ssh/config, unlabelled,
             # beside the connections above.
             read_ssh_config = false;
+            file_scan_exclusions = [
+              "**/node_modules"
+              "**/.turbo"
+              "**/Pods"
+              "**/.local/worktrees"
+              "..."
+            ];
             base_keymap = "VSCode";
             # Editor
             auto_indent_on_paste = true;
