@@ -164,7 +164,16 @@ in {
             name = "model-profile";
             src = "${pkgs.yorganci-pi-extension}/model-profile";
           }
+          {
+            name = "compaction-thinking";
+            src = "${pkgs.yorganci-pi-extension}/compaction-thinking";
+          }
         ];
+
+        # Compaction reuses the session's thinking level, and Opus at `max`
+        # fails to produce a summary where `high` succeeds. Only the summary
+        # request is remapped; the session stays on `max`.
+        compactionThinking.models."llm-gateway/claude-code/claude-opus-5-5".max = "high";
 
         modelProfiles.models = lib.listToAttrs (map (model: lib.nameValuePair "llm-gateway/${model.id}" (mkProfile model)) gatewayModels);
 
