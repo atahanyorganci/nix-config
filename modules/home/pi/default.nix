@@ -43,10 +43,16 @@
     hasModels = cfg.models != {};
     hasModelProfiles = (modelProfilesJson.models or {}) != {};
 
+    # A model whose every level is left unset maps nothing, so it is dropped
+    # rather than written as an empty object.
+    compactionThinkingModels = lib.filterAttrs (_: levels: levels != {}) (stripNulls cfg.compactionThinking.models);
+    hasCompactionThinking = compactionThinkingModels != {};
+
     settingsFile = jsonFormat.generate "pi-settings.json" settingsJson;
     keybindingsFile = jsonFormat.generate "pi-keybindings.json" keybindingsJson;
     modelsFile = jsonFormat.generate "pi-models.json" cfg.models;
     modelProfilesFile = jsonFormat.generate "pi-model-profile.json" modelProfilesJson;
+    compactionThinkingFile = jsonFormat.generate "pi-compaction-thinking.json" {models = compactionThinkingModels;};
 
     # Files are copied into place, not symlinked. Pi rewrites settings.json at
     # runtime (`/model` Ctrl+S, `/settings`, and its own changelog/analytics
@@ -469,6 +475,47 @@
           this option only supplies its configuration.
         '';
       };
+
+      compactionThinking = lib.mkOption {
+        type = lib.types.submodule {
+          options.models = lib.mkOption {
+            type = let
+              # Pi's thinking levels, in order.
+              levels = ["off" "minimal" "low" "medium" "high" "xhigh" "max"];
+            in
+              lib.types.attrsOf (lib.types.submodule {
+                options = lib.genAttrs levels (from:
+                  lib.mkOption {
+                    type = lib.types.nullOr (lib.types.enum levels);
+                    default = null;
+                    description = ''
+                      Thinking level compaction uses while the session is on
+                      `${from}`. Unset keeps `${from}`.
+                    '';
+                  });
+              });
+            default = {};
+            example = lib.literalExpression ''
+              {
+                "llm-gateway/claude-code/claude-opus-5-5".max = "high";
+              }
+            '';
+            description = ''
+              Per-model thinking-level remaps for compaction, keyed by
+              `"provider/modelId"`. The session keeps its own level; only
+              the summary request is sent at the mapped one.
+            '';
+          };
+        };
+        default = {};
+        description = ''
+          Configuration for the `compaction-thinking` extension, written to
+          {file}`compaction-thinking.json` in {option}`programs.pi.configDir`.
+
+          Only written when a level is mapped. The extension itself still
+          has to be listed in {option}`programs.pi.extensions`.
+        '';
+      };
     };
 
     config = lib.mkIf cfg.enable {
@@ -529,6 +576,9 @@
       home.file =
         lib.optionalAttrs hasModelProfiles {
           "${cfg.configDir}/model-profile.json".source = modelProfilesFile;
+        }
+        // lib.optionalAttrs hasCompactionThinking {
+          "${cfg.configDir}/compaction-thinking.json".source = compactionThinkingFile;
         }
         // lib.optionalAttrs (cfg.context != "") (
           if lib.isPath cfg.context

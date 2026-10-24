@@ -63,20 +63,21 @@ Add the flake that provides this module as an input and import
 
 ## Options
 
-| Option          | Description                                                                                                          |
-| --------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `enable`        | Install pi and manage its configuration.                                                                             |
-| `package`       | The pi package. Set to `null` to manage config without installing pi.                                                |
-| `extraPackages` | Extra programs on the wrapped `pi` binary's PATH (pi shells out to `npm`, and some packages need `bun` or `git`).    |
-| `configDir`     | Where pi's configuration lives. Defaults to `$XDG_CONFIG_HOME/pi/agent`; `PI_CODING_AGENT_DIR` is exported to match. |
-| `sessionDir`    | Where session transcripts live. Defaults to `$XDG_STATE_HOME/pi/sessions`; `null` keeps them in `configDir`.         |
-| `settings`      | Typed settings written to `settings.json`.                                                                           |
-| `extraSettings` | Free-form settings merged over `settings`, for keys a newer pi supports.                                             |
-| `keybindings`   | Typed keybindings written to `keybindings.json`.                                                                     |
-| `models`        | Free-form custom providers and models written to `models.json`.                                                      |
-| `extensions`    | Extensions linked into `configDir/extensions`, each `{ name; src; }`.                                                |
-| `context`       | Global agent context written to `AGENTS.md`; inline text or a path.                                                  |
-| `modelProfiles` | Context budgets and fast-mode flags for the `model-profile` extension, written to `model-profile.json`.              |
+| Option               | Description                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `enable`             | Install pi and manage its configuration.                                                                             |
+| `package`            | The pi package. Set to `null` to manage config without installing pi.                                                |
+| `extraPackages`      | Extra programs on the wrapped `pi` binary's PATH (pi shells out to `npm`, and some packages need `bun` or `git`).    |
+| `configDir`          | Where pi's configuration lives. Defaults to `$XDG_CONFIG_HOME/pi/agent`; `PI_CODING_AGENT_DIR` is exported to match. |
+| `sessionDir`         | Where session transcripts live. Defaults to `$XDG_STATE_HOME/pi/sessions`; `null` keeps them in `configDir`.         |
+| `settings`           | Typed settings written to `settings.json`.                                                                           |
+| `extraSettings`      | Free-form settings merged over `settings`, for keys a newer pi supports.                                             |
+| `keybindings`        | Typed keybindings written to `keybindings.json`.                                                                     |
+| `models`             | Free-form custom providers and models written to `models.json`.                                                      |
+| `extensions`         | Extensions linked into `configDir/extensions`, each `{ name; src; }`.                                                |
+| `context`            | Global agent context written to `AGENTS.md`; inline text or a path.                                                  |
+| `modelProfiles`      | Context budgets and fast-mode flags for the `model-profile` extension, written to `model-profile.json`.              |
+| `compactionThinking` | Per-model thinking-level remaps for the `compaction-thinking` extension, written to `compaction-thinking.json`.      |
 
 ## Extensions
 
@@ -140,6 +141,31 @@ it, so nothing rewrites it at runtime.
 
 See `packages/pi-extension/src/model-profile/README.md` for the extension's own
 behaviour and the file format it accepts.
+
+### compaction-thinking
+
+Pi's compaction summarizes at the session's thinking level. `compactionThinking`
+configures the in-tree `compaction-thinking` extension, which swaps that level
+for another, per model and per session level, during compaction only. The
+session keeps its own level:
+
+```nix
+programs.pi = {
+  extensions = [
+    {
+      name = "compaction-thinking";
+      src = "${pkgs.yorganci-pi-extension}/compaction-thinking";
+    }
+  ];
+
+  # While the session is on `max`, compaction summarizes at `high`.
+  compactionThinking.models."llm-gateway/claude-code/claude-opus-5-5".max = "high";
+};
+```
+
+If a model or level has no entry, pi's default compaction runs. A mapped
+compaction that fails is cancelled rather than retried at the original level,
+and pi tries again at the next threshold.
 
 When `src` is a directory it is copied without `node_modules`, build caches or
 tooling configs, so a workspace package can be pointed at directly. Dropping

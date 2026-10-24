@@ -10,6 +10,7 @@
 	],
 	"type": "module",
 	"exports": {
+		"./compaction-thinking": "./src/compaction-thinking/index.ts",
 		"./context7": "./src/context7/index.ts",
 		"./fetch-content": "./src/fetch-content/index.ts",
 		"./package.json": "./package.json",
@@ -53,6 +54,7 @@
 	},
 	"pi": {
 		"extensions": [
+			"./dist/compaction-thinking",
 			"./dist/context7",
 			"./dist/fetch-content",
 			"./dist/model-profile",
