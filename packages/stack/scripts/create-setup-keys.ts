@@ -128,6 +128,14 @@ const withAlchemyState = <A, E>(
 		}).pipe(Effect.provide(services), Effect.scoped);
 	});
 
+const noGroupFlag = Flag.Boolean("no-group").pipe(
+	Flag.withDescription(
+		"Create the keys without a group, for a NetBird server HomeInfra has not set up yet (it puts Servers and Agents peers in their groups itself)",
+	),
+	// A boolean flag left out fails unless it has a default.
+	Flag.withDefault(false),
+);
+
 const hostsArg = Argument.String("host").pipe(
 	Argument.withDescription("Host name (NetBird peer dns_label, e.g. mars, venus)"),
 	Argument.variadic({ min: 1 }),
@@ -137,12 +145,13 @@ const createSetupKeys = Command.make("create-setup-keys", {
 	hosts: hostsArg,
 	stage: stageFlag,
 	profile: profileFlag,
+	noGroup: noGroupFlag,
 }).pipe(
 	Command.withDescription(
-		"Create one-off NetBird setup keys that assign each host to its inventory peer group (Servers or Agents)",
+		"Create one-off NetBird setup keys that assign each host to its inventory peer group (Servers or Agents), or to none with --no-group",
 	),
 	Command.withHandler(
-		Effect.fn(function* ({ hosts, stage, profile }) {
+		Effect.fn(function* ({ hosts, stage, profile, noGroup }) {
 			const inventory = yield* evalInventory;
 			yield* withAlchemyState({ stage, profile }, state =>
 				Effect.gen(function* () {
@@ -158,12 +167,15 @@ const createSetupKeys = Command.make("create-setup-keys", {
 							);
 						}
 
-						const groupId = yield* groupIdFromState(state, stage, groupName);
+						// The group ids come from HomeInfra's output, which a NetBird server
+						// it has not set up yet does not match: HomeInfra needs the peers
+						// enrolled first, and then puts them in their groups itself.
+						const autoGroups = noGroup ? [] : [yield* groupIdFromState(state, stage, groupName)];
 						const setupKey = yield* setupKeysPost({
 							name: host,
 							type: "one-off",
 							expires_in: SETUP_KEY_EXPIRES_IN_SECONDS,
-							auto_groups: [groupId],
+							auto_groups: autoGroups,
 							usage_limit: 1,
 							ephemeral: false,
 							allow_extra_dns_labels: false,

@@ -14,6 +14,7 @@ STAGE="${STAGE:-dev_${USER}}"
 PROFILE="${ALCHEMY_PROFILE:-default}"
 MANAGEMENT_URL="${NETBIRD_MANAGEMENT_URL:-}"
 SSH_USER="${SSH_USER:-$USER}"
+NO_GROUP=""
 
 PEER=""
 SSH_TARGET=""
@@ -42,6 +43,8 @@ Flags:
   --profile PROFILE        Alchemy auth profile (defaults to $ALCHEMY_PROFILE or default)
   --management-url URL     NetBird management URL (defaults to $NETBIRD_MANAGEMENT_URL or flake)
   --ssh-user USER          SSH login user (defaults to $SSH_USER or $USER)
+  --no-group               Create the setup key without a group, for a NetBird
+                           server HomeInfra has not set up yet
   -h, --help               Show this help
 EOF
 }
@@ -73,6 +76,10 @@ parse_args() {
             --ssh-user)
                 SSH_USER="${2:?--ssh-user requires a value}"
                 shift 2
+                ;;
+            --no-group)
+                NO_GROUP=1
+                shift
                 ;;
             -h | --help)
                 usage
@@ -120,7 +127,11 @@ load_management_url() {
 
 provision_setup_key() {
     # Runs inside the NetbirdServer stack, whose secrets load NetBird credentials from Doppler.
-    local -a cmd=(node "${SCRIPT_DIR}/create-setup-keys.ts" --stage "$STAGE" --profile "$PROFILE" "$PEER")
+    local -a cmd=(node "${SCRIPT_DIR}/create-setup-keys.ts" --stage "$STAGE" --profile "$PROFILE")
+    if [[ -n $NO_GROUP ]]; then
+        cmd+=(--no-group)
+    fi
+    cmd+=("$PEER")
 
     cd "$STACK_DIR"
     local line setup_key
