@@ -79,16 +79,22 @@ in {
     postgres = ["authelia/postgres/host" "authelia/postgres/username" "authelia/postgres/password"];
     # NetbirdServer's `smtp`, shared by every service on the host that mails.
     smtp = ["smtp/host" "smtp/username" "smtp/password"];
+    # The LLDAP account Authelia logs in with: a password manager may read
+    # users and groups and reset non-admins' passwords, and nothing else. Its
+    # password is generated once into nix-secrets.
+    ldapUser = "authelia";
+    ldapPasswordSecret = "authelia/ldap-password";
   in {
     options.authelia = {
       enable = lib.mkEnableOption ''
         Authelia, the login portal and OpenID Connect provider, keeping its
         state (second factors, consents, tokens, bans) in the infra Postgres
         cluster (HomeInfra's `postgres.roles.authelia`) and its sessions in a
-        local Redis. Users and groups are LLDAP's, on the same host. It needs
+        local Redis. Users and groups are LLDAP's, on the same host, which it
+        reads as its own account (`authelia`, a password manager). It needs
         `authelia/postgres/{host,username,password}` and
-        `authelia/{jwt-secret,session-secret,storage-encryption-key}` in the
-        host's nix-secrets file before it is enabled, and
+        `authelia/{jwt-secret,session-secret,storage-encryption-key,ldap-password}`
+        in the host's nix-secrets file before it is enabled, and
         `authelia/oidc/{hmac-secret,issuer-private-key}` once it has a client:
         sops-nix fails activation on a missing key. The storage encryption key
         encrypts second factors in Postgres; replacing it, rather than changing
@@ -283,9 +289,10 @@ in {
               implementation = "lldap";
               address = "ldap://127.0.0.1:${toString config.lldap.ldapPort}";
               base_dn = config.lldap.baseDn;
-              # LLDAP's admin: password resets and changes need a user that may
-              # set passwords, and its password is pinned from nix-secrets.
-              user = "uid=${infra.admin.name},ou=people,${config.lldap.baseDn}";
+              # Its own account: password resets and changes need one that may
+              # set passwords, which a password manager may for everyone but
+              # LLDAP's admins.
+              user = "uid=${ldapUser},ou=people,${config.lldap.baseDn}";
             };
             # Only forward-auth consults access control, and nothing uses it:
             # apps log in over OpenID Connect. Authelia wants a policy anyway.
@@ -329,19 +336,32 @@ in {
           };
       };
 
+      lldap.ensure = {
+        users.${ldapUser} = {
+          email = "${ldapUser}@${infra.domain}";
+          displayName = "Authelia";
+          groups = ["lldap_password_manager"];
+          passwordSecret = ldapPasswordSecret;
+        };
+        # Every group a client lets in exists, so membership is all that is
+        # left to grant.
+        groups = lib.unique (lib.concatMap (client: client.groups) (lib.attrValues declared));
+      };
+
       systemd.services.${unit} = {
-        # LLDAP may still be migrating when Authelia starts; Authelia restarts
-        # until it answers. Sessions cannot do without Redis.
-        wants = ["lldap.service"];
+        # Authelia's startup check logs in to LLDAP as its account, which
+        # lldap-ensure creates and keeps the password of; Authelia restarts
+        # until it can. Sessions cannot do without Redis.
+        wants = ["lldap.service" "lldap-ensure.service"];
         requires = ["redis-authelia.service"];
-        after = ["lldap.service" "redis-authelia.service"];
+        after = ["lldap.service" "lldap-ensure.service" "redis-authelia.service"];
         serviceConfig = {
           # Read by PID 1 before it drops to the service user, so it stays
           # root's alone.
           EnvironmentFile = config.sops.templates."authelia.env".path;
           LoadCredential =
             [
-              "ldap-password:${secret infra.admin.passwordSecret}"
+              "ldap-password:${secret ldapPasswordSecret}"
               "postgres-password:${secret "authelia/postgres/password"}"
             ]
             ++ lib.optional cfg.smtp.enable "smtp-password:${secret "smtp/password"}"
@@ -354,8 +374,8 @@ in {
           restartUnits = ["${unit}.service"];
         })
         // {
-          # Declared by the lldap module; Authelia binds with it too.
-          ${infra.admin.passwordSecret}.restartUnits = ["${unit}.service"];
+          # Declared by the lldap module, which sets it on Authelia's account.
+          ${ldapPasswordSecret}.restartUnits = ["${unit}.service"];
         };
 
       # Settings Authelia takes from the environment: PlanetScale's host and the
