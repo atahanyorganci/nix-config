@@ -245,6 +245,8 @@ export default HomeInfra.make(
 		});
 
 		const services: Record<string, string> = {};
+		// By the domain they publish, for what has to wait for one of them.
+		const proxyServices: Record<string, NetBird.ReverseProxyService> = {};
 		for (const plan of plans) {
 			const peer = peers[plan.hostKey]!;
 			for (const groupName of ReverseProxy.groupNamesForPlan(plan)) {
@@ -259,7 +261,7 @@ export default HomeInfra.make(
 				}
 			}
 			const auth = yield* ReverseProxy.decodeAuth(plan.cfg.auth);
-			yield* NetBird.ReverseProxyService(
+			proxyServices[plan.domain] = yield* NetBird.ReverseProxyService(
 				String.pascalCase(plan.serviceKey),
 				Output.all(peer.peerId, groupIdTable).pipe(
 					Output.map(([peerId, groupIds]) => ReverseProxy.bindServiceProps(plan, auth, peerId, groupIds)),
@@ -454,7 +456,9 @@ export default HomeInfra.make(
 		// run them. Each client secret is decrypted from its host's nix-secrets
 		// file at the revision the flake locks, the one that host deploys, so
 		// planning needs the YubiKey. NetBird checks the issuer on create and
-		// update: deploy the host first.
+		// update: deploy the host first. An issuer published through this
+		// stack's reverse proxy (Authelia's) is waited for: the provider comes
+		// after its service, and then until its discovery document answers.
 		const identityProviderConfigs = yield* Nix.evaluate(
 			{ flakeRoot: REPO_ROOT, attr: "identityProviders" },
 			IdentityProviders.IdentityProviders,
@@ -464,12 +468,14 @@ export default HomeInfra.make(
 			{ idpId: NetBird.IdentityProvider["idpId"]; redirectUrl: NetBird.IdentityProvider["redirectUrl"] }
 		> = {};
 		for (const plan of yield* IdentityProviders.plans(identityProviderConfigs)) {
+			const servedBy = proxyServices[IdentityProviders.issuerHost(plan.cfg)];
 			const idp = yield* NetBird.IdentityProvider(`${String.pascalCase(plan.providerKey)}IdentityProvider`, {
 				name: plan.cfg.name,
 				type: plan.cfg.type,
 				issuer: plan.cfg.issuer,
 				clientId: plan.cfg.clientId,
 				clientSecret: yield* Sops.decrypt(plan.secretsFile, plan.cfg.clientSecret),
+				...(servedBy ? { ready: servedBy.serviceId } : {}),
 			});
 			identityProviders[plan.providerKey] = { idpId: idp.idpId, redirectUrl: idp.redirectUrl };
 		}

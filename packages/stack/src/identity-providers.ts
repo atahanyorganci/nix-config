@@ -34,6 +34,19 @@ export const IdentityProviderHost = Schema.Struct({
 export const IdentityProviders = Schema.Record(Schema.String, IdentityProviderHost);
 export type IdentityProviders = typeof IdentityProviders.Type;
 
+/**
+ * The host the provider's issuer is served from, lowercased like the
+ * reverse-proxy services' domains; empty for an issuer that is not a URL
+ * (the `google` and `microsoft` types use none).
+ */
+export const issuerHost = (cfg: IdentityProviderConfig) => {
+	try {
+		return new URL(cfg.issuer).host.toLowerCase();
+	} catch {
+		return "";
+	}
+};
+
 export interface IdentityProviderPlan {
 	readonly hostKey: string;
 	readonly providerKey: string;
