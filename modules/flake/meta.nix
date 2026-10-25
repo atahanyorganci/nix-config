@@ -40,6 +40,40 @@ in {
               subdomain, so the apex stays free for a mailbox.
             '';
           };
+          admin = lib.mkOption {
+            type = lib.types.submodule {
+              options = {
+                name = lib.mkOption {
+                  type = lib.types.str;
+                  description = "Username of the stack's admin: LLDAP's admin user, and NetBird's owner's display name.";
+                };
+                email = lib.mkOption {
+                  type = lib.types.str;
+                  description = ''
+                    The admin's login wherever one has to look like an email:
+                    NetBird's local users sign in with it, and LLDAP requires
+                    one. Nothing is ever mailed to it.
+                  '';
+                };
+                passwordSecret = lib.mkOption {
+                  type = lib.types.str;
+                  description = ''
+                    Key of the admin's password in the nix-secrets file of the
+                    host running LLDAP and the NetBird server, `/`-separated like
+                    a sops-nix secret name. LLDAP re-applies it at every start;
+                    the NetbirdServer stack sets NetBird's owner up with it
+                    once. 8 to 72 characters: NetBird's limits.
+                  '';
+                };
+              };
+            };
+            description = ''
+              The account that owns the stack: NetBird's owner, a local user
+              that signs in only with `netbird-server.bootstrap` on, and LLDAP's
+              built-in admin, with one password. Authelia has no owner; people
+              use their own LLDAP accounts.
+            '';
+          };
           axiom.dataset = lib.mkOption {
             type = lib.types.strMatching "[A-Za-z0-9-]{1,128}";
             description = ''
@@ -66,6 +100,11 @@ in {
     domain = "yorganci.dev";
     netbirdManagementDomain = "netbird.${domain}";
     mailDomain = "mail.${domain}";
+    admin = {
+      name = "admin";
+      email = "admin@${domain}";
+      passwordSecret = "admin/password";
+    };
     axiom.dataset = "otel";
   };
 }

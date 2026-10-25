@@ -285,7 +285,7 @@ in {
               base_dn = config.lldap.baseDn;
               # LLDAP's admin: password resets and changes need a user that may
               # set passwords, and its password is pinned from nix-secrets.
-              user = "uid=admin,ou=people,${config.lldap.baseDn}";
+              user = "uid=${infra.admin.name},ou=people,${config.lldap.baseDn}";
             };
             # Only forward-auth consults access control, and nothing uses it:
             # apps log in over OpenID Connect. Authelia wants a policy anyway.
@@ -341,7 +341,7 @@ in {
           EnvironmentFile = config.sops.templates."authelia.env".path;
           LoadCredential =
             [
-              "ldap-password:${secret "lldap/admin-password"}"
+              "ldap-password:${secret infra.admin.passwordSecret}"
               "postgres-password:${secret "authelia/postgres/password"}"
             ]
             ++ lib.optional cfg.smtp.enable "smtp-password:${secret "smtp/password"}"
@@ -355,7 +355,7 @@ in {
         })
         // {
           # Declared by the lldap module; Authelia binds with it too.
-          "lldap/admin-password".restartUnits = ["${unit}.service"];
+          ${infra.admin.passwordSecret}.restartUnits = ["${unit}.service"];
         };
 
       # Settings Authelia takes from the environment: PlanetScale's host and the

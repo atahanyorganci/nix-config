@@ -11,7 +11,7 @@ in {
     secret = name: config.sops.secrets.${name}.path;
     placeholder = name: config.sops.placeholder.${name};
     # Values written to nix-secrets once (see `enable`), never by a stack.
-    generated = ["lldap/jwt-secret" "lldap/key-seed" "lldap/admin-password"];
+    generated = ["lldap/jwt-secret" "lldap/key-seed" infra.admin.passwordSecret];
     # HomeInfra's `postgres.roles.lldap`, written by `just store-secret`.
     postgres = ["lldap/postgres/host" "lldap/postgres/username" "lldap/postgres/password"];
   in {
@@ -19,8 +19,9 @@ in {
       enable = lib.mkEnableOption ''
         LLDAP, the directory of users and groups Authelia authenticates
         against, keeping it in the infra Postgres cluster (HomeInfra's
-        `postgres.roles.lldap`). It needs `lldap/postgres/{host,username,password}`
-        and `lldap/{jwt-secret,key-seed,admin-password}` in the host's
+        `postgres.roles.lldap`). It needs `lldap/postgres/{host,username,password}`,
+        `lldap/{jwt-secret,key-seed}` and the stack admin's password
+        (`infra.admin.passwordSecret`, `admin/password`) in the host's
         nix-secrets file before it is enabled: sops-nix fails activation on a
         missing key. The key seed derives the server key every password is
         bound to, so replacing it invalidates them all
@@ -79,10 +80,11 @@ in {
           http_port = cfg.httpPort;
           http_url = "https://${cfg.key}.${infra.domain}";
           ldap_base_dn = cfg.baseDn;
-          ldap_user_dn = "admin";
-          ldap_user_email = "admin@${infra.domain}";
+          # The stack's admin, who also owns NetBird, with the same password.
+          ldap_user_dn = infra.admin.name;
+          ldap_user_email = infra.admin.email;
           # The admin password is the one in nix-secrets, restored on every
-          # start: Authelia binds with it, so it must not drift.
+          # start, so it cannot drift from NetBird's owner's.
           force_ldap_user_pass_reset = "always";
           # The server key comes from the key seed, not a file in the state
           # directory; an empty path silences LLDAP's warning about ignoring it.
@@ -105,7 +107,7 @@ in {
         LoadCredential = [
           "jwt-secret:${secret "lldap/jwt-secret"}"
           "key-seed:${secret "lldap/key-seed"}"
-          "admin-password:${secret "lldap/admin-password"}"
+          "admin-password:${secret infra.admin.passwordSecret}"
         ];
         # LLDAP opens its ports once it has reached and migrated the database,
         # seconds after it starts. Started means LDAP answers, so a unit after
