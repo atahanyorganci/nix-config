@@ -8,7 +8,7 @@ import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { NetbirdServer, NetbirdServerStack, Nix, Aws, Ses } from "../src/index.ts";
+import { NetbirdServer, NetbirdServerStack, Nix, Aws, Ses, Sops } from "../src/index.ts";
 
 /**
  * The repository root, relative to `packages/stack`. `Nix` resources and
@@ -37,6 +37,21 @@ const Infra = Schema.Struct({
 	netbirdManagementDomain: Schema.String,
 	mailDomain: Schema.String,
 });
+
+/** `flake.stackAdmin`: who NetBird's owner is, and where its password is. */
+const StackAdmin = Schema.Struct({
+	name: Schema.String,
+	email: Schema.String,
+	passwordSecret: Schema.String,
+	secretsFile: Schema.String,
+});
+
+/**
+ * The service user `Setup` creates on a new server, whose key is `NB_PAT`
+ * (`just netbird-token`). The names match the running installation's, which
+ * was set up by hand.
+ */
+const AUTOMATION = { name: "NB_PAT", tokenName: "Doppler", expiresIn: 365 };
 
 /**
  * Saturn boots this Ubuntu 24.04 arm64 AMI once; `nixos-bootstrap` then
@@ -76,9 +91,10 @@ export default NetbirdServerStack.make(
 		secrets: [Doppler.Secrets({ project: "nix-config", config: "dev" })],
 	},
 	Effect.gen(function* () {
-		const [me, infra] = yield* Effect.all([
+		const [me, infra, admin] = yield* Effect.all([
 			Nix.evaluate({ flakeRoot: REPO_ROOT, attr: "me" }, Me),
 			Nix.evaluate({ flakeRoot: REPO_ROOT, attr: "infra" }, Infra),
+			Nix.evaluate({ flakeRoot: REPO_ROOT, attr: "stackAdmin" }, StackAdmin),
 		]);
 
 		const deployKey = me.deployKey;
@@ -215,12 +231,19 @@ export default NetbirdServerStack.make(
 			ttl: "1",
 		});
 
-		// Setup generates the admin password and keeps the one the account was
-		// created with; `setup.password` is the only source of it.
+		// NetBird's owner is the stack's admin, a local user with the password
+		// LLDAP's admin has, decrypted from mars's nix-secrets file when the plan
+		// resolves it (so planning needs the YubiKey; the scripts that only read
+		// this stack's state do not). On a new server, which mars has to be
+		// deployed with `netbird-server.bootstrap = true` for, setup also creates
+		// the automation service user with the owner's one-time token and deletes
+		// that token.
 		const setup = yield* NetBird.Setup("Admin", {
 			apiBaseUrl: netbirdApiBaseUrl,
-			email: me.email,
-			name: me.name,
+			email: admin.email,
+			name: admin.name,
+			password: Output.fromEffect(Sops.decrypt(admin.secretsFile, admin.passwordSecret)),
+			automation: AUTOMATION,
 			// Order only: the management API needs its DNS record and Mars's NixOS
 			// install/rebuild. Setup's diff ignores this, so Mars deploys do not
 			// update `Admin`.
@@ -244,7 +267,8 @@ export default NetbirdServerStack.make(
 			apiBaseUrl: netbirdApiBaseUrl,
 			admin: {
 				email: setup.email,
-				password: setup.password,
+				// Absent on an installation set up before Setup made it.
+				automation: setup.automation,
 			},
 			smtp,
 		};

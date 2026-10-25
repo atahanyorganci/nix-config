@@ -17,9 +17,22 @@ export interface NetbirdServerStackOutputs {
 		instanceId: string;
 	};
 	apiBaseUrl: string;
+	/** NetBird's owner, the stack's admin; its password is in nix-secrets. */
 	admin: {
 		email: string;
-		password: Redacted.Redacted<string>;
+		/**
+		 * The service user setup created on a new server, and its key, which
+		 * `just netbird-token` copies into Doppler as `NB_PAT`. Absent on an
+		 * installation set up before setup made one.
+		 */
+		automation?: {
+			userId: string;
+			name: string;
+			tokenId: string;
+			tokenName: string;
+			token: Redacted.Redacted<string>;
+			expirationDate: string;
+		};
 	};
 	/** SES's SMTP relay for mail from `infra.mailDomain` (STARTTLS on `port`). */
 	smtp: {

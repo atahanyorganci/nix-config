@@ -37,6 +37,13 @@ test *args:
 store-secret *args:
     {{ node }} scripts/store-secret.ts {{ args }}
 
+# Copy the automation key NetBird.Setup made on a new server (NetbirdServer's
+# admin/automation/token) into Doppler's NB_PAT, after checking NetBird takes
+# it. Does nothing for an installation set up before Setup made one.
+[doc("Copy NetbirdServer's automation key into Doppler's NB_PAT, after checking it works")]
+netbird-token *args:
+    {{ node }} scripts/netbird-token.ts {{ args }}
+
 # Write the Axiom ingest token and endpoint (HomeInfra outputs) into
 # nix-secrets/hosts/<host>.yaml for the host's otel-collector.
 [doc("Write the Axiom ingest token and endpoint into nix-secrets/hosts/<host>.yaml")]
