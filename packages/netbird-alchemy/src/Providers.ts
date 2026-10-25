@@ -3,6 +3,7 @@ import { ProfileStoreLive } from "alchemy/Auth/Profile";
 import * as Provider from "alchemy/Provider";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
+import { AccountSettings, AccountSettingsProvider } from "./AccountSettings/AccountSettings.ts";
 import { AgentGateway, AgentGatewayProvider } from "./AgentGateway/AgentGateway.ts";
 import { AgentNetworkGuardrail, AgentNetworkGuardrailProvider } from "./AgentNetworkGuardrail/AgentNetworkGuardrail.ts";
 import { AgentNetworkPolicy, AgentNetworkPolicyProvider } from "./AgentNetworkPolicy/AgentNetworkPolicy.ts";
@@ -60,6 +61,7 @@ export const providers = () =>
 	Layer.effect(
 		Providers,
 		Provider.collection([
+			AccountSettings,
 			AgentGateway,
 			AgentNetworkGuardrail,
 			AgentNetworkPolicy,
@@ -84,6 +86,7 @@ export const providers = () =>
 	).pipe(
 		Layer.provide(
 			Layer.mergeAll(
+				AccountSettingsProvider(),
 				AgentGatewayProvider(),
 				AgentNetworkGuardrailProvider(),
 				AgentNetworkPolicyProvider(),
