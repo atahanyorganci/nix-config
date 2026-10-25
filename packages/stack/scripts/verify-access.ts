@@ -1,5 +1,6 @@
 import { NodeRuntime } from "@effect/platform-node";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import { accountsGet } from "@yorganci/netbird-api/accounts";
 import {
 	agentNetworkGuardrailsGet,
 	agentNetworkPoliciesGet,
@@ -12,6 +13,7 @@ import { groupsGet } from "@yorganci/netbird-api/groups";
 import { peersGet } from "@yorganci/netbird-api/peers";
 import { policiesGet } from "@yorganci/netbird-api/policies";
 import { routesGet } from "@yorganci/netbird-api/routes";
+import { usersUserIdTokensGet } from "@yorganci/netbird-api/tokens";
 import { usersGet } from "@yorganci/netbird-api/users";
 import * as Command from "effect/cli/Command";
 import * as Console from "effect/Console";
@@ -42,6 +44,7 @@ const verifyAccess = Command.make("verify-access", {}).pipe(
 				agentProviders,
 				agentGuardrails,
 				agentPolicies,
+				accounts,
 			] = yield* Effect.all([
 				usersGet({}),
 				groupsGet({}),
@@ -53,16 +56,36 @@ const verifyAccess = Command.make("verify-access", {}).pipe(
 				agentNetworkProvidersGet({}),
 				agentNetworkGuardrailsGet({}),
 				agentNetworkPoliciesGet({}),
+				accountsGet({}),
 			]).pipe(Effect.provide(netbirdApi));
 
 			const peerById = new Map(peers.map(peer => [peer.id, peer]));
 			const groupNameById = new Map(groups.map(group => [group.id, group.name]));
 			const groupNames = (ids: ReadonlyArray<string> | null | undefined) =>
 				(ids ?? []).map(id => groupNameById.get(id) ?? id).join(",");
-			for (const user of users) {
+			// Local login is off unless mars runs with `netbird-server.bootstrap`;
+			// approval is off since people come through Authelia.
+			for (const account of accounts) {
+				const { settings } = account;
 				yield* Console.log(
-					`USER\t${user.email}\trole=${user.role}\tstatus=${user.status}\tauto_groups=${JSON.stringify(user.auto_groups)}`,
+					`ACCOUNT\t${account.id}\tlocal_login=${settings.local_auth_disabled ? "off" : "on"}\tapproval=${settings.extra?.user_approval_required ?? "unset"}\tgroup_propagation=${settings.groups_propagation_enabled ?? "unset"}`,
 				);
+			}
+			// The owner should be the stack's admin, a local user; people sign in
+			// through Authelia (its connector id); service users have no login.
+			for (const user of users) {
+				const login = user.is_service_user ? "service" : (user.idp_id ?? "-");
+				yield* Console.log(
+					`USER\t${user.email || user.name}\trole=${user.role}\tlogin=${login}\tstatus=${user.status}${user.pending_approval ? "\tpending" : ""}\tauto_groups=[${groupNames(user.auto_groups)}]`,
+				);
+			}
+			// Service users' keys, NB_PAT's among them, expire after a year at most.
+			for (const user of users.filter(user => user.is_service_user)) {
+				for (const token of yield* usersUserIdTokensGet({ userId: user.id }).pipe(Effect.provide(netbirdApi))) {
+					yield* Console.log(
+						`TOKEN\t${user.name}\t${token.name}\texpires=${token.expiration_date}\tlast_used=${token.last_used ?? "never"}`,
+					);
+				}
 			}
 			for (const group of groups) {
 				const names = (group.peers ?? []).map(entry => {
