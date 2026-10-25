@@ -14,6 +14,84 @@ in {
     generated = ["lldap/jwt-secret" "lldap/key-seed" infra.admin.passwordSecret];
     # HomeInfra's `postgres.roles.lldap`, written by `just store-secret`.
     postgres = ["lldap/postgres/host" "lldap/postgres/username" "lldap/postgres/password"];
+
+    # Groups LLDAP has from the start, for its own permissions.
+    builtinGroups = ["lldap_admin" "lldap_password_manager" "lldap_strict_readonly"];
+    ensure = cfg.ensure.groups != [] || cfg.ensure.users != {};
+    # Users whose password is kept in nix-secrets and re-applied: service accounts.
+    usersWithPassword = lib.filterAttrs (_: user: user.passwordSecret != null) cfg.ensure.users;
+    passwordCredential = id: "user-${id}";
+    ensureSpec = pkgs.writeText "lldap-ensure.json" (builtins.toJSON {
+      groups = lib.unique cfg.ensure.groups;
+      users =
+        lib.mapAttrsToList (id: user: {
+          inherit id;
+          inherit (user) email displayName;
+          groups = lib.unique user.groups;
+          password = user.passwordSecret != null;
+        })
+        cfg.ensure.users;
+    });
+    ensureScript = pkgs.writeShellApplication {
+      name = "lldap-ensure";
+      runtimeInputs = [pkgs.curl pkgs.jq config.services.lldap.package];
+      # jq programs and GraphQL documents name their own `$variables`.
+      excludeShellChecks = ["SC2016"];
+      text = ''
+        base=http://127.0.0.1:${toString cfg.httpPort}
+        spec=${ensureSpec}
+        headers="$RUNTIME_DIRECTORY/headers"
+
+        # Log in as the admin. The token goes into a header file rather than
+        # onto a command line; only lldap_set_password takes it as an argument.
+        jq -n --rawfile password "$CREDENTIALS_DIRECTORY/admin-password" --arg username ${lib.escapeShellArg infra.admin.name} \
+          '{username: $username, password: ($password | rtrimstr("\n"))}' |
+          curl -fsS --retry 30 --retry-connrefused --retry-delay 1 \
+            -H 'Content-Type: application/json' --data-binary @- "$base/auth/simple/login" |
+          jq -r '"Authorization: Bearer " + .token' >"$headers"
+        token="$(sed 's/^Authorization: Bearer //' "$headers")"
+
+        gql() { # query, variables
+          jq -n --arg query "$1" --argjson variables "$2" '{query: $query, variables: $variables}' |
+            curl -fsS -H @"$headers" -H 'Content-Type: application/json' --data-binary @- "$base/api/graphql" |
+            jq -e 'if .errors then error(.errors[0].message) else .data end'
+        }
+        groups=""
+        load_groups() { groups="$(gql '{groups{id displayName}}' '{}')"; }
+        group_id() { jq -r --arg name "$1" '.groups[] | select(.displayName == $name) | .id' <<<"$groups"; }
+
+        load_groups
+        while IFS= read -r group; do
+          if [[ -z $(group_id "$group") ]]; then
+            gql 'mutation($name: String!) { createGroup(name: $name) { id } }' "$(jq -n --arg name "$group" '{name: $name}')" >/dev/null
+            echo "created group $group"
+          fi
+        done < <(jq -r '.groups[]' "$spec")
+        load_groups
+
+        while IFS= read -r user; do
+          id="$(jq -r .id <<<"$user")"
+          vars="$(jq -n --arg id "$id" '{id: $id}')"
+          if ! gql 'query($id: String!) { user(userId: $id) { id } }' "$vars" >/dev/null 2>&1; then
+            gql 'mutation($user: CreateUserInput!) { createUser(user: $user) { id } }' \
+              "$(jq '{user: {id, email, displayName}}' <<<"$user")" >/dev/null
+            echo "created user $id"
+          fi
+          member_of="$(gql 'query($id: String!) { user(userId: $id) { groups { displayName } } }' "$vars" | jq -r '.user.groups[].displayName')"
+          while IFS= read -r group; do
+            grep -qxF -- "$group" <<<"$member_of" && continue
+            gql 'mutation($user: String!, $group: Int!) { addUserToGroup(userId: $user, groupId: $group) { ok } }' \
+              "$(jq -n --arg user "$id" --argjson group "$(group_id "$group")" '{user: $user, group: $group}')" >/dev/null
+            echo "added $id to $group"
+          done < <(jq -r '.groups[]' <<<"$user")
+          if [[ $(jq -r .password <<<"$user") == true ]]; then
+            # Passwords are set through LLDAP's own protocol (OPAQUE), not GraphQL.
+            LLDAP_USER_PASSWORD="$(<"$CREDENTIALS_DIRECTORY/user-$id")" \
+              lldap_set_password --base-url "$base" --token "$token" --username "$id" >/dev/null
+          fi
+        done < <(jq -c '.users[]' "$spec")
+      '';
+    };
   in {
     options.lldap = {
       enable = lib.mkEnableOption ''
@@ -63,9 +141,108 @@ in {
         default = ["Admin"];
         description = "NetBird groups allowed to reach the admin UI.";
       };
+
+      ensure = {
+        groups = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [];
+          example = ["admin"];
+          description = "Groups created when missing; never deleted.";
+        };
+
+        users = lib.mkOption {
+          type = lib.types.attrsOf (lib.types.submodule {
+            options = {
+              email = lib.mkOption {
+                type = lib.types.str;
+                description = "Email address, unique among LLDAP's users. Authelia mails one-time codes and reset links to it.";
+              };
+              displayName = lib.mkOption {
+                type = lib.types.str;
+                default = "";
+                description = "Display name.";
+              };
+              groups = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [];
+                description = ''
+                  Groups the user is added to when missing, built in
+                  (`lldap_admin`, `lldap_password_manager`,
+                  `lldap_strict_readonly`) or in `ensure.groups`; never taken
+                  away. A password manager cannot reset an `lldap_admin`'s
+                  password, so someone whose password Authelia should reset
+                  stays out of it.
+                '';
+              };
+              passwordSecret = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                example = "authelia/ldap-password";
+                description = ''
+                  Key of the user's password in the host's nix-secrets file,
+                  re-applied at every run: for service accounts. Null leaves
+                  the password to its owner, who sets the first one with
+                  Authelia's "Reset password".
+                '';
+              };
+            };
+          });
+          default = {};
+          description = ''
+            Users created when missing, by user ID. Nothing here deletes a user,
+            changes one's email or name, or takes a group away; a oneshot
+            (`lldap-ensure`) applies it after LLDAP starts, as the admin.
+          '';
+        };
+      };
     };
 
     config = lib.mkIf cfg.enable {
+      assertions =
+        lib.mapAttrsToList (id: user: let
+          unknown = lib.subtractLists (cfg.ensure.groups ++ builtinGroups) user.groups;
+        in {
+          assertion = unknown == [];
+          message = "lldap.ensure.users.${id}: ${lib.concatStringsSep ", " unknown} is neither built in nor in lldap.ensure.groups.";
+        })
+        cfg.ensure.users;
+
+      # Declared users and groups, applied as the admin once LLDAP answers, again
+      # whenever LLDAP restarts or the declaration changes.
+      systemd.services.lldap-ensure = lib.mkIf ensure {
+        description = "Create LLDAP's declared users and groups";
+        requires = ["lldap.service"];
+        after = ["lldap.service"];
+        partOf = ["lldap.service"];
+        wantedBy = ["multi-user.target"];
+        restartTriggers = [ensureSpec];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = lib.getExe ensureScript;
+          DynamicUser = true;
+          RuntimeDirectory = "lldap-ensure";
+          RuntimeDirectoryMode = "0700";
+          # PID 1 copies the root-only secrets for the dynamic user.
+          LoadCredential =
+            ["admin-password:${secret infra.admin.passwordSecret}"]
+            ++ lib.mapAttrsToList (id: user: "${passwordCredential id}:${secret user.passwordSecret}") usersWithPassword;
+          NoNewPrivileges = true;
+          PrivateTmp = true;
+          PrivateDevices = true;
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          ProtectKernelTunables = true;
+          ProtectKernelModules = true;
+          ProtectControlGroups = true;
+          RestrictAddressFamilies = ["AF_INET" "AF_INET6"];
+          LockPersonality = true;
+          RestrictRealtime = true;
+          SystemCallArchitectures = "native";
+          CapabilityBoundingSet = "";
+        };
+      };
+
       services.lldap = {
         enable = true;
         # Postgres is PlanetScale's, reached with the URL from lldap.env.
@@ -125,9 +302,11 @@ in {
         '';
       };
 
-      sops.secrets = lib.genAttrs (generated ++ postgres) (_: {
-        restartUnits = ["lldap.service"];
-      });
+      sops.secrets =
+        lib.genAttrs (generated ++ postgres) (_: {
+          restartUnits = ["lldap.service"];
+        })
+        // lib.mapAttrs' (_: user: lib.nameValuePair user.passwordSecret {restartUnits = ["lldap-ensure.service"];}) usersWithPassword;
 
       # sqlx, not libpq: it reads `sslrootcert` as a file path, and verifies
       # `verify-full` against its bundled Mozilla roots without one.
