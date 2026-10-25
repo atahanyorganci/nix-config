@@ -17,12 +17,6 @@ export interface HomeInfraNameserverOutput {
 	ip: string;
 }
 
-export interface HomeInfraOwnerOutput {
-	userId: string;
-	email: string;
-	autoGroups: ReadonlyArray<string>;
-}
-
 export interface HomeInfraAgentNetworkOutput {
 	/** Hostname NetBird allocated; pin it as `flake.agentNetwork.gateway.endpoint`. */
 	endpoint: string;
@@ -91,7 +85,6 @@ export interface HomeInfraOutputs {
 	groups: Record<string, HomeInfraGroupOutput>;
 	services: Record<string, string>;
 	dns: Record<string, HomeInfraNameserverOutput>;
-	owner: HomeInfraOwnerOutput;
 	policies: {
 		allowRuleCount: number;
 		legacyDefaultDisabled: boolean;

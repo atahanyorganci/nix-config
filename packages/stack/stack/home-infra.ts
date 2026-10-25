@@ -194,19 +194,14 @@ export default HomeInfra.make(
 			),
 		);
 
-		// NetBird setup created the owner; this adopts it and keeps every device
-		// it enrolls in Admin. Retained so a stack destroy can never delete it.
-		const owner = yield* NetBird.User("Owner", {
-			email: me.email,
-			name: me.name,
-			isServiceUser: false,
-			autoGroups: [adminGroup.groupId],
+		// People join through Authelia, which only lets in LLDAP's users, with a
+		// second factor: no approval on top. Group propagation moves the devices
+		// they registered to the groups they are given later. The owner is the
+		// stack's admin, a local user NetbirdServer's setup created.
+		yield* NetBird.AccountSettings("Account", {
+			userApprovalRequired: false,
+			groupsPropagationEnabled: true,
 		}).pipe(Alchemy.RemovalPolicy.retain());
-		const ownerOutput = {
-			userId: owner.userId,
-			email: owner.email,
-			autoGroups: [adminGroup.groupId],
-		};
 
 		const marsPeer = peers.mars;
 		if (!marsPeer) {
@@ -493,7 +488,6 @@ export default HomeInfra.make(
 			groups: groupOutputs,
 			services,
 			dns,
-			owner: ownerOutput,
 			policies: {
 				allowRuleCount: allowRules.length,
 			},

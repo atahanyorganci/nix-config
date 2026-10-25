@@ -23,7 +23,6 @@ export {
 	type HomeInfraIdentityProviderOutput,
 	type HomeInfraNameserverOutput,
 	type HomeInfraOutputs,
-	type HomeInfraOwnerOutput,
 	type HomeInfraPeerOutput,
 	type HomeInfraPostgresOutput,
 	type HomeInfraPostgresRoleOutput,
