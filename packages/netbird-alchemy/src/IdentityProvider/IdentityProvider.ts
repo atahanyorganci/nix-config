@@ -9,15 +9,33 @@ import {
 import { isResolved } from "alchemy/Diff";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
+import * as Data from "effect/Data";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
+import * as Schedule from "effect/Schedule";
+import * as Schema from "effect/Schema";
 import { Credentials } from "../Credentials.ts";
 import { catchNotFound } from "../errors.ts";
 
 export type { IdentityProviderType };
 
 const DEFAULT_TYPE: IdentityProviderType = "oidc";
+
+/** Types whose connector does not use `issuer`. */
+const ISSUERLESS_TYPES: ReadonlyArray<IdentityProviderType> = ["google", "microsoft"];
+
+const DEFAULT_ISSUER_TIMEOUT: Duration.Input = "5 minutes";
+
+/** How often the issuer's discovery document is asked for while waiting. */
+const ISSUER_POLL_INTERVAL: Duration.Input = "5 seconds";
+
+export class IssuerNotReady extends Data.TaggedError("IssuerNotReady")<{
+	readonly message: string;
+}> {}
 
 export interface IdentityProviderProps {
 	/**
@@ -51,6 +69,22 @@ export interface IdentityProviderProps {
 	 * it written once.
 	 */
 	clientSecret: Redacted.Redacted<string>;
+	/**
+	 * How long to wait, before creating or updating the provider, for
+	 * `<issuer>/.well-known/openid-configuration` to answer and name this
+	 * issuer: NetBird refuses an issuer it cannot fetch, and a new one (behind
+	 * NetBird's own reverse proxy, say) may still be waiting for its route or
+	 * certificate. `0` checks once.
+	 *
+	 * @default "5 minutes"
+	 */
+	issuerTimeout?: Duration.Input;
+	/**
+	 * Optional dependency edge, e.g. the id of the reverse-proxy service that
+	 * publishes the issuer. Ignored by the provider, including when diffing;
+	 * include any upstream Output so the provider waits for it.
+	 */
+	ready?: string | boolean | null;
 }
 
 export interface IdentityProviderAttributes {
@@ -116,13 +150,7 @@ export const isIdentityProvider = (value: unknown): value is IdentityProvider =>
 export const IdentityProviderProvider = () =>
 	Provider.succeed(IdentityProvider, {
 		stables: ["idpId", "type", "redirectUrl", "logoutUrl"],
-		diff: ({ news, olds }) =>
-			Effect.sync(() => {
-				if (!isResolved(news) || !olds) return undefined;
-				if ((news.type ?? DEFAULT_TYPE) !== (olds.type ?? DEFAULT_TYPE)) {
-					return { action: "replace" } as const;
-				}
-			}),
+		diff: ({ news, olds }) => Effect.sync(() => diffIdentityProvider({ news, olds })),
 		read: Effect.fn(function* ({ output, olds }) {
 			const urls = yield* callbackUrls;
 			if (output?.idpId) {
@@ -158,6 +186,9 @@ export const IdentityProviderProvider = () =>
 			}
 
 			if (!observed) {
+				if (usesIssuer(type, desired.issuer)) {
+					yield* awaitIssuer(desired.issuer, news.issuerTimeout ?? DEFAULT_ISSUER_TIMEOUT);
+				}
 				const created = yield* identityProvidersPost({ type, ...desired }).pipe(
 					Effect.catch(err =>
 						Effect.gen(function* () {
@@ -182,6 +213,10 @@ export const IdentityProviderProvider = () =>
 				return toAttributes(observed, urls);
 			}
 
+			// NetBird checks the issuer on update too.
+			if (usesIssuer(observed.type, desired.issuer)) {
+				yield* awaitIssuer(desired.issuer, news.issuerTimeout ?? DEFAULT_ISSUER_TIMEOUT);
+			}
 			// PUT replaces the whole configuration, secret included.
 			const updated = yield* identityProvidersIdpIdPut({
 				idpId: requireId(observed),
@@ -193,6 +228,61 @@ export const IdentityProviderProvider = () =>
 		delete: Effect.fn(function* ({ output }) {
 			yield* catchNotFound(identityProvidersIdpIdDelete({ idpId: output.idpId }));
 		}),
+	});
+
+/**
+ * Replacing for a new type, which NetBird cannot change in place; otherwise a
+ * no-op when nothing NetBird stores changed: `ready` only orders the provider
+ * and `issuerTimeout` only paces it. Anything else is the engine's props
+ * comparison.
+ */
+export const diffIdentityProvider = ({
+	news,
+	olds,
+}: {
+	news: unknown;
+	olds: IdentityProviderProps | undefined;
+}): { readonly action: "replace" | "noop" } | undefined => {
+	if (!isResolved(news) || !olds) return undefined;
+	const props = news as IdentityProviderProps;
+	if ((props.type ?? DEFAULT_TYPE) !== (olds.type ?? DEFAULT_TYPE)) {
+		return { action: "replace" };
+	}
+	const unchanged =
+		props.name === olds.name &&
+		(props.issuer ?? "") === (olds.issuer ?? "") &&
+		props.clientId === olds.clientId &&
+		olds.clientSecret !== undefined &&
+		reveal(props.clientSecret) === reveal(olds.clientSecret);
+	return unchanged ? { action: "noop" } : undefined;
+};
+
+const usesIssuer = (type: IdentityProviderType, issuer: string) => issuer !== "" && !ISSUERLESS_TYPES.includes(type);
+
+const Discovery = Schema.Struct({ issuer: Schema.String });
+
+/**
+ * Waits until the issuer's discovery document answers and names `issuer`,
+ * asking every few seconds for up to `timeout`, the way NetBird checks it
+ * before accepting a provider.
+ */
+export const awaitIssuer = (issuer: string, timeout: Duration.Input = DEFAULT_ISSUER_TIMEOUT) =>
+	Effect.gen(function* () {
+		const client = yield* HttpClient.HttpClient;
+		const url = `${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`;
+		const times = Math.ceil(Duration.toMillis(timeout) / Duration.toMillis(ISSUER_POLL_INTERVAL));
+		yield* client.get(url).pipe(
+			Effect.flatMap(HttpClientResponse.filterStatusOk),
+			Effect.flatMap(HttpClientResponse.schemaBodyJson(Discovery)),
+			Effect.mapError(cause => new IssuerNotReady({ message: `${url}: ${String(cause)}` })),
+			Effect.flatMap(document =>
+				document.issuer === issuer
+					? Effect.void
+					: Effect.fail(new IssuerNotReady({ message: `${url} names the issuer ${document.issuer}, not ${issuer}` })),
+			),
+			Effect.tapError(error => Effect.logInfo(`waiting for the identity provider's issuer: ${error.message}`)),
+			Effect.retry({ schedule: Schedule.spaced(ISSUER_POLL_INTERVAL), times: Math.max(0, times) }),
+		);
 	});
 
 /**
