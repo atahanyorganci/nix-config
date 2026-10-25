@@ -55,10 +55,11 @@
       enable = true;
       acmeEmail = user.email;
       enableAgentNetwork = true;
-      # Authelia is NetBird's only login: local users are off. Recovery without
-      # it is the stack's service-user token, and SSH.
+      # Authelia is NetBird's only login: local users, the owner
+      # (admin@<domain>) among them, sign in only with `bootstrap = true`, which a
+      # new installation needs until HomeInfra has created the provider.
+      # Recovery without Authelia is the stack's service-user token, and SSH.
       authelia.enable = true;
-      localAuthDisabled = true;
     };
     netbird-proxy = {
       enable = true;

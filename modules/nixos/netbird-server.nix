@@ -70,7 +70,7 @@ in {
         disableGeoliteUpdate: false
         auth:
           issuer: "https://${cfg.domain}/oauth2"
-          localAuthDisabled: ${lib.boolToString cfg.localAuthDisabled}
+          localAuthDisabled: ${lib.boolToString (!cfg.bootstrap)}
           signKeyRefreshEnabled: true
           sessionCookieEncryptionKey: "@sessionCookieKey@"
           dashboardRedirectURIs:
@@ -241,17 +241,22 @@ in {
         };
       };
 
-      localAuthDisabled = lib.mkOption {
+      bootstrap = lib.mkOption {
         type = lib.types.bool;
         default = false;
         description = ''
-          Turn off the embedded IdP's local users (email and password): the
-          login page offers only external providers, and NetBird refuses to
-          create or invite local users. The server will not start unless a
-          provider already exists, and providers only come from the API (the
-          stack), so a new installation starts with this off and turns it on
-          once its provider is in place. Service-user tokens keep working; they
-          never use the login page.
+          Let the embedded IdP's local users (email and password) sign in: the
+          account owner, `admin@<domain>`, is one, and on a new installation
+          `POST /api/setup`, which creates it, may also return a token
+          (`NB_SETUP_PAT_ENABLED`, for `NetBird.Setup`'s `automation`).
+
+          Off, the login page offers only external providers and NetBird
+          refuses to create or invite local users. It then needs one to exist,
+          and will not start without one; providers only come from the API (the
+          HomeInfra stack), so a new installation is deployed with this on until
+          its provider is in place. Anything only the owner can do needs it on
+          again. Service-user tokens work either way: they never use the login
+          page.
         '';
       };
     };
@@ -263,8 +268,8 @@ in {
           {
             # The provider itself is in the embedded IdP's storage, which Nix
             # cannot see; one declared here is the closest check.
-            assertion = !cfg.localAuthDisabled || config.identityProviders != {};
-            message = "netbird-server.localAuthDisabled: no identity provider is declared on this host (`identityProviders`), so nobody could log in.";
+            assertion = cfg.bootstrap || config.identityProviders != {};
+            message = "netbird-server: with bootstrap off only external identity providers can log in, and none is declared on this host (`identityProviders`).";
           }
         ];
       }
@@ -417,6 +422,8 @@ in {
           after = ["network-online.target" "traefik.service"];
           wants = ["network-online.target"];
           wantedBy = ["multi-user.target"];
+          # Only honoured while setup is still required (no account yet).
+          environment = lib.optionalAttrs cfg.bootstrap {NB_SETUP_PAT_ENABLED = "true";};
 
           serviceConfig = {
             Type = "simple";
