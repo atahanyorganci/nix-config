@@ -4,7 +4,7 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 
 ## Resources
 
-- `NetBird.Setup` — first-admin bootstrap via `POST /api/setup` (`password` is `Redacted`, generated when omitted)
+- `NetBird.Setup` — first-owner bootstrap via `POST /api/setup` (`password` is `Redacted`, generated when omitted); with `automation` it also creates a service user and its key with the one-time owner token, which it then deletes
 - `NetBird.Group` — peer groups
 - `NetBird.Network` — networks
 - `NetBird.Peer` — adopt existing mesh peers by `host` identity or stable `peerId` (not created by Alchemy)
@@ -33,7 +33,7 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 | `NB_MANAGEMENT_URL` | Optional; management server origin, defaults to `https://api.netbird.io` |
 | `DEBUG`             | Optional boolean; enables Debug log level in tests                       |
 
-These are the variables NetBird's Terraform provider reads. `NetBird.Setup` does not use `Credentials` (setup is unauthenticated). After Setup, mint a token in the dashboard and store it as `NB_PAT` for Group, SetupKey, and other API resources.
+These are the variables NetBird's Terraform provider reads. `NetBird.Setup` does not use `Credentials` (setup is unauthenticated). Its `automation` key (`setup.automation.token`, which needs the server to run with `NB_SETUP_PAT_ENABLED=true`) is what to store as `NB_PAT` for Group, SetupKey, and other API resources; without it, mint a token in the dashboard.
 
 Tests pass the fixture's bootstrapped PAT to `providers()` as `NB_PAT` / `NB_MANAGEMENT_URL` — no cloud token required.
 

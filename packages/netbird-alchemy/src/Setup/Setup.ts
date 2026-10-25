@@ -1,3 +1,9 @@
+import {
+	usersUserIdTokensGet,
+	usersUserIdTokensPost,
+	usersUserIdTokensTokenIdDelete,
+} from "@yorganci/netbird-api/tokens";
+import { usersPost } from "@yorganci/netbird-api/users";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
 import * as Data from "effect/Data";
@@ -9,6 +15,7 @@ import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
+import { Credentials } from "../Credentials.ts";
 import type { Diff } from "alchemy/Diff";
 import type { Input } from "alchemy/Input";
 
@@ -16,13 +23,37 @@ export class NetBirdSetupError extends Data.TaggedError("NetBirdSetupError")<{
 	readonly message: string;
 }> {}
 
+/**
+ * A service user `Setup` creates with the new owner's one-time token, and a
+ * key for it.
+ */
+export interface SetupAutomation {
+	/** Name of the service user. */
+	name: string;
+	/**
+	 * Role of the service user. Service users cannot be owners.
+	 *
+	 * @default "admin"
+	 */
+	role?: string;
+	/** Name of the service user's key. */
+	tokenName: string;
+	/**
+	 * Lifetime of the key in days (1–365).
+	 *
+	 * @default 365
+	 */
+	expiresIn?: number;
+}
+
 export interface SetupProps {
 	/**
 	 * Management API base URL (no trailing slash), e.g. `https://netbird.example.com`.
 	 */
 	apiBaseUrl: string;
 	/**
-	 * Admin email for the initial owner account.
+	 * Login of the initial owner account. NetBird requires an email-shaped one
+	 * for its local users; nothing is mailed to it.
 	 */
 	email: string;
 	/**
@@ -30,11 +61,19 @@ export interface SetupProps {
 	 */
 	name: string;
 	/**
-	 * Admin password. Generated on first setup when omitted. Either way the
-	 * password the owner account was created with is persisted in the
-	 * `password` attribute — NetBird will not return it again.
+	 * Owner password, 8 to 72 characters. Generated on first setup when
+	 * omitted, in which case the `password` attribute keeps it: NetBird will
+	 * not return it again.
 	 */
 	password?: Redacted.Redacted<string>;
+	/**
+	 * Also create a service user, and a key for it, with the owner token
+	 * `/api/setup` returns, then delete that token: the key is the only
+	 * credential setup leaves behind, so nothing has to be minted in the
+	 * dashboard. The server must run with `NB_SETUP_PAT_ENABLED=true`, and,
+	 * like the rest of setup, it happens only on a new server.
+	 */
+	automation?: SetupAutomation;
 	/**
 	 * Optional dependency edge (e.g. NixOS `Command.Exec` hash). Ignored by
 	 * the provider, including when diffing; include any upstream Output so
@@ -43,15 +82,32 @@ export interface SetupProps {
 	ready?: string | boolean | null;
 }
 
+export interface SetupAutomationAttributes {
+	/** Service user id. */
+	userId: string;
+	/** Service user name. */
+	name: string;
+	/** Key id. */
+	tokenId: string;
+	/** Key name. */
+	tokenName: string;
+	/** The key itself; NetBird never returns it again. */
+	token: Redacted.Redacted<string>;
+	/** Expiration timestamp reported by NetBird. */
+	expirationDate: string;
+}
+
 export interface SetupAttributes {
 	/** Owner user id returned by `/api/setup`. */
 	userId: string;
-	/** Admin email. */
+	/** Owner login. */
 	email: string;
-	/** Admin password (persisted from props; never re-fetched). */
-	password: Redacted.Redacted<string>;
+	/** Generated owner password, when none was given; never re-fetched. */
+	password?: Redacted.Redacted<string>;
 	/** API base URL used for setup. */
 	apiBaseUrl: string;
+	/** The service user and key made with the owner's one-time token. */
+	automation?: SetupAutomationAttributes;
 }
 
 export type Setup = Resource<"NetBird.Setup", SetupProps, SetupAttributes>;
@@ -59,27 +115,29 @@ export type Setup = Resource<"NetBird.Setup", SetupProps, SetupAttributes>;
 /**
  * First-time NetBird management bootstrap via unauthenticated `POST /api/setup`.
  *
- * Creates the owner account only. API credentials are supplied out of band via
- * `NB_PAT` (mint a token from the dashboard), so no PAT is
- * requested here. The admin password is generated unless supplied, persisted
- * in Alchemy state and reused when setup is already complete
- * (`setup_required: false`).
+ * Creates the owner account and, with `automation`, a service user and its
+ * key through the one-time owner token setup returns, which it then deletes:
+ * the key is what the rest of the stack authenticates with (`NB_PAT`). A
+ * password left out is generated and kept in state.
  *
  * Setup happens once per management server: after it, the resource only
- * changes when `apiBaseUrl` names a different server.
+ * changes when `apiBaseUrl` names a different server, and its stored output
+ * is kept.
  *
  * @resource
  * @product Setup
  * @category NetBird
  * @section Bootstrapping Management
- * @example Admin account
+ * @example Owner and an automation key
  * ```typescript
  * const setup = yield* NetBird.Setup("Admin", {
  *   apiBaseUrl: "https://netbird.example.com",
  *   email: "admin@example.com",
- *   name: "Admin",
+ *   name: "admin",
+ *   password: Redacted.make(secret),
+ *   automation: { name: "automation", tokenName: "stack" },
  * });
- * // setup.password holds the generated password.
+ * // setup.automation.token is an admin service user's key.
  * ```
  */
 export const Setup = Resource<Setup>("NetBird.Setup");
@@ -94,11 +152,24 @@ const InstanceResponse = Schema.Struct({
 const SetupResponse = Schema.Struct({
 	user_id: Schema.String,
 	email: Schema.String,
+	personal_access_token: Schema.optional(Schema.String),
 });
 
 const normalizeBaseUrl = (url: string) => url.replace(/\/$/, "");
 
 const PASSWORD_BYTES = 24;
+
+/** NetBird's name for the token `/api/setup` creates. */
+export const SETUP_TOKEN_NAME = "setup-token";
+
+/**
+ * Days the owner's setup token lives: NetBird's minimum. `Setup` deletes it
+ * as soon as it has made the service user's key.
+ */
+const SETUP_TOKEN_DAYS = 1;
+
+const DEFAULT_AUTOMATION_ROLE = "admin";
+const DEFAULT_AUTOMATION_EXPIRES_IN = 365;
 
 /**
  * A random admin password: `Nb`, 48 hex digits and `!`, so it holds upper- and
@@ -112,8 +183,9 @@ const generatePassword = () => {
 
 /**
  * The owner account's email, name and password are fixed by the first
- * `/api/setup`, and `ready` only orders the resource, so none of them is
- * compared. A different management server needs its own setup.
+ * `/api/setup`, as is the service user made then, and `ready` only orders
+ * the resource, so none of them is compared. A different management server
+ * needs its own setup.
  *
  * Returns `undefined` (the engine's props comparison) before the first setup
  * or while `apiBaseUrl` is still unresolved.
@@ -132,6 +204,19 @@ export const diffSetup = ({
 		? { action: "noop" }
 		: { action: "replace" };
 };
+
+/** The body of `POST /api/setup`; a setup token is asked for only with `automation`. */
+export const setupRequestBody = (props: {
+	email: string;
+	name: string;
+	password: Redacted.Redacted<string>;
+	automation?: SetupAutomation;
+}) => ({
+	email: props.email,
+	name: props.name,
+	password: Redacted.value(props.password),
+	...(props.automation ? { create_pat: true, pat_expire_in: SETUP_TOKEN_DAYS } : {}),
+});
 
 export const SetupProvider = () =>
 	Provider.succeed(Setup, {
@@ -163,33 +248,32 @@ export const SetupProvider = () =>
 			);
 
 			if (!instance.setup_required) {
-				if (output?.password) {
-					return {
-						userId: output.userId,
-						email: output.email,
-						password: output.password,
-						apiBaseUrl,
-					} satisfies SetupAttributes;
+				if (output) {
+					return { ...output, apiBaseUrl } satisfies SetupAttributes;
 				}
 				return yield* Effect.fail(
 					new NetBirdSetupError({
 						message:
-							"NetBird setup is already complete but Alchemy has no stored admin password. " +
-							"Destroy management state and redeploy, or recover the password out of band.",
+							`NetBird at ${apiBaseUrl} is already set up, and Alchemy has no record of this setup. ` +
+							"Setup only runs on a new server: restore the stack's state, or reset the server's state and deploy again.",
 					}),
 				);
 			}
 
-			// Reuse a password from an earlier setup (e.g. management state was
-			// wiped) so the stored credential stays valid.
-			const password = props.password ?? output?.password ?? generatePassword();
+			// Reuse a generated password from an earlier setup (e.g. management
+			// state was wiped) so the stored credential stays valid.
+			const generated = props.password === undefined ? (output?.password ?? generatePassword()) : undefined;
+			const password = props.password ?? generated!;
 
 			const request = yield* HttpClientRequest.post(`${apiBaseUrl}/api/setup`).pipe(
-				HttpClientRequest.bodyJson({
-					email,
-					name,
-					password: Redacted.value(password),
-				}),
+				HttpClientRequest.bodyJson(
+					setupRequestBody({
+						email,
+						name,
+						password,
+						...(props.automation ? { automation: props.automation } : {}),
+					}),
+				),
 			);
 
 			const created = yield* client.execute(request).pipe(
@@ -203,12 +287,83 @@ export const SetupProvider = () =>
 				),
 			);
 
-			return {
+			const attributes: SetupAttributes = {
 				userId: created.user_id,
 				email: created.email,
-				password,
 				apiBaseUrl,
-			} satisfies SetupAttributes;
+				...(generated ? { password: generated } : {}),
+			};
+			if (!props.automation) return attributes;
+
+			if (created.personal_access_token === undefined) {
+				return yield* Effect.fail(
+					new NetBirdSetupError({
+						message:
+							"NetBird created the owner but returned no setup token: the server has to run with " +
+							"NB_SETUP_PAT_ENABLED=true. The owner exists now, so sign in as it and create the service " +
+							"user by hand, or reset the server's state and deploy again.",
+					}),
+				);
+			}
+			const automation = yield* createAutomation({
+				apiBaseUrl,
+				ownerId: created.user_id,
+				ownerToken: Redacted.make(created.personal_access_token),
+				automation: props.automation,
+			}).pipe(
+				Effect.mapError(
+					cause =>
+						new NetBirdSetupError({
+							message:
+								`NetBird created the owner, but the service user or its key failed: ${String(cause)}. ` +
+								"The setup token is gone with this process, so sign in as the owner and create them by hand, " +
+								"or reset the server's state and deploy again.",
+						}),
+				),
+			);
+			return { ...attributes, automation } satisfies SetupAttributes;
 		}),
 		delete: () => Effect.void,
 	});
+
+/**
+ * The service user and its key, made with the owner's setup token, which is
+ * then deleted: only its own user may delete a person's token, so it has to
+ * be this one.
+ */
+const createAutomation = ({
+	apiBaseUrl,
+	ownerId,
+	ownerToken,
+	automation,
+}: {
+	apiBaseUrl: string;
+	ownerId: string;
+	ownerToken: Redacted.Redacted<string>;
+	automation: SetupAutomation;
+}) =>
+	Effect.gen(function* () {
+		const user = yield* usersPost({
+			name: automation.name,
+			role: automation.role ?? DEFAULT_AUTOMATION_ROLE,
+			auto_groups: [],
+			is_service_user: true,
+		});
+		const key = yield* usersUserIdTokensPost({
+			userId: user.id,
+			name: automation.tokenName,
+			expires_in: automation.expiresIn ?? DEFAULT_AUTOMATION_EXPIRES_IN,
+		});
+		const ownerTokens = yield* usersUserIdTokensGet({ userId: ownerId });
+		for (const token of ownerTokens.filter(token => token.name === SETUP_TOKEN_NAME)) {
+			yield* usersUserIdTokensTokenIdDelete({ userId: ownerId, tokenId: token.id });
+		}
+		return {
+			userId: user.id,
+			name: user.name,
+			tokenId: key.personal_access_token.id,
+			tokenName: key.personal_access_token.name,
+			token: Redacted.make(key.plain_token),
+			expirationDate: key.personal_access_token.expiration_date,
+		} satisfies SetupAutomationAttributes;
+	}).pipe(Effect.provideService(Credentials, Effect.succeed({ apiToken: ownerToken, managementUrl: apiBaseUrl })));

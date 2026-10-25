@@ -1,7 +1,7 @@
 import * as Output from "alchemy/Output";
 import * as Redacted from "effect/Redacted";
 import { describe, expect, it } from "vitest";
-import { diffSetup, type SetupAttributes, type SetupProps } from "../src/Setup/Setup.ts";
+import { diffSetup, setupRequestBody, type SetupAttributes, type SetupProps } from "../src/Setup/Setup.ts";
 
 const output: SetupAttributes = {
 	userId: "user-1",
@@ -51,5 +51,34 @@ describe("diffSetup", () => {
 	it("defers to the engine while the base URL is unresolved", () => {
 		const news = { ...props, apiBaseUrl: Output.literal(props.apiBaseUrl) };
 		expect(diffSetup({ news, output })).toBeUndefined();
+	});
+});
+
+describe("setupRequestBody", () => {
+	const base = { email: "admin@example.com", name: "admin", password: Redacted.make("secret-password") };
+
+	it("asks for no setup token without automation", () => {
+		expect(setupRequestBody(base)).toEqual({
+			email: "admin@example.com",
+			name: "admin",
+			password: "secret-password",
+		});
+	});
+
+	it("asks for a one-day setup token with automation", () => {
+		expect(setupRequestBody({ ...base, automation: { name: "automation", tokenName: "stack" } })).toEqual({
+			email: "admin@example.com",
+			name: "admin",
+			password: "secret-password",
+			create_pat: true,
+			pat_expire_in: 1,
+		});
+	});
+});
+
+describe("diffSetup with automation", () => {
+	it("never sets up again for a different service user", () => {
+		const news = { ...props, automation: { name: "other", tokenName: "other", expiresIn: 30 } };
+		expect(diffSetup({ news, output })).toEqual({ action: "noop" });
 	});
 });

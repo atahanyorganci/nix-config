@@ -24,8 +24,12 @@ import { isDockerReady } from "./fixtures/Runtime.ts";
  * `NB_MANAGEMENT_URL` environment credentials, read from a Ref the fixture
  * fills once it has booted. The providers resolve them on first use, so
  * create/update/delete and ensuring teardown all see the same PAT.
+ *
+ * With `setup: false` the fixture is left before `POST /api/setup`, for tests
+ * of `NetBird.Setup` itself: there is no PAT then, only `NB_MANAGEMENT_URL`.
  */
-export const createHarness = (fixtureName: string) => {
+export const createHarness = (fixtureName: string, options: { readonly setup?: boolean } = {}) => {
+	const setup = options.setup ?? true;
 	const envRef = Ref.makeUnsafe<Record<string, string>>({});
 
 	const handleRef = Ref.makeUnsafe<NetBirdServerHandle | null>(null);
@@ -67,14 +71,14 @@ export const createHarness = (fixtureName: string) => {
 
 		const resources = yield* api.deploy(fixtureStack);
 		yield* waitUntilReady(resources.baseUrl);
-		const apiToken = yield* bootstrapPat(resources.baseUrl);
+		const apiToken = setup ? yield* bootstrapPat(resources.baseUrl) : Redacted.make("");
 		const handle = {
 			baseUrl: resources.baseUrl,
 			hostPort: resources.hostPort,
 			apiToken,
 		} satisfies NetBirdServerHandle;
 		yield* Ref.set(envRef, {
-			[NetBird.NB_PAT_ENV]: Redacted.value(apiToken),
+			...(setup ? { [NetBird.NB_PAT_ENV]: Redacted.value(apiToken) } : {}),
 			[NetBird.NB_MANAGEMENT_URL_ENV]: resources.baseUrl,
 		});
 		yield* Ref.set(handleRef, handle);
