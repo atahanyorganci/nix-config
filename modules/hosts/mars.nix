@@ -60,6 +60,9 @@
       # new installation needs until HomeInfra has created the provider.
       # Recovery without Authelia is the stack's service-user token, and SSH.
       authelia.enable = true;
+      # On while NetBird is set up again; off once HomeInfra has created the
+      # Authelia provider and atahan is an admin.
+      bootstrap = true;
     };
     netbird-proxy = {
       enable = true;
