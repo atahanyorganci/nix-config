@@ -99,7 +99,21 @@
     };
     # Single sign-on: Authelia at auth.<domain>, against users and groups in
     # LLDAP (admin UI at ldap.<domain>, Admin only).
-    lldap.enable = true;
+    lldap = {
+      enable = true;
+      # The owner of this flake. No password is kept anywhere: the first one is
+      # set with Authelia's "Reset password", mailed through SES. Out of
+      # lldap_admin (the stack's admin administers LLDAP) so that Authelia's
+      # account, a password manager, may reset it.
+      ensure = {
+        groups = ["admin"];
+        users.${user.username} = {
+          inherit (user) email;
+          displayName = user.name;
+          groups = ["admin"];
+        };
+      };
+    };
     authelia = {
       enable = true;
       smtp.enable = true;
