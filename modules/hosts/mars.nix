@@ -103,6 +103,16 @@
       enable = true;
       smtp.enable = true;
     };
+    oidcClients.synology-dsm = {
+      name = "Synology DSM";
+      secretDigest = "authelia/oidc/clients/synology-dsm/secret-digest";
+      redirectUris = ["https://nas.yorganci.dev"];
+      scopes = ["openid" "profile" "groups" "email"];
+      pkce = false;
+      groups = ["admin" "users"];
+      idTokenClaims = ["email" "email_verified" "name" "preferred_username" "groups"];
+      settings.token_endpoint_auth_method = "client_secret_post";
+    };
     agent-gateway = {
       enable = true;
       # The reverse proxy dials mars's mesh address, so the listener has to exist
