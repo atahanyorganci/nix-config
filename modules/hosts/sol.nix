@@ -19,6 +19,7 @@
     gum.enable = true;
     hunk.enable = true;
     python.enable = true;
+    rex.enable = true;
     shell = {
       bash.enable = true;
       fish.enable = true;
