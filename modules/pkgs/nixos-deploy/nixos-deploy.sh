@@ -30,6 +30,12 @@ KNOWN_HOSTS="${NIXOS_KNOWN_HOSTS:?NIXOS_KNOWN_HOSTS must point at the pinned hos
 # would stand in for the pinned one), and without the GPG RemoteForward from
 # ~/.ssh/config: a forward taken by a deploy dies when the deploy ends, and
 # with it signing for every session on the host.
+#
+# Keepalives every 15 seconds: a remote build can go minutes without output,
+# long enough for a NAT on the way to forget the connection, after which
+# neither end hears from the other and ssh, with nothing to send, would wait
+# for hours. With them a dead connection fails within a minute.
+SSH_KEEPALIVE_OPTS="-o ServerAliveInterval=15 -o ServerAliveCountMax=4"
 SSH_OPTS=(
     -o ConnectTimeout=10
     -o BatchMode=yes
@@ -37,6 +43,8 @@ SSH_OPTS=(
     -o ControlPath=none
     -o ClearAllForwardings=yes
 )
+read -r -a keepalive_opts <<< "$SSH_KEEPALIVE_OPTS"
+SSH_OPTS+=("${keepalive_opts[@]}")
 if grep -q "^${HOST_NAME} " "$KNOWN_HOSTS"; then
     # Check the key pinned for this configuration, whatever address it is
     # reached at. Nothing else is trusted: not ~/.ssh/known_hosts, not the
@@ -51,7 +59,11 @@ read -r -a host_key_opts <<< "$HOST_KEY_OPTS"
 SSH_OPTS+=("${host_key_opts[@]}")
 
 export TMPDIR="${TMPDIR:-/tmp}"
-export NIX_SSHOPTS="${NIX_SSHOPTS:-} ${HOST_KEY_OPTS} -o ControlMaster=auto -o ControlPath=/tmp/nr-%C -o ControlPersist=60 -o ClearAllForwardings=yes"
+# No ControlPath here: nixos-rebuild multiplexes over a master of its own, in
+# a temporary directory of this run, and closes it when it exits. One set here
+# would win over it (ssh takes an option's first value), outlive the deploy and
+# be shared by every later one, all of them hanging once it does.
+export NIX_SSHOPTS="${NIX_SSHOPTS:-} ${HOST_KEY_OPTS} ${SSH_KEEPALIVE_OPTS} -o ClearAllForwardings=yes"
 
 host_key_mismatch() {
     log "host key mismatch: ${SSH_TARGET} is not the ${HOST_NAME} pinned in the flake"
@@ -119,13 +131,15 @@ if [[ ${NIXOS_DEPLOY_FORCE:-} != 1 ]]; then
 fi
 
 log "deploying ${want} to ${SSH_TARGET}"
-# Build on the target — never on the local machine.
-# Keep SSH ControlPath under the macOS socket-path limit.
+# Build on the target — never on the local machine — printing the build logs,
+# so that a long build shows progress rather than looking hung.
+# Keep nixos-rebuild's ControlPath under the macOS socket-path limit.
 export TMPDIR=/tmp
 nixos-rebuild switch \
     --flake "$FLAKE_EXPR" \
     --build-host "$SSH_TARGET" \
     --target-host "$SSH_TARGET" \
+    --print-build-logs \
     --elevate=sudo
 
 log "deploy complete"
