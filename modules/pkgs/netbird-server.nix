@@ -2,16 +2,16 @@
   flake.overlays.netbird-server = final: _prev: {
     netbird-server = final.buildGoModule rec {
       pname = "netbird-server";
-      version = "0.80.0";
+      version = "0.83.1";
 
       src = final.fetchFromGitHub {
         owner = "netbirdio";
         repo = "netbird";
         tag = "v${version}";
-        hash = "sha256-oZgDYmNzf8UESUEbwn0Br0CaPTNLaEpuiKR2wW5zeGw=";
+        hash = "sha256-4KX44eX6ylXM59B1jOVoSgUytl7WSqHGs0qaX+XFngI=";
       };
 
-      vendorHash = "sha256-2lM0KtyU3RxA7KJtM10JslMpyHmgqxQ23B1Ieq986Y8=";
+      vendorHash = "sha256-iIbATQiIfazszBSi4jl5Ys/27uYwfweEMo+4BLSnRms=";
 
       proxyVendor = true;
 
