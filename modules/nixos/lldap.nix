@@ -73,6 +73,13 @@ in {
           id="$(jq -r .id <<<"$user")"
           vars="$(jq -n --arg id "$id" '{id: $id}')"
           if ! gql 'query($id: String!) { user(userId: $id) { id } }' "$vars" >/dev/null 2>&1; then
+            # Emails are unique, and LLDAP's own refusal does not say whose it is.
+            email="$(jq -r .email <<<"$user")"
+            owner="$(gql '{users{id email}}' '{}' | jq -r --arg email "$email" '.users[] | select(.email == $email) | .id')"
+            if [[ -n $owner ]]; then
+              echo "lldap-ensure: cannot create $id: $email already belongs to $owner; declare that user ID instead" >&2
+              exit 1
+            fi
             gql 'mutation($user: CreateUserInput!) { createUser(user: $user) { id } }' \
               "$(jq '{user: {id, email, displayName}}' <<<"$user")" >/dev/null
             echo "created user $id"
