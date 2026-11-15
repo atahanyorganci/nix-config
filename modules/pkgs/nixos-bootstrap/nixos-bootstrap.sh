@@ -31,9 +31,12 @@ SSH_OPTS=(
     -o ControlMaster=no
     -o ControlPath=none
     -o ClearAllForwardings=yes
+    # Keepalives, so a connection a NAT dropped during a silent build fails
+    # instead of hanging (see nixos-deploy).
+    -o ServerAliveInterval=15
+    -o ServerAliveCountMax=4
 )
 export TMPDIR="${TMPDIR:-/tmp}"
-export NIX_SSHOPTS="${NIX_SSHOPTS:-} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=auto -o ControlPath=/tmp/nr-%C -o ControlPersist=60 -o ClearAllForwardings=yes"
 
 KNOWN_HOSTS="${NIXOS_KNOWN_HOSTS:?NIXOS_KNOWN_HOSTS must point at the pinned host keys}"
 SECRETS="${NIXOS_SECRETS:?NIXOS_SECRETS must point at the secrets repository}"
@@ -148,6 +151,8 @@ run_nixos_anywhere() {
         --ssh-option StrictHostKeyChecking=no \
         --ssh-option UserKnownHostsFile=/dev/null \
         --ssh-option ClearAllForwardings=yes \
+        --ssh-option ServerAliveInterval=15 \
+        --ssh-option ServerAliveCountMax=4 \
         --target-host "$SSH_TARGET" \
         "$@"
 }
