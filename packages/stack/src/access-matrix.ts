@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
-import { PROXY_GROUP_NAME, PolicySourceGroupName, isLoginGroupName, isPolicySourceGroupName } from "./inventory.ts";
+import { PolicySourceGroupName, isLoginGroupName, isPolicySourceGroupName } from "./inventory.ts";
 import { MeshServices, type MeshService } from "./mesh-services.ts";
 import { NameServers, type NameServerPlan } from "./name-servers.ts";
 import { HttpServices, type HttpHost, type HttpService } from "./reverse-proxy.ts";
@@ -34,7 +34,7 @@ const sourceGroups = (
 		return Effect.fail(
 			new SchemaIssue.InvalidValue(
 				{
-					message: `${label}: group(s) ${unknown.join(", ")} cannot be granted access — expected Admin, Users, Servers or Proxy (Agents peers are isolated, and All would include them)`,
+					message: `${label}: group(s) ${unknown.join(", ")} cannot be granted access — expected Admin, Users or Servers (Agents peers are isolated, and All would include them)`,
 				},
 				groups,
 			),
@@ -46,18 +46,21 @@ const sourceGroups = (
 /**
  * An HTTP service's port is reached over the mesh by the reverse proxy, which
  * checks `expose.accessGroups` itself, and by machine groups among them (e.g.
- * Servers calling an API). People's devices (login groups) go through the
- * proxy only: a backend that trusts the proxy's identity headers must not be
+ * Servers calling an API). NetBird lets the proxy's peers through on its own,
+ * from ACLs it synthesises for every enabled service target, so only machine
+ * groups need an entry. People's devices (login groups) go through the proxy
+ * only: a backend that trusts the proxy's identity headers must not be
  * reachable by anyone who could forge them.
  */
 const httpEntries = (hostKey: string, serviceKey: string, cfg: HttpService) =>
 	Effect.gen(function* () {
 		const label = `${hostKey}.${serviceKey}.expose.accessGroups`;
 		yield* sourceGroups(label, cfg.expose.accessGroups);
-		const allowedSourceGroups = yield* sourceGroups(label, [
-			...cfg.expose.accessGroups.filter(group => !isLoginGroupName(group)),
-			PROXY_GROUP_NAME,
-		]);
+		const allowedSourceGroups = yield* sourceGroups(
+			label,
+			cfg.expose.accessGroups.filter(group => !isLoginGroupName(group)),
+		);
+		if (allowedSourceGroups.length === 0) return [];
 		const entry: AccessMatrixEntry = {
 			host: hostKey,
 			service: serviceKey,

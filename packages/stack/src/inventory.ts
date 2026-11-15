@@ -29,26 +29,21 @@ export const isNetBirdGroupName = (value: string): value is NetBirdGroupName =>
 	(ZERO_TRUST_GROUP_NAMES as ReadonlyArray<string>).includes(value);
 
 /**
- * Reverse-proxy peers. The proxy's embedded NetBird client is not in the
- * flake inventory, so its membership is added once in the dashboard.
- */
-export const PROXY_GROUP_NAME = "Proxy";
-
-/**
  * Group names accepted as policy sources. Agents peers are isolated and are
  * never a source; NetBird's built-in All group is rejected because it would
- * include them.
+ * include them. The reverse proxy needs no group: NetBird lets its peers reach
+ * every enabled service target itself, from ACLs it synthesises in memory.
  *
  * Agent Network policies are the one place Agents may be a source
  * (`AgentNetworkSourceGroupName` in agent-network.ts): NetBird turns them into
  * access to the proxy peer on 80/443 only, and the proxy still checks every
  * other service's own access groups.
  */
-export const PolicySourceGroupName = Schema.Literals(["Admin", "Users", "Servers", "Proxy"]);
+export const PolicySourceGroupName = Schema.Literals(["Admin", "Users", "Servers"]);
 export type PolicySourceGroupName = typeof PolicySourceGroupName.Type;
 
 export const isPolicySourceGroupName = (value: string): value is PolicySourceGroupName =>
-	value === PROXY_GROUP_NAME || (isNetBirdGroupName(value) && value !== "Agents");
+	isNetBirdGroupName(value) && value !== "Agents";
 
 export const InventoryHost = Schema.Struct({
 	name: Schema.String,

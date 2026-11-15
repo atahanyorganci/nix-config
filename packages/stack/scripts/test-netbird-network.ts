@@ -26,7 +26,7 @@ const REQUIRED_PEERS = ["mars", "mercury", "venus", "jupiter"] as const;
 const BLOCKED_PROBE_DOMAIN = "doubleclick.net";
 
 /** Segment groups HomeInfra always maintains. */
-const REQUIRED_GROUPS = ["Admin", "Users", "Servers", "Agents", "Proxy", "All"] as const;
+const REQUIRED_GROUPS = ["Admin", "Users", "Servers", "Agents", "All"] as const;
 
 /** Core allow policies that must stay enabled under default-deny. */
 const REQUIRED_POLICIES = ["allow-admin-ssh", "allow-admin-proxy-tcp"] as const;
@@ -308,14 +308,6 @@ const testNetbirdNetwork = Command.make("test-netbird-network", {
 					detail: group === undefined ? "missing" : `id=${group.id} peers=${group.peers?.length ?? 0}`,
 				});
 			}
-
-			const proxyGroup = groups.find(group => group.name === "Proxy");
-			checks.push({
-				name: "proxy-group-has-peers",
-				ok: (proxyGroup?.peers?.length ?? 0) > 0,
-				soft: true,
-				detail: `peers=${proxyGroup?.peers?.length ?? 0} (add live proxy-* peers in the dashboard for durable Admin→Proxy ACL)`,
-			});
 
 			for (const host of REQUIRED_PEERS) {
 				const peer = peers.find(entry => peerMatchesHost(entry.name || entry.dns_label || "", host));

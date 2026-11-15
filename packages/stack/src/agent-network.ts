@@ -11,7 +11,7 @@ import type {
  * Groups an Agent Network policy may authorise. `Agents` is allowed here,
  * unlike as a mesh policy source: an Agent Network policy only opens the proxy
  * peer on 80/443, and the proxy checks every other service's own access
- * groups. `All` would include the proxy's peers, and `Proxy` is not a caller.
+ * groups. `All` would include the proxy's peers.
  */
 export const AgentNetworkSourceGroupName = Schema.Literals(["Admin", "Users", "Servers", "Agents"]);
 export type AgentNetworkSourceGroupName = typeof AgentNetworkSourceGroupName.Type;

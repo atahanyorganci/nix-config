@@ -156,18 +156,9 @@ export default HomeInfra.make(
 			name: Policies.ALL_GROUP_NAME,
 		}).pipe(Alchemy.RemovalPolicy.retain());
 
-		// The reverse proxy joins the mesh as embedded peers that are not in the
-		// flake inventory and are omitted from /api/peers. Add those peers to this
-		// group once in the dashboard (Peers → proxy-* → Groups). Without that,
-		// allow-admin-proxy-tcp has an empty destination after Default is disabled,
-		// and matrix rules that list Proxy as a source never match a peer.
-		const proxyGroup = yield* NetBird.Group("Proxy", {
-			name: Inventory.PROXY_GROUP_NAME,
-		});
-		groupOutputs[Inventory.PROXY_GROUP_NAME] = {
-			groupId: proxyGroup.groupId,
-			name: proxyGroup.name,
-		};
+		// The reverse proxy's embedded peers need no group: NetBird synthesises
+		// the ACLs that let them reach every enabled service target, and lets a
+		// private service's access groups reach them.
 
 		const adminGroup = groupResources.Admin!;
 		const usersGroup = groupResources.Users!;
@@ -180,16 +171,14 @@ export default HomeInfra.make(
 			usersGroup.groupId,
 			serversGroup.groupId,
 			agentsGroup.groupId,
-			proxyGroup.groupId,
 		).pipe(
 			Output.map(
-				([all, admin, users, servers, agents, proxy]): Record<string, string> => ({
+				([all, admin, users, servers, agents]): Record<string, string> => ({
 					[Policies.ALL_GROUP_NAME]: all,
 					Admin: admin,
 					Users: users,
 					Servers: servers,
 					Agents: agents,
-					[Inventory.PROXY_GROUP_NAME]: proxy,
 				}),
 			),
 		);
@@ -245,11 +234,7 @@ export default HomeInfra.make(
 		for (const plan of plans) {
 			const peer = peers[plan.hostKey]!;
 			for (const groupName of ReverseProxy.groupNamesForPlan(plan)) {
-				if (
-					groupName !== Policies.ALL_GROUP_NAME &&
-					groupName !== Inventory.PROXY_GROUP_NAME &&
-					!Inventory.isNetBirdGroupName(groupName)
-				) {
+				if (groupName !== Policies.ALL_GROUP_NAME && !Inventory.isNetBirdGroupName(groupName)) {
 					return yield* Effect.die(
 						`service "${plan.serviceKey}": unknown NetBird group "${groupName}" in expose.accessGroups or auth.distributionGroups`,
 					);
@@ -281,11 +266,7 @@ export default HomeInfra.make(
 			}
 
 			for (const groupName of plan.cfg.groups) {
-				if (
-					groupName !== Policies.ALL_GROUP_NAME &&
-					groupName !== Inventory.PROXY_GROUP_NAME &&
-					!Inventory.isNetBirdGroupName(groupName)
-				) {
+				if (groupName !== Policies.ALL_GROUP_NAME && !Inventory.isNetBirdGroupName(groupName)) {
 					return yield* Effect.die(`NetBird group "${groupName}" not found for nameserver "${plan.nameserverKey}"`);
 				}
 			}
@@ -417,7 +398,6 @@ export default HomeInfra.make(
 		// access, so backends can trust the proxy's identity headers.
 		const allowRules = [
 			...Policies.adminSshRules(),
-			...Policies.adminProxyRules(),
 			...Policies.serverSshRules(),
 			...Policies.allowRulesFromMatrix(accessMatrix, inventory),
 		];
