@@ -217,9 +217,7 @@ in {
     gateway = {
       # Allocated by NetBird on the first deploy and never renamed; clients
       # (Hermes) are configured with it, and the stack fails if it drifts.
-      # Unpinned while NetBird is set up again: the new server allocates a new
-      # one, which HomeInfra reports (`agentNetwork.endpoint`) to pin here.
-      endpoint = null;
+      endpoint = "kindred-prairie.yorganci.dev";
       logCollection = true;
       promptCollection = true;
       redactPii = false;
