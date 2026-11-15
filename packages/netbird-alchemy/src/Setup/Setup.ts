@@ -168,6 +168,15 @@ export const SETUP_TOKEN_NAME = "setup-token";
  */
 const SETUP_TOKEN_DAYS = 1;
 
+/**
+ * How long setup waits for a new server's management API: asked every 5
+ * seconds for 10 minutes, each request given 30 seconds. A host that has just
+ * been installed answers within a minute or two (its certificate included).
+ */
+const API_READY_INTERVAL = "5 seconds";
+const API_READY_ATTEMPTS = 120;
+const REQUEST_TIMEOUT = "30 seconds";
+
 const DEFAULT_AUTOMATION_ROLE = "admin";
 const DEFAULT_AUTOMATION_EXPIRES_IN = 365;
 
@@ -232,17 +241,20 @@ export const SetupProvider = () =>
 
 			const client = yield* HttpClient.HttpClient;
 
+			// Bounded: an exponential backoff without a cap waited, in effect,
+			// forever for a server that never came up.
 			const instance = yield* client.get(`${apiBaseUrl}/api/instance`).pipe(
 				Effect.flatMap(HttpClientResponse.filterStatusOk),
 				Effect.flatMap(HttpClientResponse.schemaBodyJson(InstanceResponse)),
+				Effect.timeout(REQUEST_TIMEOUT),
 				Effect.retry({
-					schedule: Schedule.exponential("1 second"),
-					times: 90,
+					schedule: Schedule.spaced(API_READY_INTERVAL),
+					times: API_READY_ATTEMPTS,
 				}),
 				Effect.mapError(
 					cause =>
 						new NetBirdSetupError({
-							message: `NetBird management API not ready at ${apiBaseUrl}: ${String(cause)}`,
+							message: `NetBird management API not ready at ${apiBaseUrl} after 10 minutes: ${String(cause)}`,
 						}),
 				),
 			);
@@ -279,6 +291,7 @@ export const SetupProvider = () =>
 			const created = yield* client.execute(request).pipe(
 				Effect.flatMap(HttpClientResponse.filterStatusOk),
 				Effect.flatMap(HttpClientResponse.schemaBodyJson(SetupResponse)),
+				Effect.timeout(REQUEST_TIMEOUT),
 				Effect.mapError(
 					cause =>
 						new NetBirdSetupError({
