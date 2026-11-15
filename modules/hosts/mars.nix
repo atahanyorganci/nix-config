@@ -104,13 +104,14 @@
     # LLDAP (admin UI at ldap.<domain>, Admin only).
     lldap = {
       enable = true;
-      # The owner of this flake. No password is kept anywhere: the first one is
-      # set with Authelia's "Reset password", mailed through SES. Out of
-      # lldap_admin (the stack's admin administers LLDAP) so that Authelia's
-      # account, a password manager, may reset it.
+      # The owner of this flake, under the user ID the account already has. No
+      # password is kept anywhere: the first one is set with Authelia's "Reset
+      # password", mailed through SES. Out of lldap_admin (the stack's admin
+      # administers LLDAP) so that Authelia's account, a password manager, may
+      # reset it.
       ensure = {
         groups = ["admin"];
-        users.${user.username} = {
+        users."atahan.yorganci" = {
           inherit (user) email;
           displayName = user.name;
           groups = ["admin"];
