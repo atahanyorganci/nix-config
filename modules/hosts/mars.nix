@@ -80,10 +80,7 @@
       enable = true;
       setupKeyFile = "/var/lib/netbird-client/setup.key";
     };
-    pihole = {
-      enable = true;
-      hostName = "${networking.hostName}.netbird.selfhosted";
-    };
+    pihole.enable = true;
     searx.enable = true;
     atuin-server.enable = true;
     vaultwarden = {

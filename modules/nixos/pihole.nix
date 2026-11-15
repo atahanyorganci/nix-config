@@ -1,4 +1,6 @@
-{
+{config, ...}: let
+  infra = config.flake.infra;
+in {
   flake.modules.nixos.pihole = {
     lib,
     config,
@@ -7,6 +9,8 @@
   }: let
     cfg = config.pihole;
     ftl = config.services.pihole-ftl;
+    # Subdomain of infra.domain NetBird's reverse proxy serves the admin UI on.
+    serviceKey = "pihole";
     # NetBird NixOS client exposes WireGuard as nb-<clientName>.
     netbirdInterface = "nb-wt0";
     pihole = lib.getExe ftl.piholePackage;
@@ -115,8 +119,14 @@
       enable = lib.mkEnableOption "Pi-hole DNS for NetBird mesh peers";
       hostName = lib.mkOption {
         type = lib.types.str;
-        example = "mars.netbird.selfhosted";
-        description = "Hostname for the Pi-hole admin UI (services.pihole-web).";
+        default = "${serviceKey}.${infra.domain}";
+        defaultText = lib.literalExpression ''"pihole.''${infra.domain}"'';
+        description = ''
+          Name the admin UI is reached by (`webserver.domain`): the reverse
+          proxy's, which it forwards as the Host header. Without a web password
+          Pi-hole (FTL 6.8 and later) answers only requests for its own names,
+          this one among them, against DNS rebinding.
+        '';
       };
     };
 
@@ -170,7 +180,7 @@
         ports = [8053];
       };
 
-      httpServices.pihole = {
+      httpServices.${serviceKey} = {
         port = 8053;
         expose = {
           enable = true;
