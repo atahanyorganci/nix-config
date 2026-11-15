@@ -12,7 +12,22 @@ in {
     nix.settings = {
       experimental-features = ["nix-command" "flakes"];
       trusted-users = ["root" "@wheel"];
+      # Collect garbage during a build once free space falls under 2 GiB,
+      # until 10 GiB are free, rather than failing it: mars ran out of disk
+      # mid-deploy.
+      min-free = 2 * 1024 * 1024 * 1024;
+      max-free = 10 * 1024 * 1024 * 1024;
     };
+    # Generations older than two weeks and whatever nothing refers to any more
+    # go weekly; mars had kept fifty system generations, most of its disk.
+    nix.gc = {
+      automatic = true;
+      dates = "weekly";
+      options = "--delete-older-than 14d";
+      persistent = true;
+      randomizedDelaySec = "1h";
+    };
+    nix.optimise.automatic = true;
     # ssh-ng / nixos-rebuild --build-host inherit the SSH session ulimit.
     # The default 1024 FDs is too low for a full system+home-manager closure.
     security.pam.loginLimits = [
