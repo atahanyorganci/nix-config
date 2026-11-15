@@ -132,13 +132,16 @@ fi
 
 log "deploying ${want} to ${SSH_TARGET}"
 # Build on the target — never on the local machine — printing the build logs,
-# so that a long build shows progress rather than looking hung.
+# so that a long build shows progress rather than looking hung. ssh-ng copies
+# the derivations over with `nix copy`, in batches; plain ssh uses
+# nix-copy-closure, one path at a time, which after a nixpkgs bump (thousands
+# of derivations) takes the better part of an hour.
 # Keep nixos-rebuild's ControlPath under the macOS socket-path limit.
 export TMPDIR=/tmp
 nixos-rebuild switch \
     --flake "$FLAKE_EXPR" \
-    --build-host "$SSH_TARGET" \
-    --target-host "$SSH_TARGET" \
+    --build-host "ssh-ng://${SSH_TARGET}" \
+    --target-host "ssh-ng://${SSH_TARGET}" \
     --print-build-logs \
     --elevate=sudo
 
