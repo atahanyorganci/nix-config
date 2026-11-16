@@ -203,7 +203,7 @@ in {
         fallbacks = ["1.1.1.1"];
         # Agents peers (jupiter) are isolated and keep their provider resolver;
         # the reverse-proxy peer needs no Pi-hole either.
-        groups = ["Admin" "Users" "Servers"];
+        groups = ["Admin" "User" "Servers"];
         domains = [];
         searchDomainsEnabled = false;
       };

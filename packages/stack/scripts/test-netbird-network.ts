@@ -26,7 +26,7 @@ const REQUIRED_PEERS = ["mars", "mercury", "venus", "jupiter"] as const;
 const BLOCKED_PROBE_DOMAIN = "doubleclick.net";
 
 /** Segment groups HomeInfra always maintains. */
-const REQUIRED_GROUPS = ["Admin", "Users", "Servers", "Agents", "All"] as const;
+const REQUIRED_GROUPS = ["Admin", "User", "Servers", "Agents", "All"] as const;
 
 /** Core allow policies that must stay enabled under default-deny. */
 const REQUIRED_POLICIES = ["allow-admin-ssh", "allow-admin-proxy-tcp"] as const;

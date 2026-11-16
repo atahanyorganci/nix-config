@@ -134,8 +134,12 @@ export default HomeInfra.make(
 		const groupResources: Record<string, NetBird.Group> = {};
 		const groupOutputs: Record<string, { groupId: NetBird.Group["groupId"]; name: NetBird.Group["name"] }> = {};
 		for (const groupName of Inventory.ZERO_TRUST_GROUP_NAMES) {
-			// Admin and Users are filled by NetBird login (user auto_groups), so only
-			// the infra groups get their member list rewritten from inventory.
+			// Infra groups get their member list rewritten from inventory. Login
+			// groups (Admin, User) belong to JWT group sync: NetBird creates them
+			// when a member of the LLDAP group of that name first signs in through
+			// Authelia, and only ever adds users to groups it issued that way, so
+			// the stack adopts them, never creates one through the API, and never
+			// deletes one, which no deploy could put back.
 			const group = Inventory.isPeerGroupName(groupName)
 				? yield* NetBird.Group(groupName, {
 						name: groupName,
@@ -143,7 +147,11 @@ export default HomeInfra.make(
 							.filter(hostKey => peers[hostKey] !== undefined)
 							.map(hostKey => peers[hostKey]!.peerId),
 					})
-				: yield* NetBird.Group(groupName, { name: groupName });
+				: yield* NetBird.Group(`${groupName}LoginGroup`, {
+						name: groupName,
+						create: false,
+						issued: "jwt",
+					}).pipe(Alchemy.RemovalPolicy.retain());
 			groupResources[groupName] = group;
 			groupOutputs[groupName] = {
 				groupId: group.groupId,
@@ -161,22 +169,22 @@ export default HomeInfra.make(
 		// private service's access groups reach them.
 
 		const adminGroup = groupResources.Admin!;
-		const usersGroup = groupResources.Users!;
+		const userGroup = groupResources.User!;
 		const serversGroup = groupResources.Servers!;
 		const agentsGroup = groupResources.Agents!;
 
 		const groupIdTable = Output.all(
 			allGroup.groupId,
 			adminGroup.groupId,
-			usersGroup.groupId,
+			userGroup.groupId,
 			serversGroup.groupId,
 			agentsGroup.groupId,
 		).pipe(
 			Output.map(
-				([all, admin, users, servers, agents]): Record<string, string> => ({
+				([all, admin, user, servers, agents]): Record<string, string> => ({
 					[Policies.ALL_GROUP_NAME]: all,
 					Admin: admin,
-					Users: users,
+					User: user,
 					Servers: servers,
 					Agents: agents,
 				}),
@@ -184,19 +192,26 @@ export default HomeInfra.make(
 		);
 
 		// People join through Authelia, which only lets in LLDAP's users, with a
-		// second factor: no approval on top. Group propagation moves the devices
-		// they registered to the groups they are given later. The owner is the
-		// stack's admin, a local user NetbirdServer's setup created.
+		// second factor: no approval on top. Their groups come with them: Authelia
+		// puts their LLDAP groups (only `authelia.groups`) in the `groups`
+		// claim, and JWT group sync makes those their auto groups on every
+		// request. Group propagation moves the devices they registered along.
+		// Anyone in none of the login groups is refused. The owner is the stack's
+		// admin, a local user NetbirdServer's setup created, which JWT group sync
+		// never touches; nor does it touch service users' API tokens.
 		yield* NetBird.AccountSettings("Account", {
 			userApprovalRequired: false,
 			groupsPropagationEnabled: true,
+			jwtGroupsEnabled: true,
+			jwtGroupsClaimName: "groups",
+			jwtAllowGroups: Inventory.LOGIN_GROUP_NAMES,
 		}).pipe(Alchemy.RemovalPolicy.retain());
 
 		const marsPeer = peers.mars;
 		if (!marsPeer) {
 			return yield* Effect.die('NetBird peer "mars" is required for exit routes and Pi-hole DNS');
 		}
-		const exitGroups = Output.all(adminGroup.groupId, usersGroup.groupId).pipe(Output.map(ids => [...ids]));
+		const exitGroups = Output.all(adminGroup.groupId, userGroup.groupId).pipe(Output.map(ids => [...ids]));
 		// One IPv4 default route defines the exit node. NetBird's network map
 		// derives the ::/0 companion (network id "mars-exit-v6") for every
 		// IPv6-capable peer, so an explicit ::/0 route only duplicates it.

@@ -34,7 +34,7 @@ const sourceGroups = (
 		return Effect.fail(
 			new SchemaIssue.InvalidValue(
 				{
-					message: `${label}: group(s) ${unknown.join(", ")} cannot be granted access — expected Admin, Users or Servers (Agents peers are isolated, and All would include them)`,
+					message: `${label}: group(s) ${unknown.join(", ")} cannot be granted access — expected Admin, User or Servers (Agents peers are isolated, and All would include them)`,
 				},
 				groups,
 			),

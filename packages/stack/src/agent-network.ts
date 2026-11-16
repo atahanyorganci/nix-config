@@ -13,7 +13,7 @@ import type {
  * peer on 80/443, and the proxy checks every other service's own access
  * groups. `All` would include the proxy's peers.
  */
-export const AgentNetworkSourceGroupName = Schema.Literals(["Admin", "Users", "Servers", "Agents"]);
+export const AgentNetworkSourceGroupName = Schema.Literals(["Admin", "User", "Servers", "Agents"]);
 export type AgentNetworkSourceGroupName = typeof AgentNetworkSourceGroupName.Type;
 
 /** USD per million tokens, as `flake.agentGateway.models` prices them. */

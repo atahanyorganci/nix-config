@@ -10,7 +10,7 @@
   # Groups a policy may authorise. Unlike mesh policies, `Agents` is allowed:
   # an Agent Network policy only opens the proxy peer on 80/443, never other
   # peers. `All` would include the proxy's own peers.
-  sourceGroup = types.enum ["Admin" "Users" "Servers" "Agents"];
+  sourceGroup = types.enum ["Admin" "User" "Servers" "Agents"];
 
   window = mkOption {
     type = types.ints.between 60 31536000;
@@ -234,7 +234,7 @@ in {
     policies = {
       users = {
         description = "Every user, uncapped";
-        sourceGroups = ["Admin" "Users"];
+        sourceGroups = ["Admin" "User"];
         providers = ["agent-gateway"];
         guardrails = ["capture-prompts"];
       };

@@ -59,6 +59,7 @@
       # (admin@<domain>) among them, sign in only with `bootstrap = true`, which a
       # new installation needs until HomeInfra has created the provider.
       # Recovery without Authelia is the stack's service-user token, and SSH.
+      # People's NetBird groups are their LLDAP groups (JWT group sync).
       authelia.enable = true;
     };
     netbird-proxy = {

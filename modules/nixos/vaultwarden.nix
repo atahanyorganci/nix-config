@@ -53,7 +53,7 @@ in {
 
       accessGroups = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = ["Admin" "Users"];
+        default = ["Admin" "User"];
         description = "NetBird groups allowed to reach the service.";
       };
 

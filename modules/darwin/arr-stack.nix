@@ -53,7 +53,7 @@
         expose = {
           enable = true;
           private = false;
-          accessGroups = ["Admin" "Users"];
+          accessGroups = ["Admin" "User"];
         };
         auth = {type = "none";};
       };

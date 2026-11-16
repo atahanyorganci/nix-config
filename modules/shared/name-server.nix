@@ -36,9 +36,9 @@
           };
           groups = lib.mkOption {
             type = lib.types.listOf lib.types.str;
-            default = ["Admin" "Users" "Servers"];
+            default = ["Admin" "User" "Servers"];
             description = ''
-              NetBird distribution group names (Admin, Users, Servers), resolved to IDs at
+              NetBird distribution group names (Admin, User, Servers), resolved to IDs at
               deploy time. The stack allows exactly these groups to reach the resolver, so
               Agents and All are rejected: Agents peers are isolated.
             '';

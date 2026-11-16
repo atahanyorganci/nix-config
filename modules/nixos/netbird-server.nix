@@ -33,19 +33,23 @@ in {
         secretDigest = autheliaSecretDigest;
         # The embedded IdP gives every connector this one callback.
         redirectUris = ["https://${cfg.domain}/oauth2/callback"];
-        # What the embedded IdP's generic OIDC connector requests: no groups,
-        # and no PKCE.
-        scopes = ["openid" "profile" "email"];
+        # What the embedded IdP's `pocketid` connector requests, without PKCE.
+        # `groups` is the user's `authelia.groups`, for JWT group sync.
+        scopes = ["openid" "profile" "email" "groups"];
         pkce = false;
-        # The connector reads the user from the ID token alone, never
-        # userinfo, and refuses one without `name`.
-        idTokenClaims = ["email" "email_verified" "name" "preferred_username"];
+        # The connector reads the user, and their groups, from the ID token
+        # alone, never userinfo, and refuses one without `name`.
+        idTokenClaims = ["email" "email_verified" "name" "preferred_username" "groups"];
       };
 
       # Created by the HomeInfra stack, which reads the plaintext secret from
       # this host's nix-secrets file.
       identityProviders.authelia = {
         inherit (cfg.authelia) name;
+        # Dex's generic OIDC connector, as `oidc` is, but one that also asks
+        # for the `groups` scope; `oidc` never does, so NetBird would see no
+        # groups. NetBird cannot change a provider's type in place.
+        type = "pocketid";
         issuer = config.oidcIssuer;
         clientId = "netbird";
         clientSecret = autheliaSecret;
@@ -231,7 +235,12 @@ in {
           as `authelia/oidc/clients/netbird/secret` in this host's nix-secrets
           file (plaintext, for the stack) and `…/secret-digest` in the Authelia
           host's (its PBKDF2 digest). Deploy the Authelia host before the stack:
-          NetBird checks the issuer when the provider is created
+          NetBird checks the issuer when the provider is created.
+
+          Authelia also sends a user's groups (`authelia.groups`), from which
+          the stack's JWT group sync sets their NetBird groups: a group is
+          created, issued by JWT, when its first member signs in, and the stack
+          only adopts it. Users in none of the stack's login groups are refused
         '';
 
         name = lib.mkOption {

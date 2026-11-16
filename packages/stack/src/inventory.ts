@@ -1,14 +1,15 @@
 import * as Schema from "effect/Schema";
 
-export const NetBirdGroupName = Schema.Literals(["Admin", "Users", "Servers", "Agents"]);
+export const NetBirdGroupName = Schema.Literals(["Admin", "User", "Servers", "Agents"]);
 export type NetBirdGroupName = typeof NetBirdGroupName.Type;
 
-export const ZERO_TRUST_GROUP_NAMES: ReadonlyArray<NetBirdGroupName> = ["Admin", "Users", "Servers", "Agents"];
+export const ZERO_TRUST_GROUP_NAMES: ReadonlyArray<NetBirdGroupName> = ["Admin", "User", "Servers", "Agents"];
 
 /**
  * Infra roles — membership managed as peer lists from inventory / setup keys.
- * Admin and Users are login roles: NetBird user `auto_groups` populate them,
- * so the stack never rewrites their members.
+ * Admin and User are login roles: JWT group sync creates them and fills
+ * users' `auto_groups` from the LLDAP groups Authelia reports, so the stack
+ * only adopts them and never rewrites their members.
  */
 export const PEER_GROUP_NAMES: ReadonlyArray<NetBirdGroupName> = ["Servers", "Agents"];
 
@@ -16,11 +17,12 @@ export const isPeerGroupName = (value: NetBirdGroupName): boolean =>
 	(PEER_GROUP_NAMES as ReadonlyArray<string>).includes(value);
 
 /**
- * Login roles: people's devices. They reach services through the reverse
+ * Login roles: people's devices, named after the LLDAP groups that put people
+ * in them (through Authelia and JWT group sync). They reach services through the reverse
  * proxy, never a host's ports directly; the only exceptions are SSH (Admin),
  * the mesh nameserver and a host's declared `meshServices`.
  */
-export const LOGIN_GROUP_NAMES: ReadonlyArray<NetBirdGroupName> = ["Admin", "Users"];
+export const LOGIN_GROUP_NAMES: ReadonlyArray<NetBirdGroupName> = ["Admin", "User"];
 
 export const isLoginGroupName = (value: string): boolean =>
 	(LOGIN_GROUP_NAMES as ReadonlyArray<string>).includes(value);
@@ -39,7 +41,7 @@ export const isNetBirdGroupName = (value: string): value is NetBirdGroupName =>
  * access to the proxy peer on 80/443 only, and the proxy still checks every
  * other service's own access groups.
  */
-export const PolicySourceGroupName = Schema.Literals(["Admin", "Users", "Servers"]);
+export const PolicySourceGroupName = Schema.Literals(["Admin", "User", "Servers"]);
 export type PolicySourceGroupName = typeof PolicySourceGroupName.Type;
 
 export const isPolicySourceGroupName = (value: string): value is PolicySourceGroupName =>
@@ -86,7 +88,7 @@ export const hostNetBirdGroup = (inventory: Inventory, hostKey: string): NetBird
 	return host?.netbird.group ?? undefined;
 };
 
-/** Peer-list group used at setup-key enrollment. Undefined for login-only (Admin/Users) or unknown hosts. */
+/** Peer-list group used at setup-key enrollment. Undefined for login-only (Admin/User) or unknown hosts. */
 export const peerGroupForHost = (inventory: Inventory, hostKey: string): NetBirdGroupName | undefined => {
 	const group = hostNetBirdGroup(inventory, hostKey);
 	if (!group || !isPeerGroupName(group)) {

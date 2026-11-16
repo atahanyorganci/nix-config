@@ -72,7 +72,7 @@
         expose = {
           enable = true;
           private = true;
-          accessGroups = ["Admin" "Users"];
+          accessGroups = ["Admin" "User"];
         };
         auth = {type = "none";};
       };

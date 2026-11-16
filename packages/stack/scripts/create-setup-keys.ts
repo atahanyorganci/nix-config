@@ -163,7 +163,7 @@ const createSetupKeys = Command.make("create-setup-keys", {
 								return yield* Effect.die(`host "${host}" is not in flake inventory`);
 							}
 							return yield* Effect.die(
-								`host "${host}" has no peer group — Admin/Users devices enroll via NetBird login, not setup keys`,
+								`host "${host}" has no peer group — Admin/User devices enroll via NetBird login, not setup keys`,
 							);
 						}
 
