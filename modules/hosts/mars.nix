@@ -24,7 +24,7 @@
     user,
     config,
     ...
-  }: rec {
+  }: {
     headless = true;
     hostInventory.role = "managedTarget";
     hostInventory.netbird.group = "Servers";
@@ -104,11 +104,11 @@
       # administers LLDAP) so that Authelia's account, a password manager, may
       # reset it.
       ensure = {
-        groups = ["admin"];
+        groups = ["Admin" "User"];
         users."atahan.yorganci" = {
           inherit (user) email;
           displayName = user.name;
-          groups = ["admin"];
+          groups = ["Admin"];
         };
       };
     };
@@ -122,7 +122,7 @@
       redirectUris = ["https://nas.yorganci.dev"];
       scopes = ["openid" "profile" "groups" "email"];
       pkce = false;
-      groups = ["admin" "users"];
+      groups = ["Admin" "User"];
       idTokenClaims = ["email" "email_verified" "name" "preferred_username" "groups"];
       settings.token_endpoint_auth_method = "client_secret_post";
     };

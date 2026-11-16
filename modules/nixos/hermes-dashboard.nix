@@ -246,7 +246,7 @@ in {
           groups = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [];
-            example = ["admin"];
+            example = ["Admin"];
             description = ''
               LLDAP groups whose members may log in, enforced by the flake's
               Authelia when it is the issuer. Hermes itself lets in anyone the

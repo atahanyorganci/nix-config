@@ -81,10 +81,10 @@
         # listener (bind.port) is reachable, and it dials 127.0.0.1.
         host = "0.0.0.0";
         port = 9120;
-        # Through the flake's Authelia, for LLDAP's `admin` group only.
+        # Through the flake's Authelia, for LLDAP's `Admin` group only.
         auth = {
           type = "oidc";
-          oidc.groups = ["admin"];
+          oidc.groups = ["Admin"];
         };
         bind = {
           interface = "nb-wt0";

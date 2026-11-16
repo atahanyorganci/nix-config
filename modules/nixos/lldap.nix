@@ -153,7 +153,7 @@ in {
         groups = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [];
-          example = ["admin"];
+          example = ["Admin"];
           description = "Groups created when missing; never deleted.";
         };
 

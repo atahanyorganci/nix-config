@@ -71,7 +71,7 @@
       groups = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [];
-        example = ["admin"];
+        example = ["Admin"];
         description = ''
           LLDAP groups whose members may use the client; any one suffices. Empty
           lets every user in. Two factors are required either way.
