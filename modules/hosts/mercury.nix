@@ -64,7 +64,7 @@
   mercuryNixosModule = {user, ...}: {
     headless = true;
     hostInventory.role = "managedTarget";
-    hostInventory.netbird.group = "Servers";
+    hostInventory.netbird.group = "Server";
     hostInventory.ssh.localHostName.enable = true;
     # Verified over the NetBird mesh and the LAN, and matching known_hosts, on
     # 2026-10-05.

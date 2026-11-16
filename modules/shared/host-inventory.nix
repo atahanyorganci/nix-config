@@ -47,9 +47,9 @@
       };
       netbird = {
         group = lib.mkOption {
-          type = lib.types.nullOr (lib.types.enum ["Admin" "User" "Servers" "Agents"]);
+          type = lib.types.nullOr (lib.types.enum ["Admin" "User" "Server" "Agent"]);
           default = null;
-          description = "Peer group for this host (Servers, Agents). Admin/User membership comes from NetBird login, not this option.";
+          description = "Peer group for this host (Server, Agent). Admin/User membership comes from NetBird login, not this option.";
         };
         loginExpirationEnabled = lib.mkOption {
           type = lib.types.bool;

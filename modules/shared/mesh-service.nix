@@ -15,7 +15,7 @@
           groups = lib.mkOption {
             type = lib.types.nonEmptyListOf lib.types.str;
             example = ["Admin"];
-            description = "NetBird groups whose devices may connect to the port directly (Admin, User, Servers).";
+            description = "NetBird groups whose devices may connect to the port directly (Admin, User, Server).";
           };
         };
       });

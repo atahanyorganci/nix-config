@@ -27,7 +27,7 @@
   }: {
     headless = true;
     hostInventory.role = "managedTarget";
-    hostInventory.netbird.group = "Servers";
+    hostInventory.netbird.group = "Server";
     # Verified over the public IP and the NetBird mesh on 2026-10-02.
     hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC7mbXvWy/PXRldSlle2YRiJYuu8rQK36ai4m/4+nond";
     hetzner.enable = true;
@@ -136,7 +136,7 @@
       expose = {
         enable = true;
         key = "ai";
-        accessGroups = ["Admin" "Servers"];
+        accessGroups = ["Admin" "Server"];
       };
       # A second entry point next to `ai`: the NetBird Agent Network endpoint,
       # whose proxy runs here and dials the gateway over loopback.

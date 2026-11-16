@@ -7,10 +7,10 @@
   infra = config.flake.infra;
   catalog = lib.listToAttrs (map (model: lib.nameValuePair model.id model) config.flake.agentGateway.models);
 
-  # Groups a policy may authorise. Unlike mesh policies, `Agents` is allowed:
+  # Groups a policy may authorise. Unlike mesh policies, `Agent` is allowed:
   # an Agent Network policy only opens the proxy peer on 80/443, never other
   # peers. `All` would include the proxy's own peers.
-  sourceGroup = types.enum ["Admin" "User" "Servers" "Agents"];
+  sourceGroup = types.enum ["Admin" "User" "Server" "Agent"];
 
   window = mkOption {
     type = types.ints.between 60 31536000;
@@ -240,7 +240,7 @@ in {
       };
       agents = {
         description = "Agent hosts such as jupiter (Hermes), uncapped";
-        sourceGroups = ["Agents"];
+        sourceGroups = ["Agent"];
         providers = ["agent-gateway"];
         guardrails = ["capture-prompts"];
       };

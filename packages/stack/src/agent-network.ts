@@ -8,12 +8,12 @@ import type {
 } from "@yorganci/netbird-alchemy";
 
 /**
- * Groups an Agent Network policy may authorise. `Agents` is allowed here,
+ * Groups an Agent Network policy may authorise. `Agent` is allowed here,
  * unlike as a mesh policy source: an Agent Network policy only opens the proxy
  * peer on 80/443, and the proxy checks every other service's own access
  * groups. `All` would include the proxy's peers.
  */
-export const AgentNetworkSourceGroupName = Schema.Literals(["Admin", "User", "Servers", "Agents"]);
+export const AgentNetworkSourceGroupName = Schema.Literals(["Admin", "User", "Server", "Agent"]);
 export type AgentNetworkSourceGroupName = typeof AgentNetworkSourceGroupName.Type;
 
 /** USD per million tokens, as `flake.agentGateway.models` prices them. */

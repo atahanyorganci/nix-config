@@ -47,8 +47,8 @@ export const serverSshRules = (): ReadonlyArray<PolicyRuleSpec> => [
 		bidirectional: false,
 		protocol: "tcp",
 		ports: ["22"],
-		sourceGroups: ["Servers"],
-		destinationGroups: ["Servers", "Agents"],
+		sourceGroups: ["Server"],
+		destinationGroups: ["Server", "Agent"],
 	},
 ];
 

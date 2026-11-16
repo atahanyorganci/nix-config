@@ -201,9 +201,9 @@ in {
         # sends a group to a peer listed in it, so mars gets no primary and
         # resolves through its own uplink (Hetzner) resolvers.
         fallbacks = ["1.1.1.1"];
-        # Agents peers (jupiter) are isolated and keep their provider resolver;
+        # Agent peers (jupiter) are isolated and keep their provider resolver;
         # the reverse-proxy peer needs no Pi-hole either.
-        groups = ["Admin" "User" "Servers"];
+        groups = ["Admin" "User" "Server"];
         domains = [];
         searchDomainsEnabled = false;
       };

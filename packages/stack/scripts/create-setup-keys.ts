@@ -130,7 +130,7 @@ const withAlchemyState = <A, E>(
 
 const noGroupFlag = Flag.Boolean("no-group").pipe(
 	Flag.withDescription(
-		"Create the keys without a group, for a NetBird server HomeInfra has not set up yet (it puts Servers and Agents peers in their groups itself)",
+		"Create the keys without a group, for a NetBird server HomeInfra has not set up yet (it puts Server and Agent peers in their groups itself)",
 	),
 	// A boolean flag left out fails unless it has a default.
 	Flag.withDefault(false),
@@ -148,7 +148,7 @@ const createSetupKeys = Command.make("create-setup-keys", {
 	noGroup: noGroupFlag,
 }).pipe(
 	Command.withDescription(
-		"Create one-off NetBird setup keys that assign each host to its inventory peer group (Servers or Agents), or to none with --no-group",
+		"Create one-off NetBird setup keys that assign each host to its inventory peer group (Server or Agent), or to none with --no-group",
 	),
 	Command.withHandler(
 		Effect.fn(function* ({ hosts, stage, profile, noGroup }) {

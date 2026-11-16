@@ -24,7 +24,7 @@
                 accessGroups = lib.mkOption {
                   type = lib.types.listOf lib.types.str;
                   default = [];
-                  description = "NetBird group names allowed to reach this service (Admin, User, Servers); Agents peers are isolated. Empty uses the stack default (Admin for private services)";
+                  description = "NetBird group names allowed to reach this service (Admin, User, Server); Agent peers are isolated. Empty uses the stack default (Admin for private services)";
                 };
               };
             };

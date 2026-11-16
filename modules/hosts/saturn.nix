@@ -23,7 +23,7 @@
   saturnNixosModule = {user, ...}: {
     headless = true;
     hostInventory.role = "managedTarget";
-    hostInventory.netbird.group = "Servers";
+    hostInventory.netbird.group = "Server";
     # Verified over the public IP and the NetBird mesh on 2026-10-02.
     hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFwkC8wGQ1u0G4PzFB8Zn3fIJRg177wKxzA79KCncBDb";
     aws.enable = true;

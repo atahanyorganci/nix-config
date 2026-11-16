@@ -28,7 +28,7 @@
   }: {
     headless = true;
     hostInventory.role = "managedTarget";
-    hostInventory.netbird.group = "Agents";
+    hostInventory.netbird.group = "Agent";
     # Verified over the public IP and the NetBird mesh on 2026-10-02.
     hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBC1Os2v/8NJGg/NXZHcnqMLWePQyej4iiZx6bnIW3JA";
     hetzner = {
@@ -67,7 +67,7 @@
       enable = true;
       settings.telegram.require_mention = true;
       # Every LLM call goes through the NetBird Agent Network endpoint to the
-      # agent gateway on mars; jupiter is authorised as an `Agents` peer.
+      # agent gateway on mars; jupiter is authorised as an `Agent` peer.
       agentNetwork = {
         enable = true;
         model = "claude-code/claude-opus-5-5";

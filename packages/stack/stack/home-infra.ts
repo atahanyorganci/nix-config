@@ -146,7 +146,8 @@ export default HomeInfra.make(
 						peers: (hostsByGroup.get(groupName) ?? [])
 							.filter(hostKey => peers[hostKey] !== undefined)
 							.map(hostKey => peers[hostKey]!.peerId),
-					})
+						// Once named in the plural (Servers, Agents): the same group, renamed.
+					}).pipe(Alchemy.renamedFrom(`${groupName}s`))
 				: yield* NetBird.Group(`${groupName}LoginGroup`, {
 						name: groupName,
 						create: false,
@@ -170,23 +171,23 @@ export default HomeInfra.make(
 
 		const adminGroup = groupResources.Admin!;
 		const userGroup = groupResources.User!;
-		const serversGroup = groupResources.Servers!;
-		const agentsGroup = groupResources.Agents!;
+		const serverGroup = groupResources.Server!;
+		const agentGroup = groupResources.Agent!;
 
 		const groupIdTable = Output.all(
 			allGroup.groupId,
 			adminGroup.groupId,
 			userGroup.groupId,
-			serversGroup.groupId,
-			agentsGroup.groupId,
+			serverGroup.groupId,
+			agentGroup.groupId,
 		).pipe(
 			Output.map(
-				([all, admin, user, servers, agents]): Record<string, string> => ({
+				([all, admin, user, server, agent]): Record<string, string> => ({
 					[Policies.ALL_GROUP_NAME]: all,
 					Admin: admin,
 					User: user,
-					Servers: servers,
-					Agents: agents,
+					Server: server,
+					Agent: agent,
 				}),
 			),
 		);
