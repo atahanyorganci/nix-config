@@ -68,6 +68,31 @@
         '';
       };
 
+      customClaims = lib.mkOption {
+        type = lib.types.attrsOf (lib.types.submodule {
+          options.expression = lib.mkOption {
+            type = lib.types.str;
+            example = ''username + "@example.com"'';
+            description = ''
+              Authelia expression over the user's attributes (`username`,
+              `groups`, `email`, …) whose value the claim carries.
+            '';
+          };
+        });
+        default = {};
+        example = lib.literalExpression ''
+          {
+            synology_username.expression = '''username + "@example.com"''';
+          }
+        '';
+        description = ''
+          Claims of the client's own, by name, for an app that needs a value no
+          standard claim has. The client may request them with a scope named
+          after its client ID, which it is allowed, and they are in the ID token
+          as well as userinfo.
+        '';
+      };
+
       groups = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [];

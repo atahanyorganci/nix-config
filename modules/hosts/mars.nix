@@ -136,6 +136,10 @@
       pkce = false;
       groups = ["Admin" "User"];
       idTokenClaims = ["email" "email_verified" "name" "preferred_username" "groups"];
+      # DSM names LDAP accounts `uid@<suffix>`, the suffix from the base DN,
+      # and SSO only finds an account by that full name. DSM's username claim
+      # is this one, requested with the `synology-dsm` scope.
+      customClaims.synology_username.expression = ''username + "@${infra.domain}"'';
       settings.token_endpoint_auth_method = "client_secret_post";
     };
     agent-gateway = {

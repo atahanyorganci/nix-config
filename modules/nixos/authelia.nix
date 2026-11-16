@@ -30,10 +30,14 @@ in {
     declaredIds = lib.concatMap lib.attrNames (lib.attrValues declaredByHost);
     # A client's own claims and authorization policies are named after it.
     policyName = id: "client-${id}";
+    # A client's custom claims come from user attributes named after it, and
+    # reach it through a scope named after it.
+    customAttribute = id: claim: lib.replaceStrings ["-"] ["_"] "client_${id}_${claim}";
     toClient = id: client:
       {
         client_name = client.name;
-        inherit (client) public scopes;
+        inherit (client) public;
+        scopes = client.scopes ++ lib.optional (client.customClaims != {}) id;
         authorization_policy =
           if client.groups == []
           then "two_factor"
@@ -54,7 +58,7 @@ in {
         require_pkce = true;
         pkce_challenge_method = "S256";
       }
-      // lib.optionalAttrs (client.idTokenClaims != []) {
+      // lib.optionalAttrs (client.idTokenClaims != [] || client.customClaims != {}) {
         claims_policy = policyName id;
       }
       // lib.optionalAttrs (client.secretDigest != null) {
@@ -185,6 +189,30 @@ in {
         '';
       };
 
+      userAttributes = lib.mkOption {
+        type = lib.types.attrsOf (pkgs.formats.yaml {}).type;
+        default = {};
+        example = {
+          full_username.expression = ''username + "@example.com"'';
+        };
+        description = ''
+          User attributes computed from the others (`definitions.user_attributes`),
+          for claims (`oidc.claimsPolicies`' `custom_claims`) to carry.
+        '';
+      };
+
+      oidc.scopes = lib.mkOption {
+        type = lib.types.attrsOf (pkgs.formats.yaml {}).type;
+        default = {};
+        example = {
+          example.claims = ["full_username"];
+        };
+        description = ''
+          Custom scopes by name (`identity_providers.oidc.scopes`), each the
+          custom claims a client requesting it receives.
+        '';
+      };
+
       oidc.authorizationPolicies = lib.mkOption {
         type = lib.types.attrsOf (pkgs.formats.yaml {}).type;
         default = {};
@@ -253,10 +281,24 @@ in {
         })
         declared;
 
+      authelia.userAttributes = lib.foldl' lib.mergeAttrs {} (lib.mapAttrsToList (id: client:
+        lib.mapAttrs' (claim: custom: lib.nameValuePair (customAttribute id claim) {inherit (custom) expression;})
+        client.customClaims)
+      declared);
+
       authelia.oidc = {
         clients = lib.mapAttrs toClient declared;
-        claimsPolicies = lib.mapAttrs' (id: client: lib.nameValuePair (policyName id) {id_token = client.idTokenClaims;}) (
-          lib.filterAttrs (_: client: client.idTokenClaims != []) declared
+        claimsPolicies = lib.mapAttrs' (id: client:
+          lib.nameValuePair (policyName id) (
+            {id_token = client.idTokenClaims ++ lib.attrNames client.customClaims;}
+            // lib.optionalAttrs (client.customClaims != {}) {
+              custom_claims = lib.mapAttrs (claim: _: {attribute = customAttribute id claim;}) client.customClaims;
+            }
+          )) (
+          lib.filterAttrs (_: client: client.idTokenClaims != [] || client.customClaims != {}) declared
+        );
+        scopes = lib.mapAttrs (_: client: {claims = lib.attrNames client.customClaims;}) (
+          lib.filterAttrs (_: client: client.customClaims != {}) declared
         );
         authorizationPolicies = lib.mapAttrs' (id: client:
           lib.nameValuePair (policyName id) {
@@ -349,10 +391,16 @@ in {
               enable_passkey_login = true;
             };
           }
+          // lib.optionalAttrs (cfg.userAttributes != {}) {
+            definitions.user_attributes = cfg.userAttributes;
+          }
           // lib.optionalAttrs oidc {
             identity_providers.oidc =
               {
                 clients = lib.mapAttrsToList clientSettings cfg.oidc.clients;
+              }
+              // lib.optionalAttrs (cfg.oidc.scopes != {}) {
+                inherit (cfg.oidc) scopes;
               }
               // lib.optionalAttrs (cfg.oidc.claimsPolicies != {}) {
                 claims_policies = cfg.oidc.claimsPolicies;
