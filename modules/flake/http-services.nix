@@ -32,12 +32,22 @@
 
   uniqueHostNames = lib.unique hostNames;
 
+  # Peers the flake does not configure serve theirs alike; their names cannot
+  # clash with a configuration's (flake.inventory checks).
+  external =
+    lib.mapAttrs (name: peer: {
+      inherit name;
+      system = null;
+      services = peer.httpServices;
+    })
+    config.flake.externalPeers;
+
   httpServices =
-    lib.filterAttrs (_: h: h.services != {}) extracted;
+    lib.filterAttrs (_: h: h.services != {}) (extracted // external);
 in {
   options.flake.httpServices = lib.mkOption {
     type = lib.types.raw;
-    description = "HTTP services inferred from NixOS and Darwin configurations";
+    description = "HTTP services inferred from NixOS and Darwin configurations and flake.externalPeers";
   };
 
   config = {

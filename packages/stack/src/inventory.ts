@@ -49,7 +49,8 @@ export const isPolicySourceGroupName = (value: string): value is PolicySourceGro
 
 export const InventoryHost = Schema.Struct({
 	name: Schema.String,
-	system: Schema.String,
+	/** Null for an external peer, which the flake does not build. */
+	system: Schema.NullOr(Schema.String),
 	role: Schema.NullOr(Schema.Literals(["agentHolder", "managedTarget"])),
 	netbird: Schema.Struct({
 		group: Schema.NullOr(NetBirdGroupName),
@@ -62,13 +63,23 @@ export type InventoryHost = typeof InventoryHost.Type;
 export const Inventory = Schema.Struct({
 	managedTargets: Schema.Record(Schema.String, InventoryHost),
 	agentHolders: Schema.Record(Schema.String, InventoryHost),
+	/**
+	 * `flake.externalPeers`: peers the flake does not configure (appliances such
+	 * as the NAS), enrolled by hand, which the stack adopts like a host.
+	 */
+	externalPeers: Schema.Record(Schema.String, InventoryHost),
 });
 export type Inventory = typeof Inventory.Type;
 
 export const inventoryHosts = (inventory: Inventory): ReadonlyArray<[string, InventoryHost]> => [
 	...(Object.entries(inventory.managedTargets) as Array<[string, InventoryHost]>),
 	...(Object.entries(inventory.agentHolders) as Array<[string, InventoryHost]>),
+	...(Object.entries(inventory.externalPeers) as Array<[string, InventoryHost]>),
 ];
+
+/** A host or external peer by its key, or undefined when the inventory lacks it. */
+export const findHost = (inventory: Inventory, hostKey: string): InventoryHost | undefined =>
+	inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey] ?? inventory.externalPeers[hostKey];
 
 export const hostsByNetBirdGroup = (inventory: Inventory) => {
 	const grouped = new Map<NetBirdGroupName, Array<string>>();
@@ -84,8 +95,7 @@ export const hostsByNetBirdGroup = (inventory: Inventory) => {
 };
 
 export const hostNetBirdGroup = (inventory: Inventory, hostKey: string): NetBirdGroupName | undefined => {
-	const host = inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
-	return host?.netbird.group ?? undefined;
+	return findHost(inventory, hostKey)?.netbird.group ?? undefined;
 };
 
 /** Peer-list group used at setup-key enrollment. Undefined for login-only (Admin/User) or unknown hosts. */

@@ -42,7 +42,11 @@ const Me = Schema.Struct({
 // are launched from (as the package scripts and Justfile do).
 const REPO_ROOT = "../..";
 
-const peerLogicalId = (hostKey: string) => hostKey[0]!.toUpperCase() + hostKey.slice(1);
+const capitalize = (hostKey: string) => hostKey[0]!.toUpperCase() + hostKey.slice(1);
+// Suffixed so a peer never shares a logical id with a service of the same
+// name (the NAS peer `nas` serves `nas.<domain>`). Peers were once declared
+// without it; `renamedFrom` carries their state over.
+const peerLogicalId = (hostKey: string) => `${capitalize(hostKey)}Peer`;
 
 export default HomeInfra.make(
 	{
@@ -87,10 +91,12 @@ export default HomeInfra.make(
 			);
 		}
 
-		const managedHostKeys = Object.entries(inventory.managedTargets)
+		// Managed hosts and external peers in a peer group are adopted even when
+		// they publish nothing, so the stack can put them in it.
+		const groupedHostKeys = [...Object.entries(inventory.managedTargets), ...Object.entries(inventory.externalPeers)]
 			.filter(([, host]) => host.netbird.group !== null && Inventory.isPeerGroupName(host.netbird.group))
 			.map(([hostKey]) => hostKey);
-		const hostKeys = [...new Set([...Object.keys(httpServices), ...Object.keys(nameServers), ...managedHostKeys])];
+		const hostKeys = [...new Set([...Object.keys(httpServices), ...Object.keys(nameServers), ...groupedHostKeys])];
 
 		const plans = yield* Schema.decodeEffect(ReverseProxy.ServicePlansFromHttpServices)({
 			httpServices,
@@ -110,7 +116,7 @@ export default HomeInfra.make(
 		const peers: Record<string, NetBird.Peer> = {};
 		const peerOutputs: Record<string, { hostname: NetBird.Peer["hostname"]; peerId: NetBird.Peer["peerId"] }> = {};
 		for (const hostKey of hostKeys) {
-			const host = inventory.managedTargets[hostKey] ?? inventory.agentHolders[hostKey];
+			const host = Inventory.findHost(inventory, hostKey);
 			const peer = yield* NetBird.Peer(peerLogicalId(hostKey), {
 				host: hostKey,
 				// OpenSSH on :22 is the login path. NetBird's embedded SSH (0.75)
@@ -122,7 +128,7 @@ export default HomeInfra.make(
 							inactivityExpirationEnabled: host.netbird.inactivityExpirationEnabled,
 						}
 					: {}),
-			});
+			}).pipe(Alchemy.renamedFrom(capitalize(hostKey)));
 			peers[hostKey] = peer;
 			peerOutputs[hostKey] = {
 				hostname: peer.hostname,

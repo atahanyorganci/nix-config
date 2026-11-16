@@ -49,7 +49,8 @@ export type HttpService = typeof HttpService.Type;
 
 export const HttpHost = Schema.Struct({
 	name: Schema.String,
-	system: Schema.String,
+	/** Null for an external peer, which the flake does not build. */
+	system: Schema.NullOr(Schema.String),
 	services: Schema.Record(Schema.String, HttpService),
 });
 export type HttpHost = typeof HttpHost.Type;

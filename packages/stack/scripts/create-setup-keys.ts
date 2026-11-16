@@ -158,7 +158,7 @@ const createSetupKeys = Command.make("create-setup-keys", {
 					for (const host of hosts) {
 						const groupName = Inventory.peerGroupForHost(inventory, host);
 						if (!groupName) {
-							const known = inventory.managedTargets[host] ?? inventory.agentHolders[host];
+							const known = Inventory.findHost(inventory, host);
 							if (!known) {
 								return yield* Effect.die(`host "${host}" is not in flake inventory`);
 							}

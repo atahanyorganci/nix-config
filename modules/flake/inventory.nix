@@ -36,8 +36,23 @@
     lib.mapAttrs extract allSystems
   );
 
+  # Peers the flake does not configure (`flake.externalPeers`): only what the
+  # stack needs, and no SSH, which nothing here manages for them.
+  externalPeers =
+    lib.mapAttrs (name: peer: {
+      inherit name;
+      system = null;
+      role = null;
+      netbird = {
+        inherit (peer.netbird) group loginExpirationEnabled inactivityExpirationEnabled;
+      };
+    })
+    config.flake.externalPeers;
+
+  clashes = lib.attrNames (lib.intersectAttrs config.flake.externalPeers allSystems);
+
   inventory = {
-    inherit managedTargets agentHolders;
+    inherit managedTargets agentHolders externalPeers;
   };
 in {
   options.flake.inventory = lib.mkOption {
@@ -46,7 +61,10 @@ in {
   };
 
   config = {
-    flake.inventory = inventory;
+    flake.inventory =
+      lib.throwIf (clashes != [])
+      "flake.externalPeers: ${lib.concatStringsSep ", " clashes} is also a NixOS or Darwin configuration"
+      inventory;
 
     perSystem = {pkgs, ...}: {
       packages.inventory-json =
