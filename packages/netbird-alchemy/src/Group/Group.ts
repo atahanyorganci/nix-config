@@ -1,4 +1,5 @@
 import {
+	type GroupIssued,
 	groupsGet,
 	groupsGroupIdDelete,
 	groupsGroupIdGet,
@@ -32,6 +33,22 @@ export interface GroupProps {
 	 * user-role groups populated via NetBird user `auto_groups`.
 	 */
 	peers?: ReadonlyArray<string>;
+	/**
+	 * Create the group when none has its name. With `false` the group is
+	 * only adopted, and a missing one fails the deploy: for a group that
+	 * something else has to create, such as a JWT group, which NetBird
+	 * creates at a login and the API never can.
+	 *
+	 * @default true
+	 */
+	create?: boolean;
+	/**
+	 * How the adopted group must have been issued (`api`, `integration` or
+	 * `jwt`); a group issued any other way fails the deploy. JWT group sync
+	 * only ever adds users to groups issued by `jwt`, so a same-named group
+	 * created through the API would silently stop it.
+	 */
+	issued?: GroupIssued;
 }
 
 export interface GroupAttributes {
@@ -39,6 +56,8 @@ export interface GroupAttributes {
 	groupId: string;
 	/** Display name reported by NetBird. */
 	name: string;
+	/** How the group was issued: `api`, `integration` or `jwt`. */
+	issued?: GroupIssued;
 }
 
 export type Group = Resource<"NetBird.Group", GroupProps, GroupAttributes>;
@@ -65,6 +84,15 @@ export type Group = Resource<"NetBird.Group", GroupProps, GroupAttributes>;
  *   peers: ["peer-id-1", "peer-id-2"],
  * });
  * ```
+ *
+ * @example Adopt a group JWT group sync created
+ * ```typescript
+ * const admins = yield* NetBird.Group("Admin", {
+ *   name: "Admin",
+ *   create: false,
+ *   issued: "jwt",
+ * });
+ * ```
  */
 export const Group = Resource<Group>("NetBird.Group");
 
@@ -83,17 +111,17 @@ export const GroupProvider = () =>
 			if (output?.groupId) {
 				const direct = yield* catchNotFound(groupsGroupIdGet({ groupId: output.groupId }));
 				if (direct) {
-					return { groupId: direct.id, name: direct.name };
+					return toAttributes(direct);
 				}
 			}
 			const name = yield* resolveName(id, olds?.name ?? output?.name);
 			const existing = yield* findGroupByName(name);
 			if (!existing) return undefined;
-			return { groupId: existing.id, name: existing.name };
+			return toAttributes(existing);
 		}),
 		list: Effect.fn(function* () {
 			const all = yield* groupsGet({});
-			return all.map(g => ({ groupId: g.id, name: g.name }));
+			return all.map(toAttributes);
 		}),
 		reconcile: Effect.fn(function* ({ id, news, output }) {
 			const props = news ?? ({} as GroupProps);
@@ -101,13 +129,16 @@ export const GroupProvider = () =>
 			const managePeers = props.peers !== undefined;
 			const peers = props.peers ?? [];
 
-			let observed: { id: string; name: string; peers: ReadonlyArray<{ id: string }> } | undefined;
+			let observed:
+				| { id: string; name: string; issued?: GroupIssued; peers: ReadonlyArray<{ id: string }> }
+				| undefined;
 			if (output?.groupId) {
 				const direct = yield* catchNotFound(groupsGroupIdGet({ groupId: output.groupId }));
 				if (direct) {
 					observed = {
 						id: direct.id,
 						name: direct.name,
+						...(direct.issued !== undefined ? { issued: direct.issued } : {}),
 						peers: direct.peers ?? [],
 					};
 				}
@@ -118,9 +149,29 @@ export const GroupProvider = () =>
 					observed = {
 						id: byName.id,
 						name: byName.name,
+						...(byName.issued !== undefined ? { issued: byName.issued } : {}),
 						peers: byName.peers ?? [],
 					};
 				}
+			}
+
+			if (!observed && props.create === false) {
+				return yield* Effect.die(
+					new Error(
+						`NetBird.Group: no group is named "${name}", and this one is only adopted (create: false)` +
+							(props.issued === "jwt"
+								? "; JWT group sync creates it when a member first signs in through the identity provider"
+								: ""),
+					),
+				);
+			}
+
+			if (observed && props.issued !== undefined && observed.issued !== props.issued) {
+				return yield* Effect.die(
+					new Error(
+						`NetBird.Group: group "${observed.name}" was issued by ${observed.issued ?? "an unknown source"}, not ${props.issued}`,
+					),
+				);
 			}
 
 			if (!observed) {
@@ -133,7 +184,7 @@ export const GroupProvider = () =>
 						}),
 					),
 				);
-				return { groupId: created.id, name: created.name };
+				return toAttributes(created);
 			}
 
 			if (!managePeers) {
@@ -142,9 +193,9 @@ export const GroupProvider = () =>
 						groupId: observed.id,
 						name,
 					});
-					return { groupId: updated.id, name: updated.name };
+					return toAttributes(updated);
 				}
-				return { groupId: observed.id, name: observed.name };
+				return toAttributes(observed);
 			}
 
 			const peerIds = observed.peers.map(p => p.id);
@@ -155,10 +206,10 @@ export const GroupProvider = () =>
 					name,
 					peers,
 				});
-				return { groupId: updated.id, name: updated.name };
+				return toAttributes(updated);
 			}
 
-			return { groupId: observed.id, name: observed.name };
+			return toAttributes(observed);
 		}),
 		delete: Effect.fn(function* ({ output }) {
 			yield* groupsGroupIdDelete({ groupId: output.groupId }).pipe(
@@ -178,6 +229,12 @@ const resolveName = (id: string, name: string | undefined) =>
 		if (name) return name;
 		return yield* createPhysicalName({ id, lowercase: true, maxLength: 64 });
 	});
+
+const toAttributes = (group: { id: string; name: string; issued?: GroupIssued }): GroupAttributes => ({
+	groupId: group.id,
+	name: group.name,
+	...(group.issued !== undefined ? { issued: group.issued } : {}),
+});
 
 const findGroupByName = (name: string) =>
 	groupsGet({ name }).pipe(

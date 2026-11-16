@@ -5,7 +5,7 @@ Alchemy provider for NetBird management resources, built on `@yorganci/netbird-a
 ## Resources
 
 - `NetBird.Setup` — first-owner bootstrap via `POST /api/setup` (`password` is `Redacted`, generated when omitted); with `automation` it also creates a service user and its key with the one-time owner token, which it then deletes
-- `NetBird.AccountSettings` — the account's user approval and group propagation settings (adopted; every other setting is kept)
+- `NetBird.AccountSettings` — the account's user approval, group propagation and JWT group sync settings (adopted; every other setting is kept)
 - `NetBird.Group` — peer groups
 - `NetBird.Network` — networks
 - `NetBird.Peer` — adopt existing mesh peers by `host` identity or stable `peerId` (not created by Alchemy)

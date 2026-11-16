@@ -24,6 +24,26 @@ export interface AccountSettingsProps {
 	 * for a new account: `true`).
 	 */
 	groupsPropagationEnabled?: boolean;
+	/**
+	 * JWT group sync: on every request a user makes with a token from the
+	 * identity provider, their auto groups become the groups named in its
+	 * `jwtGroupsClaimName` claim. A missing group is created, marked as
+	 * issued by JWT; only such groups are ever joined or left this way, so a
+	 * group created through the API (or this stack) with the same name is
+	 * ignored. Local users and API tokens are never synced. Omitted leaves
+	 * the current value (NetBird's default: `false`).
+	 */
+	jwtGroupsEnabled?: boolean;
+	/**
+	 * The claim JWT group sync reads, a list of group names (e.g. `groups`).
+	 * Omitted leaves the current value.
+	 */
+	jwtGroupsClaimName?: string;
+	/**
+	 * With JWT group sync on, users whose claim names none of these groups
+	 * are refused; empty lets everyone in. Omitted leaves the current value.
+	 */
+	jwtAllowGroups?: ReadonlyArray<string>;
 }
 
 export interface AccountSettingsAttributes {
@@ -31,6 +51,9 @@ export interface AccountSettingsAttributes {
 	accountId: string;
 	userApprovalRequired: boolean;
 	groupsPropagationEnabled: boolean;
+	jwtGroupsEnabled: boolean;
+	jwtGroupsClaimName: string;
+	jwtAllowGroups: ReadonlyArray<string>;
 	/**
 	 * Whether local (email and password) users are off, which the server's
 	 * configuration decides; read-only.
@@ -60,6 +83,14 @@ export type AccountSettings = Resource<"NetBird.AccountSettings", AccountSetting
  *   groupsPropagationEnabled: true,
  * });
  * ```
+ * @example Users get the groups their identity provider gives them
+ * ```typescript
+ * yield* NetBird.AccountSettings("Account", {
+ *   jwtGroupsEnabled: true,
+ *   jwtGroupsClaimName: "groups",
+ *   jwtAllowGroups: ["Admin", "User"],
+ * });
+ * ```
  */
 export const AccountSettings = Resource<AccountSettings>("NetBird.AccountSettings");
 
@@ -81,11 +112,34 @@ const userApprovalRequired = (settings: ApiAccountSettings) => (settings.extra ?
 
 const groupsPropagationEnabled = (settings: ApiAccountSettings) => settings.groups_propagation_enabled ?? false;
 
+const jwtGroupsEnabled = (settings: ApiAccountSettings) => settings.jwt_groups_enabled ?? false;
+
+const jwtGroupsClaimName = (settings: ApiAccountSettings) => settings.jwt_groups_claim_name ?? "";
+
+const jwtAllowGroups = (settings: ApiAccountSettings): ReadonlyArray<string> => settings.jwt_allow_groups ?? [];
+
+const sameGroups = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) => {
+	const left = new Set(a);
+	const right = new Set(b);
+	return left.size === right.size && [...left].every(group => right.has(group));
+};
+
 /** The values the props ask for, the observed ones where they are left out. */
 export const desiredSettings = (props: AccountSettingsProps, observed: ApiAccountSettings) => ({
 	userApprovalRequired: props.userApprovalRequired ?? userApprovalRequired(observed),
 	groupsPropagationEnabled: props.groupsPropagationEnabled ?? groupsPropagationEnabled(observed),
+	jwtGroupsEnabled: props.jwtGroupsEnabled ?? jwtGroupsEnabled(observed),
+	jwtGroupsClaimName: props.jwtGroupsClaimName ?? jwtGroupsClaimName(observed),
+	jwtAllowGroups: props.jwtAllowGroups ?? jwtAllowGroups(observed),
 });
+
+/** Whether the account already has the desired values. */
+export const isUpToDate = (desired: ReturnType<typeof desiredSettings>, observed: ApiAccountSettings) =>
+	desired.userApprovalRequired === userApprovalRequired(observed) &&
+	desired.groupsPropagationEnabled === groupsPropagationEnabled(observed) &&
+	desired.jwtGroupsEnabled === jwtGroupsEnabled(observed) &&
+	desired.jwtGroupsClaimName === jwtGroupsClaimName(observed) &&
+	sameGroups(desired.jwtAllowGroups, jwtAllowGroups(observed));
 
 /**
  * The full update body: every writable setting as observed, with the
@@ -105,6 +159,9 @@ export const settingsInput = (
 	return {
 		...writable,
 		groups_propagation_enabled: desired.groupsPropagationEnabled,
+		jwt_groups_enabled: desired.jwtGroupsEnabled,
+		jwt_groups_claim_name: desired.jwtGroupsClaimName,
+		jwt_allow_groups: [...desired.jwtAllowGroups],
 		extra: {
 			peer_approval_enabled: extra.peer_approval_enabled,
 			user_approval_required: desired.userApprovalRequired,
@@ -135,10 +192,7 @@ export const AccountSettingsProvider = () =>
 				return yield* Effect.die(new Error("NetBird.AccountSettings: the credentials see no account"));
 			}
 			const desired = desiredSettings(props, account.settings);
-			if (
-				desired.userApprovalRequired === userApprovalRequired(account.settings) &&
-				desired.groupsPropagationEnabled === groupsPropagationEnabled(account.settings)
-			) {
+			if (isUpToDate(desired, account.settings)) {
 				return toAttributes(account);
 			}
 			const updated = yield* accountsAccountIdPut({
@@ -157,5 +211,8 @@ const toAttributes = (account: ApiAccount): AccountSettingsAttributes => ({
 	accountId: account.id,
 	userApprovalRequired: userApprovalRequired(account.settings),
 	groupsPropagationEnabled: groupsPropagationEnabled(account.settings),
+	jwtGroupsEnabled: jwtGroupsEnabled(account.settings),
+	jwtGroupsClaimName: jwtGroupsClaimName(account.settings),
+	jwtAllowGroups: jwtAllowGroups(account.settings),
 	localAuthDisabled: account.settings.local_auth_disabled ?? false,
 });
