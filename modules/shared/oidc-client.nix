@@ -74,7 +74,8 @@
         example = ["Admin"];
         description = ''
           LLDAP groups whose members may use the client; any one suffices. Empty
-          lets every user in. Two factors are required either way.
+          lets every user in. Two factors are required either way. Each must be
+          in the Authelia host's `authelia.groups`.
         '';
       };
 

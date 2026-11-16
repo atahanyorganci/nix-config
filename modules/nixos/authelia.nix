@@ -135,6 +135,20 @@ in {
         NetbirdServer smtp/host smtp/username smtp/password`)
       '';
 
+      groups = lib.mkOption {
+        type = lib.types.listOf (lib.types.strMatching "[A-Za-z0-9_-]+");
+        default = lib.unique config.lldap.ensure.groups;
+        defaultText = lib.literalExpression "lib.unique config.lldap.ensure.groups";
+        example = ["Admin" "User"];
+        description = ''
+          The LLDAP groups Authelia sees (its LDAP `groups_filter`); a user's
+          other groups, LLDAP's own `lldap_*` among them, do not exist for it.
+          They are all any client can check or receive in the `groups` claim,
+          and NetBird creates a group for every name in that claim, so a group
+          is added here only when some client needs it.
+        '';
+      };
+
       oidc.clients = lib.mkOption {
         type = lib.types.attrsOf (lib.types.submodule {
           freeformType = (pkgs.formats.yaml {}).type;
@@ -180,7 +194,7 @@ in {
             rules = [
               {
                 policy = "two_factor";
-                subject = ["group:admin"];
+                subject = ["group:Admin"];
               }
             ];
           };
@@ -218,7 +232,18 @@ in {
             assertion = lib.length declaredIds == lib.length (lib.unique declaredIds);
             message = "authelia: an OpenID Connect client ID is declared on more than one host (`oidcClients`).";
           }
+          {
+            assertion = cfg.groups != [];
+            message = "authelia: `authelia.groups` is empty, so no user would have a group.";
+          }
         ]
+        ++ lib.mapAttrsToList (id: client: let
+          unknown = lib.subtractLists cfg.groups client.groups;
+        in {
+          assertion = unknown == [];
+          message = "authelia: client `${id}` lets in ${lib.concatStringsSep ", " unknown}, which `authelia.groups` hides from Authelia.";
+        })
+        declared
         ++ lib.mapAttrsToList (id: client: {
           assertion =
             if client.public
@@ -293,6 +318,8 @@ in {
               # set passwords, which a password manager may for everyone but
               # LLDAP's admins.
               user = "uid=${ldapUser},ou=people,${config.lldap.baseDn}";
+              # The lldap implementation's filter, narrowed to `authelia.groups`.
+              groups_filter = "(&(member={dn})(objectClass=groupOfUniqueNames)(|${lib.concatMapStrings (group: "(cn=${group})") cfg.groups}))";
             };
             # Only forward-auth consults access control, and nothing uses it:
             # apps log in over OpenID Connect. Authelia wants a policy anyway.
