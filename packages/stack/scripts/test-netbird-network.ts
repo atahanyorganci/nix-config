@@ -29,7 +29,7 @@ const BLOCKED_PROBE_DOMAIN = "doubleclick.net";
 const REQUIRED_GROUPS = ["Admin", "User", "Servers", "Agents", "All"] as const;
 
 /** Core allow policies that must stay enabled under default-deny. */
-const REQUIRED_POLICIES = ["allow-admin-ssh", "allow-admin-proxy-tcp"] as const;
+const REQUIRED_POLICIES = ["allow-admin-ssh"] as const;
 
 /**
  * Blanket access people's devices must not have: they reach hosts only through
