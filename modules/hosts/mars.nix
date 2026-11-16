@@ -4,6 +4,7 @@
   ...
 }: let
   user = config.flake.me;
+  infra = config.flake.infra;
   marsHomeConfiguration = {user, ...}: {
     home = {
       username = user.username;
@@ -99,6 +100,9 @@
     # LLDAP (admin UI at ldap.<domain>, Admin only).
     lldap = {
       enable = true;
+      # The NAS joins the directory over the mesh, so DSM knows the people
+      # Authelia signs in to it (DSM creates no accounts at SSO).
+      ldapAccessGroups = ["Server"];
       # The owner of this flake, under the user ID the account already has. No
       # password is kept anywhere: the first one is set with Authelia's "Reset
       # password", mailed through SES. Out of lldap_admin (the stack's admin
@@ -110,6 +114,13 @@
           inherit (user) email;
           displayName = user.name;
           groups = ["Admin"];
+        };
+        # DSM's bind account: reads users and groups, changes nothing.
+        users.synology = {
+          email = "synology@${infra.domain}";
+          displayName = "Synology DSM";
+          groups = ["lldap_strict_readonly"];
+          passwordSecret = "lldap/synology-password";
         };
       };
     };

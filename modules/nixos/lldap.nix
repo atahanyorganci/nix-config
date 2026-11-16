@@ -126,8 +126,22 @@ in {
 
       ldapPort = lib.mkOption {
         type = lib.types.port;
-        default = 3890;
-        description = "Port of the LDAP server, on loopback only.";
+        # The standard port: DSM's LDAP join only ever probes 389.
+        default = 389;
+        description = "Port of the LDAP server: on loopback, and on the mesh for `ldapAccessGroups`.";
+      };
+
+      ldapAccessGroups = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [];
+        example = ["Server"];
+        description = ''
+          NetBird groups whose peers may reach LDAP over the mesh, for
+          appliances that read the directory themselves (the NAS). Empty keeps
+          it on loopback, for Authelia alone. Plain LDAP: WireGuard encrypts
+          the mesh. They bind as a read-only account (`lldap_strict_readonly`)
+          from `ensure.users`.
+        '';
       };
 
       baseDn = lib.mkOption {
@@ -255,8 +269,13 @@ in {
         # Postgres is PlanetScale's, reached with the URL from lldap.env.
         database.createLocally = false;
         settings = {
-          # Authelia binds on the same host; nothing else speaks LDAP to it.
-          ldap_host = "127.0.0.1";
+          # Authelia binds on the same host. Peers in `ldapAccessGroups` dial
+          # the mesh address, and the firewall keeps the port off every other
+          # interface.
+          ldap_host =
+            if cfg.ldapAccessGroups == []
+            then "127.0.0.1"
+            else "0.0.0.0";
           ldap_port = cfg.ldapPort;
           # The reverse proxy dials the host's mesh address; the firewall keeps
           # the port off every other interface.
@@ -288,6 +307,10 @@ in {
       };
 
       systemd.services.lldap.serviceConfig = {
+        # A port below 1024 needs this one capability, which the dynamic user
+        # otherwise lacks (the upstream unit drops every capability).
+        CapabilityBoundingSet = lib.mkIf (cfg.ldapPort < 1024) (lib.mkForce ["CAP_NET_BIND_SERVICE"]);
+        AmbientCapabilities = lib.mkIf (cfg.ldapPort < 1024) ["CAP_NET_BIND_SERVICE"];
         LoadCredential = [
           "jwt-secret:${secret "lldap/jwt-secret"}"
           "key-seed:${secret "lldap/key-seed"}"
@@ -336,7 +359,16 @@ in {
         auth.type = "none";
       };
 
-      networking.firewall.interfaces.${cfg.interface}.allowedTCPPorts = [cfg.httpPort];
+      # The stack turns it into a policy letting those groups' peers in.
+      meshServices = lib.mkIf (cfg.ldapAccessGroups != []) {
+        ldap = {
+          port = cfg.ldapPort;
+          groups = cfg.ldapAccessGroups;
+        };
+      };
+
+      networking.firewall.interfaces.${cfg.interface}.allowedTCPPorts =
+        [cfg.httpPort] ++ lib.optional (cfg.ldapAccessGroups != []) cfg.ldapPort;
     };
   };
 }
