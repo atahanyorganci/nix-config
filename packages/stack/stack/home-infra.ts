@@ -219,6 +219,34 @@ export default HomeInfra.make(
 			return yield* Effect.die('NetBird peer "mars" is required for exit routes and Pi-hole DNS');
 		}
 		const exitGroups = Output.all(adminGroup.groupId, userGroup.groupId).pipe(Output.map(ids => [...ids]));
+
+		// Exit routes permit forwarding, not services on the routing peer itself.
+		// Authelia resolves to Mars's public IP: with Mars selected as the exit,
+		// that HTTPS connection hits NetBird's input ACL rather than its forward
+		// ACL. Permit the TLS front door, not the proxy-trusting backend ports.
+		// A dedicated destination group keeps this off every other Server peer.
+		const marsHttpsGroup = yield* NetBird.Group("MarsHttps", {
+			name: "mars-https",
+			peers: [marsPeer.peerId],
+		});
+		yield* NetBird.Policy("AllowMarsHttps", {
+			name: "allow-mars-https",
+			description: "Admin/User HTTPS to Mars, including self-access through its exit route",
+			enabled: true,
+			rules: [
+				{
+					name: "mars-https",
+					enabled: true,
+					action: "accept",
+					bidirectional: false,
+					protocol: "tcp",
+					ports: ["443"],
+					sources: [adminGroup.groupId, userGroup.groupId],
+					destinations: [marsHttpsGroup.groupId],
+				},
+			],
+		});
+
 		// One IPv4 default route defines the exit node. NetBird's network map
 		// derives the ::/0 companion (network id "mars-exit-v6") for every
 		// IPv6-capable peer, so an explicit ::/0 route only duplicates it.
