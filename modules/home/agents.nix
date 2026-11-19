@@ -108,6 +108,10 @@ in {
       # used to run.
       home.sessionVariables.PI_USAGE_ENDPOINT = "${gateway}/_/usage";
 
+      # Lets agents drive the real browser over MCP (`browse mcp`); pair the
+      # Chromium extension with `browse install` or `browse pair`.
+      home.packages = [pkgs.browse];
+
       programs.pi = {
         enable = true;
         settings = {
