@@ -94,6 +94,36 @@
       "kernel.panic_on_oops" = 1;
       "kernel.softlockup_panic" = 1;
       "kernel.hardlockup_panic" = 1;
+      # Tuned for swap on zram (below), as Fedora and Pop!_OS do: swapping to
+      # compressed RAM is cheap, and pages are read back one at a time.
+      "vm.swappiness" = 180;
+      "vm.page-cluster" = 0;
+      "vm.watermark_boost_factor" = 0;
+      "vm.watermark_scale_factor" = 125;
+    };
+    # Survive running out of memory. With no swap and a systemd-oomd that
+    # watched nothing, a ~12 GB test froze the box three times on 2026-10-10;
+    # under a cgroup limit the same tests were OOM-killed nine times and it
+    # stayed up. zram gives compressed headroom, oomd kills user workloads
+    # stalled on memory and, as Fedora does, whatever holds the most swap once
+    # it is 90% full (`SwapUsedLimit`), and user sessions (agents, test runs,
+    # SSH) can never take the ~4 GB Home Assistant, Docker, NetBird and sshd
+    # run in. Not `enableRootSlice`: it kills on pressure anywhere, services
+    # included.
+    zramSwap = {
+      enable = true;
+      algorithm = "zstd";
+      memoryPercent = 50;
+      priority = 100;
+    };
+    systemd.oomd = {
+      enableUserSlices = true;
+      settings.OOM.DefaultMemoryPressureDurationSec = "20s";
+    };
+    systemd.slices."-".sliceConfig.ManagedOOMSwap = "kill";
+    systemd.slices.user.sliceConfig = {
+      MemoryHigh = "10G";
+      MemoryMax = "11G";
     };
     # Bootloader.
     boot.loader.systemd-boot.enable = true;
