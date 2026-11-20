@@ -48,6 +48,15 @@
     boot.initrd.kernelModules = [];
     boot.kernelModules = ["kvm-intel"];
     boot.extraModulePackages = [];
+    # Diagnosing the freezes: they come with no log, under no load, on 6.12 and
+    # 6.18 alike, as is known of N-series CPUs in deep idle states. C1E only
+    # (of POLL C1E C6 C8 C10, sysfs states 0-4) until a month passes without
+    # one; at the old rate of one every 6.5 days that is ~1% likely by chance.
+    # Then try `intel_idle.states_off=24` (C8 and C10 off, C6 back). Not
+    # `intel_idle.max_cstate=1`: on this CPU it registers no state but POLL, so
+    # idle cores spin at full clock (74 C at idle). Watch the package
+    # temperature: 66-70 C at idle before this.
+    boot.kernelParams = ["intel_idle.states_off=28"];
     fileSystems."/" = {
       device = "/dev/disk/by-uuid/021f08b1-a877-4169-b6db-2a55833c1694";
       fsType = "ext4";
