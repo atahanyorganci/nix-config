@@ -69,6 +69,23 @@
     # Verified over the NetBird mesh and the LAN, and matching known_hosts, on
     # 2026-10-05.
     hostInventory.ssh.hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFy1R34T0MVD0LR0MxbCcNJphaG6KKjRSktwoPcgc/tW";
+    # Recover from hangs and panics on its own. Every boot from 2026-01-30 to
+    # 2026-11-20 but two ended without a shutdown: mostly silent freezes that
+    # stayed down until power-cycled by hand (once for 61 days). systemd pings
+    # the hardware watchdog (`intel_oc_wdt`, `/dev/watchdog0`; `iTCO_wdt` is the
+    # other), which resets the board if the CPU stops; a kernel that panics or
+    # finds a CPU locked up reboots itself. `hung_task_panic` stays off: slow
+    # I/O (rclone, network mounts) trips it without anything being wrong.
+    systemd.settings.Manager = {
+      RuntimeWatchdogSec = "30s";
+      RebootWatchdogSec = "10min";
+    };
+    boot.kernel.sysctl = {
+      "kernel.panic" = 10;
+      "kernel.panic_on_oops" = 1;
+      "kernel.softlockup_panic" = 1;
+      "kernel.hardlockup_panic" = 1;
+    };
     # Bootloader.
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = true;
