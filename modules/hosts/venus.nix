@@ -161,13 +161,11 @@
           keytab.owner = user.username;
         };
       };
-      tickets = {
-        # root's, for the mount; the session's, for Immich's agents.
-        immich-mount.principal = "immich";
-        immich = {
-          principal = "immich";
-          user = user.username;
-        };
+      # The GUI session's: it triggers the automounted share (tickets are per
+      # login session) and runs Immich.
+      tickets.immich = {
+        principal = "immich";
+        user = user.username;
       };
     };
     sops.secrets = {
@@ -179,6 +177,32 @@
     nfsClient = {
       enable = true;
       nfs4Domain = "yorganci.dev";
+      # The NAS's Immich share, mounted on first access with the GUI
+      # session's ticket. The server principal must be host-based
+      # (`nfs@host`): gssd reads `nfs/host@REALM` as service `nfs/host` at
+      # host `REALM`. `resvport` because the export refuses unprivileged
+      # ports; `nfc` for non-ASCII names.
+      automounts.immich = {
+        mountPoint = "/System/Volumes/Data/nas/immich";
+        source = "nas.local:/volume1/Immich";
+        options = [
+          "vers=4.1"
+          "sec=krb5"
+          "principal=immich@YORGANCI.DEV"
+          "sprincipal=nfs@nas.yorganci.dev"
+          "resvport"
+          "hard"
+          "intr"
+          "nfc"
+        ];
+      };
+    };
+    # Holds the Network Volumes grant for Immich's server.
+    tccLauncher.enable = true;
+    # Photos on the NAS share; database, queue and models on local disk.
+    services.immich = {
+      enable = true;
+      mediaLocation = config.nfsClient.automounts.immich.mountPoint;
     };
     # rclone remotes; credentials from `rclone/*` in `hosts/venus.yaml`.
     rclone.enable = true;
