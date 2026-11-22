@@ -30,6 +30,9 @@ in {
           postBuild = ''
             wrapProgram "$out/bin/${package.meta.mainProgram}" \
               --add-flag --zed --add-flag "/Applications/Nix Apps/Zed.app"
+            # nixpkgs names the CLI `zeditor` (Linux has an unrelated ZFS
+            # `zed`); on macOS also offer upstream's name.
+            ln -s ${package.meta.mainProgram} "$out/bin/zed"
           '';
           inherit (package) meta;
         }
