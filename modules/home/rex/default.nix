@@ -163,7 +163,26 @@
             terminalFontStyle = config.terminal.font.style;
             terminalPaddingX = config.terminal.padding.x;
             terminalPaddingY = config.terminal.padding.y;
+            activityGrouping = "priority";
+            paneHeaderVisibility = "onHover";
+            shellIconTheme = "default";
+            sidebarPosition = "left";
+            tabBarEdge = "top";
+            tabIconTintMode = "off";
+            tabStyle = "vertical";
+            toolbarBehavior = "onHover";
           };
+
+          rex.extraSettings = lib.mapAttrs (_: lib.mkDefault) (
+            {
+              # Keep session names as given instead of letting agents rename them.
+              "rex.agents.names-sessions" = false;
+            }
+            # SSH keys live in gpg-agent (YubiKey) wherever it serves SSH.
+            // lib.optionalAttrs (config.services.gpg-agent.enable && config.services.gpg-agent.enableSshSupport) {
+              "Workspace.sshAgentChoice" = "gpg-agent";
+            }
+          );
 
           targets.darwin.defaults."com.superlogical.rex" = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin (
             toDefaults "Workspace." cfg.settings
