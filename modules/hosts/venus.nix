@@ -145,6 +145,41 @@
     };
     # From `hosts/venus.yaml` in the secrets repository.
     sops.secrets."samba/${user.username}" = {};
+    # Loopback KDC minting venus's own tickets for the NAS's Kerberos NFS
+    # exports (`sec=krb5`). The NAS checks them with the keytab of
+    # nfs/nas.yorganci.dev, exported once with `sudo krb5-local-kadmin -q
+    # "ktadd -norandkey -k <file> nfs/nas.yorganci.dev"` and imported in DSM
+    # (File Services > NFS > Kerberos Settings), with immich@YORGANCI.DEV
+    # mapped to the DSM user immich.
+    kerberos = {
+      enable = true;
+      masterPasswordFile = config.sops.secrets."kerberos/master".path;
+      principals = {
+        "nfs/nas.yorganci.dev".passwordFile = config.sops.secrets."kerberos/nfs-nas".path;
+        immich = {
+          passwordFile = config.sops.secrets."kerberos/immich".path;
+          keytab.owner = user.username;
+        };
+      };
+      tickets = {
+        # root's, for the mount; the session's, for Immich's agents.
+        immich-mount.principal = "immich";
+        immich = {
+          principal = "immich";
+          user = user.username;
+        };
+      };
+    };
+    sops.secrets = {
+      "kerberos/master" = {};
+      "kerberos/nfs-nas" = {};
+      "kerberos/immich" = {};
+    };
+    # NFSv4 owners map through this domain; DSM's NFSv4 domain matches.
+    nfsClient = {
+      enable = true;
+      nfs4Domain = "yorganci.dev";
+    };
     # rclone remotes; credentials from `rclone/*` in `hosts/venus.yaml`.
     rclone.enable = true;
     # SSH
