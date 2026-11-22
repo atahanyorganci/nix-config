@@ -20,6 +20,8 @@
     gum.enable = true;
     node.enable = true;
     python.enable = true;
+    # Reached from sol with `rex -S ssh://venus`.
+    rex.server.enable = true;
     shell = {
       bash.enable = true;
       fish.enable = true;

@@ -23,6 +23,8 @@
     };
     gum.enable = true;
     python.enable = true;
+    # Reached from sol with `rex -S ssh://mercury`.
+    rex.server.enable = true;
     shell = {
       bash.enable = true;
       zsh.enable = true;
