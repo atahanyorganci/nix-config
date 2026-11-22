@@ -365,16 +365,20 @@
           fi
         '';
 
+        # `command`, not ProgramArguments: nix-darwin runs it after
+        # `/bin/wait4path /nix/store`. At boot launchd starts daemons before
+        # the Nix store volume is mounted, and a store path it cannot spawn
+        # fails with EX_CONFIG once and is never retried. The config path in
+        # the command makes nix-darwin reload the daemon whenever smb.conf
+        # changes; `exec` keeps smbd the process TCC grants access to.
+        launchd.daemons.samba-smbd.command = lib.escapeShellArgs [
+          smbd
+          "--foreground"
+          "--no-process-group"
+          "--configfile=${configFile}"
+        ];
         launchd.daemons.samba-smbd.serviceConfig = {
           Label = "org.samba.smbd";
-          # The config path in the arguments makes nix-darwin reload the
-          # daemon whenever smb.conf changes.
-          ProgramArguments = [
-            smbd
-            "--foreground"
-            "--no-process-group"
-            "--configfile=${configFile}"
-          ];
           RunAtLoad = true;
           KeepAlive = true;
           ThrottleInterval = 10;
