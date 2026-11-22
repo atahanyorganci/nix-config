@@ -19,7 +19,14 @@
     gum.enable = true;
     hunk.enable = true;
     python.enable = true;
-    rex.enable = true;
+    rex = {
+      enable = true;
+      server = {
+        enable = true;
+        startAtBoot = true;
+        extraArgs = ["--websocket-origin-pattern" "https://rex.superlogical.com"];
+      };
+    };
     shell = {
       bash.enable = true;
       fish.enable = true;
