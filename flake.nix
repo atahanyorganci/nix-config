@@ -99,6 +99,10 @@
       inputs.bun2nix.inputs.flake-parts.follows = "flake-parts";
       inputs.bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
     };
+    rex = {
+      url = "https://pkgs.superlogical.com/rex/nix/preview.tar.gz";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
   outputs = inputs:
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
