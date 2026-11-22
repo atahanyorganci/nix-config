@@ -66,6 +66,7 @@
           appearance = "dark";
           interfaceStyle = "useTheme";
           inactivePaneFadeMode = "none";
+          usesStandardInactiveWindowPaneStyles = false;
           terminalFontName = config.stylix.fonts.monospace.name;
           terminalFallbackFontNames = [config.stylix.fonts.emoji.name];
           terminalFontPointSize = config.terminal.font.size;
