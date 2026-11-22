@@ -40,6 +40,7 @@
           general.instance_name = "Search";
           search = {
             safe_search = 0;
+            default_lang = "en-US";
             formats = ["html" "json"];
           };
         };
