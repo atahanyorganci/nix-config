@@ -104,6 +104,11 @@
       port = 445;
       groups = ["Admin"];
     };
+    # Screen Sharing (VNC) over the mesh, for Admin devices: `vnc://venus`.
+    meshServices.screenSharing = {
+      port = 5900;
+      groups = ["Admin"];
+    };
     # SMB file sharing (replaces Apple's File Sharing)
     samba = {
       enable = true;
