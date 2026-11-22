@@ -7,9 +7,11 @@
     # GUI apps are installed system-wide (Home Manager's `copyApps` is off, see
     # `modules/darwin/system.nix`), so Rex.app goes into `/Applications/Nix
     # Apps` whenever any user enables `rex`. A user with `rex.server.enable`
-    # gets a launchd daemon that runs `rex server run` as that user from boot:
-    # a Home Manager launchd agent would only start at a GUI login, and the
-    # servers (venus) have no auto-login.
+    # (and the default `rex.server.startAtBoot`) gets a launchd daemon that
+    # runs `rex server run` as that user from boot: a Home Manager launchd
+    # agent would only start at a GUI login, and the servers (venus) have no
+    # auto-login. Without `startAtBoot` the Home Manager module runs it as an
+    # agent instead (see `launchd.agents.rex` below).
     darwin.rex = {
       config,
       lib,
@@ -17,46 +19,16 @@
       ...
     }: let
       users = config.home-manager.users or {};
-      servers = lib.filterAttrs (_: user: user.rex.server.enable or false) users;
+      servers = lib.filterAttrs (_: user: (user.rex.server.enable or false) && user.rex.server.startAtBoot) users;
     in {
       config = lib.mkMerge [
         (lib.mkIf (lib.any (user: user.rex.enable or false) (lib.attrValues users)) {
           environment.systemPackages = [pkgs.rex-app];
         })
         {
-          launchd.daemons = lib.mapAttrs' (name: user: let
-            cfg = user.rex.server;
-            home = user.home.homeDirectory;
-          in
+          launchd.daemons = lib.mapAttrs' (name: user:
             lib.nameValuePair "rex-${name}" {
-              serviceConfig = {
-                UserName = name;
-                ProgramArguments = [(lib.getExe cfg.package) "server" "run"] ++ cfg.extraArgs;
-                RunAtLoad = true;
-                KeepAlive = true;
-                # launchd gives daemons a bare environment. HOME is what Rex
-                # derives its socket from (~/Library/Application Support/rex/
-                # server.sock), which is where `ssh://` clients look for it.
-                EnvironmentVariables =
-                  cfg.environment
-                  // {
-                    HOME = home;
-                    USER = name;
-                    LOGNAME = name;
-                    PATH = lib.concatStringsSep ":" [
-                      "/etc/profiles/per-user/${name}/bin"
-                      "/run/current-system/sw/bin"
-                      "/nix/var/nix/profiles/default/bin"
-                      "/usr/local/bin"
-                      "/usr/bin"
-                      "/bin"
-                      "/usr/sbin"
-                      "/sbin"
-                    ];
-                  };
-                StandardOutPath = "${home}/Library/Logs/rex-server.log";
-                StandardErrorPath = "${home}/Library/Logs/rex-server.log";
-              };
+              serviceConfig = user.rex.server.launchdConfig // {UserName = name;};
             })
           servers;
         }
@@ -71,7 +43,7 @@
       lib,
       ...
     }: let
-      servers = lib.filterAttrs (_: user: user.rex.server.enable or false) (config.home-manager.users or {});
+      servers = lib.filterAttrs (_: user: (user.rex.server.enable or false) && user.rex.server.startAtBoot) (config.home-manager.users or {});
     in {
       config.users.users = lib.mapAttrs (_: _: {linger = true;}) servers;
     };
@@ -105,8 +77,26 @@
           enable = lib.mkEnableOption ''
             a long-running Rex server for this account, reachable from other
             machines with `rex -S ssh://HOST`. Runs as a systemd user service
-            with lingering on Linux and as a launchd daemon on macOS, from boot
+            on Linux and as a launchd job on macOS
           '';
+          startAtBoot = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = ''
+              Start the server at boot rather than at login: lingering on
+              Linux, a launchd daemon on macOS. Turn it off on a Mac used from
+              its own GUI login: the server then runs as a launchd agent in
+              the login session, so the shells it starts can use the
+              pasteboard, `open`, the Keychain and GUI pinentry, which a
+              daemon's background session cannot reach.
+            '';
+          };
+          launchdConfig = lib.mkOption {
+            type = lib.types.attrsOf lib.types.anything;
+            internal = true;
+            readOnly = true;
+            description = "launchd job for the server, shared by the daemon (`darwin.rex`) and the agent.";
+          };
           package = lib.mkOption {
             type = lib.types.package;
             default = pkgs.rex;
@@ -182,6 +172,11 @@
             // lib.optionalAttrs (config.services.gpg-agent.enable && config.services.gpg-agent.enableSshSupport) {
               "Workspace.sshAgentChoice" = "gpg-agent";
             }
+            # With a Nix-managed server, the app must not stop it to start
+            # its bundled one (launchd would bring ours straight back).
+            // lib.optionalAttrs cfg.server.enable {
+              "rex.server.automatic-restart-enabled" = false;
+            }
           );
 
           targets.darwin.defaults."com.superlogical.rex" = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin (
@@ -203,6 +198,43 @@
           rex.server.environment = lib.mapAttrs (_: lib.mkDefault) {
             TERMINFO_DIRS = "${cfg.server.package}/share/terminfo:";
             GODEBUG = "";
+          };
+
+          rex.server.launchdConfig = let
+            name = config.home.username;
+            home = config.home.homeDirectory;
+          in {
+            ProgramArguments = [(lib.getExe cfg.server.package) "server" "run"] ++ cfg.server.extraArgs;
+            RunAtLoad = true;
+            KeepAlive = true;
+            # launchd gives jobs a bare environment. HOME is what Rex derives
+            # its socket from (~/Library/Application Support/rex/server.sock),
+            # which is where `ssh://` clients and Rex.app look for it.
+            EnvironmentVariables =
+              cfg.server.environment
+              // {
+                HOME = home;
+                USER = name;
+                LOGNAME = name;
+                PATH = lib.concatStringsSep ":" [
+                  "/etc/profiles/per-user/${name}/bin"
+                  "/run/current-system/sw/bin"
+                  "/nix/var/nix/profiles/default/bin"
+                  "/usr/local/bin"
+                  "/usr/bin"
+                  "/bin"
+                  "/usr/sbin"
+                  "/sbin"
+                ];
+              };
+            StandardOutPath = "${home}/Library/Logs/rex-server.log";
+            StandardErrorPath = "${home}/Library/Logs/rex-server.log";
+          };
+
+          # macOS without `startAtBoot`: an agent in the GUI login session.
+          launchd.agents.rex = lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && !cfg.server.startAtBoot) {
+            enable = true;
+            config = cfg.server.launchdConfig;
           };
 
           # On Linux the server is a systemd user service; `nixos.rex` turns on
