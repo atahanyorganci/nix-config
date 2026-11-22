@@ -203,6 +203,23 @@
     services.immich = {
       enable = true;
       mediaLocation = config.nfsClient.automounts.immich.mountPoint;
+      # Authelia only: password sign-in is off, Admin members are admins.
+      oidc = {
+        enable = true;
+        publicUrl = "https://photos.yorganci.dev";
+        groups = ["Admin" "User"];
+      };
+    };
+    # Public through the NetBird proxy, like Jellyfin's `watch`; Immich signs
+    # people in itself, so the apps and API keys keep working.
+    httpServices.photos = {
+      port = config.services.immich.port;
+      expose = {
+        enable = true;
+        private = false;
+        accessGroups = ["Admin" "User"];
+      };
+      auth.type = "none";
     };
     # rclone remotes; credentials from `rclone/*` in `hosts/venus.yaml`.
     rclone.enable = true;
