@@ -1,11 +1,9 @@
 # Samba for macOS hosts.
 #
-# - Install names: nixpkgs' Darwin `postFixup` only rewrites library
-#   references under `/private/tmp/`, the old build directory. Nix now builds
-#   under `/nix/var/nix/builds/`, so every binary kept pointing at the deleted
-#   build tree and `smbd` aborted in dyld. Rewrite any reference outside the
-#   store or the OS instead, also in `libexec/samba` (the RPC helpers smbd
-#   spawns) and the Python modules, and fail the build if one survives.
+# - Install names: nixpkgs' Darwin `postFixup` rewrites library references
+#   that point into the build tree (`$NIX_BUILD_TOP`), including the RPC
+#   helpers in `libexec/samba` and the Python modules. A reference it misses
+#   leaves `smbd` aborting in dyld, so the build fails if one survives.
 # - Bonjour: `smbd/dnsregister.c` already speaks Apple's DNS-SD API, but no
 #   configure check enables it since the autotools build was dropped. The
 #   patch enables it on Darwin and extends it to what `avahi_register.c`
@@ -15,7 +13,7 @@
 #
 # Linux keeps the stock package (and its binary cache).
 {
-  flake.overlays.samba = final: prev: {
+  flake.overlays.samba = _final: prev: {
     samba =
       if !prev.stdenv.hostPlatform.isDarwin
       then prev.samba
@@ -23,26 +21,11 @@
         prev.samba.overrideAttrs (old: {
           patches = (old.patches or []) ++ [./dnssd-bonjour-registration.patch];
 
+          # Upstream does the rewriting; this only proves it left nothing
+          # pointing outside the store or the OS.
           postFixup =
-            (
-              let
-                upstream = "grep /private/tmp/";
-              in
-                assert final.lib.assertMsg (final.lib.hasInfix upstream old.postFixup)
-                "samba overlay: upstream postFixup changed, revisit the install-name fix";
-                  builtins.replaceStrings [upstream] [
-                    # Everything but the store, the OS and relative (@rpath)
-                    # references is a leftover from the build tree.
-                    "grep -vE '^[[:space:]]*(/nix/store/|/usr/lib/|/System/|@)'"
-                  ]
-                  old.postFixup
-            )
+            old.postFixup
             + ''
-              # Upstream only fixes `*.dylib` and `bin/`, missing the RPC helpers
-              # smbd spawns from `libexec/samba` and the Python `*.so` modules.
-              find "$out/libexec" "$out/lib" -type f \( -path '*/libexec/*' -o -name '*.so' \) \
-                -exec $SHELL -c "$SCRIPT" \;
-
               unresolved=0
               while IFS= read -r -d "" file; do
                 refs="$(otool -L "$file" 2>/dev/null | awk 'NR > 1 { print $1 }' \
