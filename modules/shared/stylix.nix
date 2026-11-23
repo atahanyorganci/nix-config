@@ -66,12 +66,19 @@
     # Import it here, switched off, so those options exist and do nothing.
     # Overlays stay off as Stylix itself does under `useGlobalPkgs`.
     home-manager = lib.optionalAttrs (options ? home-manager) {
-      sharedModules = lib.mkIf config.headless [
-        config.stylix.homeManagerIntegration.module
-        {
-          stylix.enable = false;
-          stylix.overlays.enable = false;
-        }
+      sharedModules = lib.mkMerge [
+        (lib.mkIf config.headless [
+          config.stylix.homeManagerIntegration.module
+          {
+            stylix.enable = false;
+            stylix.overlays.enable = false;
+          }
+        ])
+        # Home Manager removed `programs.wayprompt` (nixpkgs dropped the
+        # package) and asserts against any definition, but Stylix's wayprompt
+        # target still sets it. Off, the target defines nothing. Drop this
+        # once Stylix removes the target.
+        [{stylix.targets.wayprompt.enable = false;}]
       ];
     };
 
