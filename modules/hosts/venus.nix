@@ -5,11 +5,15 @@
 }: let
   user = config.flake.me;
   # NFS shares on the NAS, mounted on first access with the GUI session's
-  # ticket. The server principal must be host-based (`nfs@host`): gssd reads
+  # ticket. NFSv3, not 4.1: under Immich's concurrent jobs macOS's NFSv4.1
+  # client deadlocked twice waiting for a session slot (`nfs41_sequence_set`)
+  # after a run of OLD_STATEID and EACCES errors, hanging every process on
+  # the share until a reboot; v3 keeps no session or open state to lose.
+  # The server principal must be host-based (`nfs@host`): gssd reads
   # `nfs/host@REALM` as service `nfs/host` at host `REALM`. `resvport`
   # because the exports refuse unprivileged ports; `nfc` for non-ASCII names.
   nasOptions = [
-    "vers=4.1"
+    "vers=3"
     "sec=krb5"
     "principal=immich@YORGANCI.DEV"
     "sprincipal=nfs@nas.yorganci.dev"
