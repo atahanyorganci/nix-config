@@ -4,6 +4,20 @@
   ...
 }: let
   user = config.flake.me;
+  # NFS shares on the NAS, mounted on first access with the GUI session's
+  # ticket. The server principal must be host-based (`nfs@host`): gssd reads
+  # `nfs/host@REALM` as service `nfs/host` at host `REALM`. `resvport`
+  # because the exports refuse unprivileged ports; `nfc` for non-ASCII names.
+  nasOptions = [
+    "vers=4.1"
+    "sec=krb5"
+    "principal=immich@YORGANCI.DEV"
+    "sprincipal=nfs@nas.yorganci.dev"
+    "resvport"
+    "hard"
+    "intr"
+    "nfc"
+  ];
   venusHomeConfiguration = {user, ...}: {
     agents.enable = true;
     # Public keys + gpg CLI; no local agent (use forwarded YubiKey from sol).
@@ -177,24 +191,18 @@
     nfsClient = {
       enable = true;
       nfs4Domain = "yorganci.dev";
-      # The NAS's Immich share, mounted on first access with the GUI
-      # session's ticket. The server principal must be host-based
-      # (`nfs@host`): gssd reads `nfs/host@REALM` as service `nfs/host` at
-      # host `REALM`. `resvport` because the export refuses unprivileged
-      # ports; `nfc` for non-ASCII names.
+      # Immich's library: originals, thumbnails, database dumps.
       automounts.immich = {
         mountPoint = "/System/Volumes/Data/nas/immich";
         source = "nas.local:/volume1/Immich";
-        options = [
-          "vers=4.1"
-          "sec=krb5"
-          "principal=immich@YORGANCI.DEV"
-          "sprincipal=nfs@nas.yorganci.dev"
-          "resvport"
-          "hard"
-          "intr"
-          "nfc"
-        ];
+        options = nasOptions;
+      };
+      # The family photo archive, read in place by Immich external
+      # libraries; read-only, so nothing on this side can change it.
+      automounts.media = {
+        mountPoint = "/System/Volumes/Data/nas/media";
+        source = "nas.local:/volume1/Media";
+        options = ["ro"] ++ nasOptions;
       };
     };
     # Holds the Network Volumes grant for Immich's server.
