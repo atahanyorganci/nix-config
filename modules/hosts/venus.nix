@@ -209,6 +209,22 @@
         publicUrl = "https://photos.yorganci.dev";
         groups = ["Admin" "User"];
       };
+      settings = {
+        # Originals under library/<storage label>/<year>/<date>/ rather than
+        # upload/<user id>/ with random names.
+        storageTemplate = {
+          enabled = true;
+          template = "{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}";
+        };
+        # Phones record HEVC; play it as recorded instead of transcoding it
+        # to H.264 on the CPU (Immich has no VideoToolbox encoder). Browsers
+        # without HEVC, such as Firefox on Linux, cannot play those videos.
+        ffmpeg.acceptedVideoCodecs = ["h264" "hevc"];
+        # Smart search in English and Turkish: Pareto-optimal for both in
+        # Immich's model benchmarks, at about 2.8 GiB while loaded.
+        machineLearning.clip.modelName = "ViT-L-16-SigLIP2-256__webli";
+        job.thumbnailGeneration.concurrency = 4;
+      };
     };
     # Public through the NetBird proxy, like Jellyfin's `watch`; Immich signs
     # people in itself, so the apps and API keys keep working.
