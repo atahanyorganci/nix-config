@@ -692,6 +692,21 @@
         "type": "github"
       }
     },
+    "multiverse": {
+      "locked": {
+        "lastModified": 1795306312,
+        "narHash": "sha256-h9PovMmNg0PbMhqLQngodlbqiWbBUdx6cbBBS7UsS1g=",
+        "owner": "fzakaria",
+        "repo": "nixpkgs-multiverse",
+        "rev": "e667ced20d0b06493b66f8bbbec4cc52ee995b81",
+        "type": "github"
+      },
+      "original": {
+        "owner": "fzakaria",
+        "repo": "nixpkgs-multiverse",
+        "type": "github"
+      }
+    },
     "nix": {
       "inputs": {
         "bdwgc": "bdwgc",
@@ -1053,6 +1068,7 @@
         "home-manager": "home-manager",
         "hunk": "hunk",
         "import-tree": "import-tree",
+        "multiverse": "multiverse",
         "nix-casks": "nix-casks",
         "nix-darwin": "nix-darwin",
         "nixos-anywhere": "nixos-anywhere",
