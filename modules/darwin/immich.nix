@@ -336,6 +336,15 @@
           default = 3003;
           description = "Loopback port of the machine-learning service.";
         };
+        environment = mkOption {
+          type = types.attrsOf types.str;
+          default = {};
+          example = {MACHINE_LEARNING_REQUEST_THREADS = "4";};
+          description = ''
+            Extra environment for the machine-learning service: its
+            `MACHINE_LEARNING_*` settings (model TTL, threads, memory arena).
+          '';
+        };
       };
     };
 
@@ -445,12 +454,14 @@
         }
         // optionalAttrs cfg.machineLearning.enable {
           immich-ml = agent "ml" ["${getExe cfg.package.machine-learning}"] {
-            EnvironmentVariables = {
-              IMMICH_HOST = "127.0.0.1";
-              IMMICH_PORT = toString cfg.machineLearning.port;
-              MACHINE_LEARNING_CACHE_FOLDER = "${cfg.cacheDir}/ml";
-              XDG_CACHE_HOME = "${cfg.cacheDir}/ml";
-            };
+            EnvironmentVariables =
+              {
+                IMMICH_HOST = "127.0.0.1";
+                IMMICH_PORT = toString cfg.machineLearning.port;
+                MACHINE_LEARNING_CACHE_FOLDER = "${cfg.cacheDir}/ml";
+                XDG_CACHE_HOME = "${cfg.cacheDir}/ml";
+              }
+              // cfg.machineLearning.environment;
           };
         };
     };
