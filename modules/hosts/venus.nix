@@ -242,6 +242,15 @@
         machineLearning.clip.modelName = "ViT-L-16-SigLIP2-256__webli";
         job.thumbnailGeneration.concurrency = 4;
       };
+      # Under a 115k-asset backlog the service grew to ~15 GiB and pushed this
+      # 16 GiB Mac deep into swap. Without ONNX Runtime's CPU arena, memory
+      # is returned after each request instead of pooled per input shape, and
+      # four request threads (default: one per core) bound how many images
+      # are in flight at once.
+      machineLearning.environment = {
+        MACHINE_LEARNING_MODEL_ARENA = "false";
+        MACHINE_LEARNING_REQUEST_THREADS = "4";
+      };
     };
     # Public through the NetBird proxy, like Jellyfin's `watch`; Immich signs
     # people in itself, so the apps and API keys keep working.
