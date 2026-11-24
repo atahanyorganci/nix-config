@@ -12,8 +12,13 @@
   # The server principal must be host-based (`nfs@host`): gssd reads
   # `nfs/host@REALM` as service `nfs/host` at host `REALM`. `resvport`
   # because the exports refuse unprivileged ports; `nfc` for non-ASCII names.
+  # 256 KiB transfers, the most DSM accepts (it clamps larger requests):
+  # against macOS's default 32 KiB, sequential writes went from 62 to 115
+  # MB/s (the gigabit link) and eight parallel 3 MB writes from 44 to 69 MB/s.
   nasOptions = [
     "vers=3"
+    "rsize=262144"
+    "wsize=262144"
     "sec=krb5"
     "principal=immich@YORGANCI.DEV"
     "sprincipal=nfs@nas.yorganci.dev"
