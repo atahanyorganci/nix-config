@@ -44,6 +44,10 @@ in {
         value = "1048576";
       }
     ];
+    # Run generic-Linux binaries (bun, workerd, fallow, sharp's add-on from npm)
+    # through a real `/lib64/ld-linux-x86-64.so.2`, so dev shells work without
+    # patchelf; the default library set covers libstdc++, zlib and openssl.
+    programs.nix-ld.enable = true;
     systemd.settings.Manager.DefaultLimitNOFILE = "1048576";
     system.stateVersion = "26.05";
     users.users.${user.username} = {
