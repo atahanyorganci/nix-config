@@ -241,8 +241,9 @@
         # Immich's model benchmarks, at about 2.8 GiB while loaded.
         machineLearning.clip.modelName = "ViT-L-16-SigLIP2-256__webli";
         # Throttled at four, thumbnails ran at ~48/minute with ten cores
-        # idle behind them.
-        job.thumbnailGeneration.concurrency = 8;
+        # idle behind them; sixteen is double the cores, because each job
+        # spends most of its time waiting on the NAS.
+        job.thumbnailGeneration.concurrency = 16;
       };
       # Backlog tuning, measured: inference is fast warm (0.45 s for the
       # search model, 0.13 s for face detection) but the first request after
