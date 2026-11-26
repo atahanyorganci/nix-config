@@ -240,21 +240,31 @@
         # Smart search in English and Turkish: Pareto-optimal for both in
         # Immich's model benchmarks, at about 2.8 GiB while loaded.
         machineLearning.clip.modelName = "ViT-L-16-SigLIP2-256__webli";
-        # Throttled at four, thumbnails ran at ~48/minute with ten cores
-        # idle behind them; sixteen is double the cores, because each job
-        # spends most of its time waiting on the NAS.
-        job.thumbnailGeneration.concurrency = 16;
+        # sharp decodes at most UV_THREADPOOL_SIZE images at once (below);
+        # more jobs than that only wait for a thread.
+        job.thumbnailGeneration.concurrency = 8;
       };
+      # libuv's pool (default 4) runs sharp's decodes and every fs call, so
+      # with four thumbnails in flight the other queues' file reads waited
+      # behind them.
+      environment.UV_THREADPOOL_SIZE = "8";
       # Backlog tuning, measured: inference is fast warm (0.45 s for the
       # search model, 0.13 s for face detection) but the first request after
       # a load pays a CoreML compile of 5-20 s. Immich unloads models after
       # five idle minutes by default, and with several queues alternating
       # that cost was paid over and over, which is what pinned throughput at
-      # ~50 assets/minute. Keep them resident; the arena is Immich's default
-      # (it halved the compile cost when measured, 9.7 s vs 18.5 s).
+      # ~50 assets/minute. Keep them resident.
+      #
+      # Resident, though, every graph keeps its own CPU arena, and on CoreML
+      # OCR compiles one graph per input shape (detection canvases, and each
+      # recognition width at batch 1 and 6): with the arena on, 18 graphs
+      # held 13 GiB, swapped this 16 GiB Mac and paged Valkey out. No arena,
+      # recognition at batch 1 only (half the graphs), four request threads.
       machineLearning.environment = {
         MACHINE_LEARNING_MODEL_TTL = "0";
-        MACHINE_LEARNING_REQUEST_THREADS = "6";
+        MACHINE_LEARNING_MODEL_ARENA = "false";
+        MACHINE_LEARNING_MAX_BATCH_SIZE__OCR = "1";
+        MACHINE_LEARNING_REQUEST_THREADS = "4";
       };
     };
     # Public through the NetBird proxy, like Jellyfin's `watch`; Immich signs
