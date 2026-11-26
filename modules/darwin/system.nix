@@ -36,7 +36,15 @@
         notion
         responsively
       ];
-      launchd.limits.maxfiles = 65536;
+      # launchd's default soft limit on open files is 256, inherited by every
+      # job; nix-darwin has no option for `launchctl limit`, so a boot-time
+      # daemon sets it (the hard limit stays unlimited).
+      launchd.daemons.limit-maxfiles.serviceConfig = {
+        Label = "dev.yorganci.limit.maxfiles";
+        ProgramArguments = ["/bin/launchctl" "limit" "maxfiles" "65536" "unlimited"];
+        RunAtLoad = true;
+        LaunchOnlyOnce = true;
+      };
       system.defaults = {
         NSGlobalDomain."com.apple.trackpad.enableSecondaryClick" = true;
         dock = {
