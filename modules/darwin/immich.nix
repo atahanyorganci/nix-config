@@ -15,6 +15,13 @@
 # mount `sec=krb5` NFS shares, and macOS can ask that session for privacy
 # grants. The user must therefore be logged in (as for the other services).
 #
+# They run as `Interactive` jobs (`processType`), not `Background`: launchd
+# runs background jobs at priority 4, which on Apple Silicon keeps them on the
+# efficiency cores at their lowest clock. Measured on an M4 under Immich's
+# backlog, the efficiency cluster sat at 100% and ~1.1 GHz with the
+# performance cluster idle, and Immich's ffmpeg encoded 900 1080p frames in
+# 12.6 s as a background job against 1.9 s otherwise.
+#
 # Sign-in through the flake's Authelia (`oidc`): Immich's OAuth settings,
 # with the client secret injected into its config when the server starts
 # (never in the store), and the client registered with Authelia. A fresh
@@ -162,7 +169,7 @@
           RunAtLoad = true;
           KeepAlive = true;
           ThrottleInterval = 10;
-          ProcessType = "Background";
+          ProcessType = cfg.processType;
           StandardOutPath = "${cfg.logDir}/${name}.log";
           StandardErrorPath = "${cfg.logDir}/${name}.log";
         }
@@ -183,6 +190,17 @@
         type = types.bool;
         default = true;
         description = "Start the server only once `mediaLocation` is a mounted NFS share.";
+      };
+
+      processType = mkOption {
+        type = types.enum ["Background" "Standard" "Adaptive" "Interactive"];
+        default = "Interactive";
+        description = ''
+          launchd `ProcessType` of the server, machine learning, Postgres and
+          Valkey. `Background` confines them to the efficiency cores at their
+          lowest clock and throttles their I/O; `Interactive` applies no
+          limits, as for apps.
+        '';
       };
 
       host = mkOption {
@@ -449,6 +467,8 @@
           immich-bootstrap = agent "bootstrap" ["${bootstrap}"] {
             # Retries until it has created the admin or found one.
             KeepAlive.SuccessfulExit = false;
+            # A few curl calls: no reason to compete with the rest.
+            ProcessType = "Background";
             ThrottleInterval = 30;
           };
         }
