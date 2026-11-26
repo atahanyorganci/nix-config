@@ -240,16 +240,20 @@
         # Smart search in English and Turkish: Pareto-optimal for both in
         # Immich's model benchmarks, at about 2.8 GiB while loaded.
         machineLearning.clip.modelName = "ViT-L-16-SigLIP2-256__webli";
-        job.thumbnailGeneration.concurrency = 4;
+        # Throttled at four, thumbnails ran at ~48/minute with ten cores
+        # idle behind them.
+        job.thumbnailGeneration.concurrency = 8;
       };
-      # Under a 115k-asset backlog the service grew to ~15 GiB and pushed this
-      # 16 GiB Mac deep into swap. Without ONNX Runtime's CPU arena, memory
-      # is returned after each request instead of pooled per input shape, and
-      # four request threads (default: one per core) bound how many images
-      # are in flight at once.
+      # Backlog tuning, measured: inference is fast warm (0.45 s for the
+      # search model, 0.13 s for face detection) but the first request after
+      # a load pays a CoreML compile of 5-20 s. Immich unloads models after
+      # five idle minutes by default, and with several queues alternating
+      # that cost was paid over and over, which is what pinned throughput at
+      # ~50 assets/minute. Keep them resident; the arena is Immich's default
+      # (it halved the compile cost when measured, 9.7 s vs 18.5 s).
       machineLearning.environment = {
-        MACHINE_LEARNING_MODEL_ARENA = "false";
-        MACHINE_LEARNING_REQUEST_THREADS = "4";
+        MACHINE_LEARNING_MODEL_TTL = "0";
+        MACHINE_LEARNING_REQUEST_THREADS = "6";
       };
     };
     # Public through the NetBird proxy, like Jellyfin's `watch`; Immich signs
