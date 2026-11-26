@@ -36,6 +36,7 @@
         notion
         responsively
       ];
+      launchd.limits.maxfiles = 65536;
       system.defaults = {
         NSGlobalDomain."com.apple.trackpad.enableSecondaryClick" = true;
         dock = {
